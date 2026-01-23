@@ -1,37 +1,48 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ServiceStatus, Project } from '@/types'
+import { healthApi, projectsApi } from '@/api'
 
-// 模拟数据 - 后续替换为 API 调用
-const mockServiceStatus: ServiceStatus = {
+const defaultStatus: ServiceStatus = {
   llm: { connected: false, type: 'ollama', url: 'localhost:11434' },
-  comfyui: { connected: false, url: 'localhost:8188' },
+  comfyui: { connected: false, url: 'localhost:8000' },
   flux2Loaded: false,
   ltx2Loaded: false,
 }
 
 export function HomePage() {
   const navigate = useNavigate()
-  const [status, setStatus] = useState<ServiceStatus>(mockServiceStatus)
+  const [status, setStatus] = useState<ServiceStatus>(defaultStatus)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const checkServices = async () => {
     setLoading(true)
-    // TODO: 调用 /api/health 获取真实状态
-    setTimeout(() => {
-      setStatus({
-        llm: { connected: true, type: 'ollama', url: 'localhost:11434' },
-        comfyui: { connected: true, url: 'localhost:8188' },
-        flux2Loaded: true,
-        ltx2Loaded: true,
-      })
+    setError(null)
+    try {
+      const response = await healthApi.check()
+      setStatus(response.services)
+    } catch (err) {
+      setError('无法连接后端服务')
+      console.error('Health check failed:', err)
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
+  }
+
+  const loadProjects = async () => {
+    try {
+      const response = await projectsApi.list()
+      setRecentProjects(response.projects.slice(0, 5))
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+    }
   }
 
   useEffect(() => {
     checkServices()
+    loadProjects()
   }, [])
 
   const StatusCard = ({
@@ -52,6 +63,14 @@ export function HomePage() {
       {detail && <div className="text-xs text-gray-400 mt-1">{detail}</div>}
     </div>
   )
+
+  const statusLabels: Record<string, string> = {
+    draft: '草稿',
+    analyzing: '分析中',
+    analyzed: '已分析',
+    generating: '生成中',
+    completed: '已完成',
+  }
 
   return (
     <div className="space-y-6">
@@ -74,16 +93,22 @@ export function HomePage() {
           </button>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatusCard
             label="LLM服务"
             connected={status.llm.connected}
-            detail={`${status.llm.type} :${status.llm.url.split(':')[1]}`}
+            detail={`${status.llm.type} :${status.llm.url.split(':').pop()}`}
           />
           <StatusCard
             label="ComfyUI"
             connected={status.comfyui.connected}
-            detail={`:${status.comfyui.url.split(':')[1]}`}
+            detail={`:${status.comfyui.url.split(':').pop()}`}
           />
           <StatusCard label="FLUX2" connected={status.flux2Loaded} />
           <StatusCard label="LTX2" connected={status.ltx2Loaded} />
@@ -117,13 +142,16 @@ export function HomePage() {
             {recentProjects.map((project) => (
               <div
                 key={project.id}
+                onClick={() => navigate(`/analysis?project=${project.id}`)}
                 className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <span>📁</span>
                   <span className="font-medium">{project.name}</span>
                 </div>
-                <span className="text-sm text-gray-500">{project.status}</span>
+                <span className="text-sm text-gray-500">
+                  {statusLabels[project.status] || project.status}
+                </span>
               </div>
             ))}
           </div>
