@@ -37,9 +37,10 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
 # 静态文件服务 (用于访问生成的图像/视频)
+# 注意: 挂载静态文件会捕获所有匹配路径，需要放在路由之后
 data_dir = settings.DATA_DIR / "projects"
-if data_dir.exists():
-    app.mount("/files", StaticFiles(directory=str(data_dir)), name="files")
+data_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/files", StaticFiles(directory=str(data_dir), check_dir=False), name="files")
 
 
 @app.get("/")

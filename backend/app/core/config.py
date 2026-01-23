@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "qwen2.5:14b"
 
     # ComfyUI 配置
-    COMFYUI_URL: str = "http://localhost:8188"
+    COMFYUI_URL: str = "http://localhost:8000"
 
     # 存储配置
     DATA_DIR: Path = Path("./data")
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # 服务配置
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 8001
 
     class Config:
         env_file = ".env"

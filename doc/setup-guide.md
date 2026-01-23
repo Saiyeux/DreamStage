@@ -73,7 +73,7 @@ python main.py --listen  # 默认端口 8188
 | 服务 | 端口 |
 |------|------|
 | Frontend (Vite) | 5173 |
-| Backend (FastAPI) | 8000 |
+| Backend (FastAPI) | 8001 |
 | Ollama | 11434 |
 | LM Studio | 1234 |
-| ComfyUI | 8188 |
+| ComfyUI | 8000 |
