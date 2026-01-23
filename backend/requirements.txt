@@ -20,5 +20,8 @@ pydantic-settings>=2.5.0
 # File Upload
 python-multipart>=0.0.12
 
+# PDF Parsing
+pypdf>=4.0.0
+
 # Utilities
 python-dotenv>=1.0.0
