@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+*.local
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build outputs
+frontend/dist/
+
+# Data (项目运行时生成)
+data/
+
+# Cache
+.cache/
+.npm/
+.eslintcache
