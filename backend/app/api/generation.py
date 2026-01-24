@@ -208,3 +208,12 @@ async def generate_all_videos(
     )
 
     return TaskResponse(task_id=task_id, message="Video generation started")
+
+
+# ============ 任务状态查询 ============
+
+@router.get("/tasks/{task_id}/status")
+async def get_task_status(task_id: str):
+    """获取任务状态"""
+    status = generation_tasks.get_task_status(task_id)
+    return status

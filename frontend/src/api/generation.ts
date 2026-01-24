@@ -5,7 +5,19 @@ interface TaskResponse {
   message: string
 }
 
+interface TaskStatus {
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'unknown'
+  progress: number
+  message: string
+  result?: unknown
+  error?: string
+}
+
 export const generationApi = {
+  // 查询任务状态
+  getTaskStatus: (taskId: string) =>
+    api.get<TaskStatus>(`/projects/tasks/${taskId}/status`),
+
   // 生成单个角色图像
   generateCharacterImages: (
     projectId: string,

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
-import { projectsApi, analysisApi } from '@/api'
+import { projectsApi, analysisApi, generationApi } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
 
 type Tab = 'characters' | 'scenes' | 'videos'
@@ -151,12 +151,14 @@ export function GenerationCenterPage() {
         <div className="p-6">
           {activeTab === 'characters' && (
             <CharacterLibraryTab
+              projectId={projectId}
               characters={characters}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
             />
           )}
           {activeTab === 'scenes' && (
             <SceneImageTab
+              projectId={projectId}
               scenes={scenes}
               hasCharacterLibrary={hasCharacterLibrary}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
@@ -164,6 +166,7 @@ export function GenerationCenterPage() {
           )}
           {activeTab === 'videos' && (
             <VideoGenerationTab
+              projectId={projectId}
               scenes={scenes}
               hasSceneImages={hasSceneImages}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
@@ -179,14 +182,28 @@ export function GenerationCenterPage() {
 const CHARACTER_IMAGE_TYPES = ['正面', '侧面', '微笑', '惊讶', '思考']
 
 function CharacterLibraryTab({
+  projectId,
   characters,
   onNavigateAnalysis,
 }: {
+  projectId: string
   characters: Character[]
   onNavigateAnalysis: () => void
 }) {
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const pollingRef = useRef<number | null>(null)
+
+  // 清理轮询
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [])
 
   // 空状态
   if (characters.length === 0) {
@@ -222,18 +239,40 @@ function CharacterLibraryTab({
     )
   }
 
-  const startGeneration = () => {
+  const startGeneration = async () => {
     setGenerating(true)
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval)
-          setGenerating(false)
-          return 100
+    setProgress(0)
+    setError(null)
+    setStatusMessage('正在启动生成任务...')
+
+    try {
+      const response = await generationApi.generateCharacterLibrary(projectId)
+      const taskId = response.task_id
+
+      // 轮询任务状态
+      pollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await generationApi.getTaskStatus(taskId)
+          setProgress(status.progress)
+          setStatusMessage(status.message)
+
+          if (status.status === 'completed') {
+            setGenerating(false)
+            if (pollingRef.current) clearInterval(pollingRef.current)
+          } else if (status.status === 'failed') {
+            setGenerating(false)
+            setError(status.error || '生成失败')
+            if (pollingRef.current) clearInterval(pollingRef.current)
+          }
+        } catch (err) {
+          console.error('Poll status failed:', err)
         }
-        return p + 10
-      })
-    }, 500)
+      }, 1000)
+    } catch (err) {
+      setGenerating(false)
+      setError('启动任务失败，请检查 ComfyUI 服务')
+      console.error('Start generation failed:', err)
+    }
   }
 
   return (
@@ -241,16 +280,22 @@ function CharacterLibraryTab({
       {/* Status Bar */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm text-gray-600">
-          {generating ? `🔄 生成中 (${progress}%)` : '⏸️ 待开始'}
+          {generating ? `🔄 ${statusMessage} (${progress}%)` : '⏸️ 待开始'}
         </div>
         <button
           onClick={startGeneration}
           disabled={generating}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600"
         >
-          {generating ? '⏸️ 暂停' : '▶️ 开始生成'}
+          {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+          ❌ {error}
+        </div>
+      )}
 
       {generating && (
         <div className="h-2 bg-gray-200 rounded-full mb-6">
@@ -266,10 +311,9 @@ function CharacterLibraryTab({
         {characters.map((character) => (
           <CharacterGenerationCard
             key={character.id}
-            name={character.name}
-            role={character.roleType}
-            status="pending"
-            images={0}
+            character={character}
+            status={character.images && character.images.length > 0 ? 'completed' : 'pending'}
+            images={character.images?.length || 0}
           />
         ))}
       </div>
@@ -282,14 +326,12 @@ function CharacterLibraryTab({
 }
 
 function CharacterGenerationCard({
-  name,
-  role,
+  character,
   status,
   images,
   progress,
 }: {
-  name: string
-  role: string
+  character: Character
   status: 'pending' | 'generating' | 'completed'
   images: number
   progress?: number
@@ -300,12 +342,15 @@ function CharacterGenerationCard({
     completed: '✅ 完成',
   }
 
+  const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
+
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
-        <div>
-          <span className="font-medium">{name}</span>
-          <span className="text-sm text-gray-500 ml-2">({role})</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{avatar}</span>
+          <span className="font-medium">{character.name}</span>
+          <span className="text-sm text-gray-500">({character.roleType})</span>
         </div>
         <span className="text-sm">{statusLabel[status]}</span>
       </div>
@@ -351,17 +396,30 @@ function CharacterGenerationCard({
 }
 
 function SceneImageTab({
+  projectId,
   scenes,
   hasCharacterLibrary,
   onNavigateAnalysis,
 }: {
+  projectId: string
   scenes: Scene[]
   hasCharacterLibrary: boolean
   onNavigateAnalysis: () => void
 }) {
   const [currentScene, setCurrentScene] = useState(1)
+  const [generating, setGenerating] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const pollingRef = useRef<number | null>(null)
+
   const totalScenes = scenes.length
-  const completedScenes = 0
+  const completedScenes = scenes.filter(s => s.sceneImage).length
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [])
 
   // 空状态
   if (scenes.length === 0) {
@@ -380,6 +438,35 @@ function SceneImageTab({
     )
   }
 
+  const startGeneration = async () => {
+    setGenerating(true)
+    setProgress(0)
+    setError(null)
+
+    try {
+      const response = await generationApi.generateAllSceneImages(projectId)
+      const taskId = response.task_id
+
+      pollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await generationApi.getTaskStatus(taskId)
+          setProgress(status.progress)
+
+          if (status.status === 'completed' || status.status === 'failed') {
+            setGenerating(false)
+            if (status.status === 'failed') setError(status.error || '生成失败')
+            if (pollingRef.current) clearInterval(pollingRef.current)
+          }
+        } catch (err) {
+          console.error('Poll status failed:', err)
+        }
+      }, 1000)
+    } catch (err) {
+      setGenerating(false)
+      setError('启动任务失败')
+    }
+  }
+
   return (
     <div>
       {/* Status Bar */}
@@ -391,16 +478,23 @@ function SceneImageTab({
             <span className="text-orange-500">⚠️ 前置条件: 请先生成角色库</span>
           )}
           <span className="ml-4 text-gray-600">
-            {completedScenes > 0 ? `🔄 进行中 (${completedScenes}/${totalScenes})` : '⏸️ 待开始'}
+            {generating ? `🔄 生成中 (${progress}%)` : completedScenes > 0 ? `✅ ${completedScenes}/${totalScenes}` : '⏸️ 待开始'}
           </span>
         </div>
         <button
-          disabled={!hasCharacterLibrary}
+          onClick={startGeneration}
+          disabled={!hasCharacterLibrary || generating}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
         >
-          ▶️ 开始生成
+          {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+          ❌ {error}
+        </div>
+      )}
 
       {totalScenes > 0 && (
         <div className="h-2 bg-gray-200 rounded-full mb-6">
@@ -469,17 +563,30 @@ function SceneImageTab({
 }
 
 function VideoGenerationTab({
+  projectId,
   scenes,
   hasSceneImages,
   onNavigateAnalysis,
 }: {
+  projectId: string
   scenes: Scene[]
   hasSceneImages: boolean
   onNavigateAnalysis: () => void
 }) {
   const [currentScene, setCurrentScene] = useState(1)
+  const [generating, setGenerating] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const pollingRef = useRef<number | null>(null)
+
   const totalScenes = scenes.length
-  const completedVideos = 0
+  const completedVideos = scenes.filter(s => s.videoClip).length
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [])
 
   // 空状态
   if (scenes.length === 0) {
@@ -498,6 +605,35 @@ function VideoGenerationTab({
     )
   }
 
+  const startGeneration = async () => {
+    setGenerating(true)
+    setProgress(0)
+    setError(null)
+
+    try {
+      const response = await generationApi.generateAllVideos(projectId)
+      const taskId = response.task_id
+
+      pollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await generationApi.getTaskStatus(taskId)
+          setProgress(status.progress)
+
+          if (status.status === 'completed' || status.status === 'failed') {
+            setGenerating(false)
+            if (status.status === 'failed') setError(status.error || '生成失败')
+            if (pollingRef.current) clearInterval(pollingRef.current)
+          }
+        } catch (err) {
+          console.error('Poll status failed:', err)
+        }
+      }, 1000)
+    } catch (err) {
+      setGenerating(false)
+      setError('启动任务失败')
+    }
+  }
+
   return (
     <div>
       {/* Status Bar */}
@@ -509,22 +645,29 @@ function VideoGenerationTab({
             <span className="text-orange-500">⚠️ 前置条件: 请先生成场景图</span>
           )}
           <span className="ml-4 text-gray-600">
-            {completedVideos > 0 ? `🔄 进行中 (${completedVideos}/${totalScenes})` : '⏸️ 待开始'}
+            {generating ? `🔄 生成中 (${progress}%)` : completedVideos > 0 ? `✅ ${completedVideos}/${totalScenes}` : '⏸️ 待开始'}
           </span>
         </div>
         <button
-          disabled={!hasSceneImages}
+          onClick={startGeneration}
+          disabled={!hasSceneImages || generating}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
         >
-          ▶️ 开始生成
+          {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
         </button>
       </div>
 
-      {totalScenes > 0 && (
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+          ❌ {error}
+        </div>
+      )}
+
+      {(generating || totalScenes > 0) && (
         <div className="h-2 bg-gray-200 rounded-full mb-6">
           <div
-            className="h-full bg-blue-500 rounded-full"
-            style={{ width: `${(completedVideos / totalScenes) * 100}%` }}
+            className="h-full bg-blue-500 rounded-full transition-all"
+            style={{ width: `${generating ? progress : (completedVideos / totalScenes) * 100}%` }}
           />
         </div>
       )}
