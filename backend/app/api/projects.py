@@ -9,6 +9,7 @@ from app.core.dependencies import get_db
 from app.models import Project, ProjectStatus
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse
 from app.services.script_parser import script_parser
+from app.services.comfyui_client import comfyui_client
 
 router = APIRouter()
 
@@ -103,6 +104,26 @@ async def update_project(
     return project
 
 
+@router.post("/{project_id}/stop")
+async def stop_project(project_id: str, db: AsyncSession = Depends(get_db)):
+    """停止项目的所有正在运行的任务"""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # 停止 ComfyUI 任务
+    stopped_count = await comfyui_client.stop_project_tasks(project_id)
+
+    # 更新项目状态（如果在分析中或生成中）
+    if project.status in [ProjectStatus.ANALYZING, ProjectStatus.GENERATING]:
+        project.status = ProjectStatus.ANALYZED if project.characters else ProjectStatus.DRAFT
+        await db.commit()
+
+    return {"message": f"Stopped {stopped_count} tasks", "stopped": stopped_count}
+
+
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: AsyncSession = Depends(get_db)):
     """删除项目"""
@@ -111,6 +132,9 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db)):
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # 先停止所有正在运行的任务
+    await comfyui_client.stop_project_tasks(project_id)
 
     # 删除项目目录
     project_dir = settings.DATA_DIR / "projects" / project_id

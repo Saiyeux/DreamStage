@@ -104,9 +104,8 @@ export interface ServiceStatus {
   comfyui: {
     connected: boolean
     url: string
+    models: Record<string, string[]>  // 按类型分组的模型列表
   }
-  flux2Loaded: boolean
-  ltx2Loaded: boolean
 }
 
 // 任务

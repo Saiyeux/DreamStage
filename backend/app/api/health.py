@@ -17,8 +17,6 @@ async def health_check():
         status="ok",
         services=ServiceStatus(
             llm=llm_status,
-            comfyui=comfyui_status["status"],
-            flux2_loaded=comfyui_status["flux2_loaded"],
-            ltx2_loaded=comfyui_status["ltx2_loaded"],
+            comfyui=comfyui_status,
         ),
     )

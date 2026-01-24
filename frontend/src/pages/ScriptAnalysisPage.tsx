@@ -1,75 +1,137 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
-
-// 模拟数据
-const mockCharacters: Character[] = [
-  {
-    id: '1',
-    projectId: '1',
-    name: '林晓雨',
-    gender: '女',
-    age: '25岁',
-    roleType: '女主角',
-    hair: '黑色长直发，及腰',
-    face: '鹅蛋脸，杏眼，柳叶眉',
-    body: '身高165cm，纤细',
-    skin: '白皙',
-    personality: '温柔、独立、有主见',
-    clothingStyle: '职业装为主',
-    sceneNumbers: [1, 3, 5, 7, 8, 12, 15],
-    basePrompt: '',
-    images: [],
-  },
-  {
-    id: '2',
-    projectId: '1',
-    name: '陈默',
-    gender: '男',
-    age: '30岁',
-    roleType: '男主角',
-    hair: '黑色短发，干练',
-    face: '国字脸，剑眉星目',
-    body: '身高180cm，健壮',
-    skin: '小麦色',
-    personality: '沉稳、神秘、有魅力',
-    clothingStyle: '高端西装',
-    sceneNumbers: [1, 4, 5, 9, 15],
-    basePrompt: '',
-    images: [],
-  },
-]
-
-const mockScenes: Scene[] = [
-  {
-    id: '1',
-    projectId: '1',
-    sceneNumber: 1,
-    location: '咖啡店内景',
-    timeOfDay: '白天',
-    atmosphere: '温馨',
-    environmentDesc: '现代风格咖啡店，落地窗，阳光洒入',
-    characters: [
-      { characterId: '1', characterName: '林晓雨', position: '左侧', action: '坐着喝咖啡', expression: '若有所思' },
-      { characterId: '2', characterName: '陈默', position: '右侧', action: '刚走进店', expression: '惊讶' },
-    ],
-    dialogue: '陈默: "好久不见，林小姐。"\n林晓雨: "陈...陈总？"',
-    shotType: '中景',
-    cameraMovement: '缓慢推进',
-    durationSeconds: 15,
-    scenePrompt: '',
-    actionPrompt: '',
-    negativePrompt: '',
-  },
-]
+import { projectsApi, analysisApi } from '@/api'
+import { useProjectStore } from '@/stores/projectStore'
 
 type Tab = 'characters' | 'scenes'
 
 export function ScriptAnalysisPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const urlProjectId = searchParams.get('project')
+
+  const {
+    currentProject,
+    characters,
+    scenes,
+    setCurrentProject,
+    setCharacters,
+    setScenes,
+  } = useProjectStore()
+
+  // 优先使用 URL 参数，否则使用 store 中的项目
+  const projectId = urlProjectId || currentProject?.id
+
   const [activeTab, setActiveTab] = useState<Tab>('characters')
-  const [characters] = useState(mockCharacters)
-  const [scenes] = useState(mockScenes)
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // 加载项目和数据
+  useEffect(() => {
+    if (!projectId) return
+
+    // 如果 store 中已有当前项目且 ID 匹配，只加载角色和场景
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        // 如果 URL 指定了项目且与 store 不同，重新加载项目
+        if (urlProjectId && (!currentProject || currentProject.id !== urlProjectId)) {
+          const projectData = await projectsApi.get(urlProjectId)
+          setCurrentProject(projectData)
+        }
+
+        // 加载角色和场景
+        const [charactersData, scenesData] = await Promise.all([
+          analysisApi.getCharacters(projectId).catch(() => []),
+          analysisApi.getScenes(projectId).catch(() => []),
+        ])
+        setCharacters(charactersData)
+        setScenes(scenesData)
+      } catch (err) {
+        setError('加载项目失败')
+        console.error('Load project failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [projectId, urlProjectId])
+
+  // 分析角色
+  const analyzeCharacters = async () => {
+    if (!projectId) return
+    setAnalyzing(true)
+    setError(null)
+    try {
+      const response = await analysisApi.analyzeCharacters(projectId)
+      if (response.success) {
+        // 重新加载角色
+        const data = await analysisApi.getCharacters(projectId)
+        setCharacters(data)
+      } else {
+        setError(response.message || '分析角色失败')
+      }
+    } catch (err) {
+      setError('分析角色失败')
+      console.error('Analyze characters failed:', err)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  // 分析场景
+  const analyzeScenes = async () => {
+    if (!projectId) return
+    setAnalyzing(true)
+    setError(null)
+    try {
+      const response = await analysisApi.analyzeScenes(projectId)
+      if (response.success) {
+        // 重新加载场景
+        const data = await analysisApi.getScenes(projectId)
+        setScenes(data)
+      } else {
+        setError(response.message || '分析场景失败')
+      }
+    } catch (err) {
+      setError('分析场景失败')
+      console.error('Analyze scenes failed:', err)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  // 无项目时的空状态
+  if (!projectId) {
+    return (
+      <div className="bg-white rounded-xl p-12 shadow-sm text-center">
+        <div className="text-6xl mb-4">📝</div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">请先上传剧本</h2>
+        <p className="text-gray-500 mb-6">上传剧本后，系统将自动分析角色和分镜</p>
+        <button
+          onClick={() => navigate('/upload')}
+          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+        >
+          上传剧本
+        </button>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl p-12 shadow-sm text-center">
+        <div className="text-4xl mb-4 animate-pulse">⏳</div>
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -77,9 +139,25 @@ export function ScriptAnalysisPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800">剧本分析</h2>
-          <p className="text-sm text-gray-500">项目: 都市恋曲</p>
+          <p className="text-sm text-gray-500">
+            项目: {currentProject?.name || '未命名'}
+          </p>
         </div>
+        <button
+          onClick={() => navigate(`/generate?project=${projectId}`)}
+          disabled={characters.length === 0}
+          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+        >
+          前往生成中心 →
+        </button>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl">
+          {error}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm">
@@ -113,9 +191,18 @@ export function ScriptAnalysisPage() {
             <CharactersTab
               characters={characters}
               onSelect={setSelectedCharacter}
+              onNavigateUpload={() => navigate('/upload')}
+              onAnalyze={analyzeCharacters}
+              analyzing={analyzing}
             />
           ) : (
-            <ScenesTab scenes={scenes} onSelect={setSelectedScene} />
+            <ScenesTab
+              scenes={scenes}
+              onSelect={setSelectedScene}
+              onNavigateUpload={() => navigate('/upload')}
+              onAnalyze={analyzeScenes}
+              analyzing={analyzing}
+            />
           )}
         </div>
       </div>
@@ -142,18 +229,45 @@ export function ScriptAnalysisPage() {
 function CharactersTab({
   characters,
   onSelect,
+  onNavigateUpload,
+  onAnalyze,
+  analyzing,
 }: {
   characters: Character[]
   onSelect: (c: Character) => void
+  onNavigateUpload: () => void
+  onAnalyze: () => void
+  analyzing: boolean
 }) {
+  if (characters.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-6xl mb-4">👤</div>
+        <p className="text-gray-500 mb-4">暂无角色信息</p>
+        <p className="text-sm text-gray-400 mb-6">点击下方按钮开始分析剧本中的角色</p>
+        <button
+          onClick={onAnalyze}
+          disabled={analyzing}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+        >
+          {analyzing ? '分析中...' : '🔍 开始分析角色'}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-600">
           ✅ 已完成 (识别到 {characters.length} 个角色)
         </p>
-        <button className="text-sm text-blue-500 hover:text-blue-600">
-          🔄 重新分析
+        <button
+          onClick={onAnalyze}
+          disabled={analyzing}
+          className="text-sm text-blue-500 hover:text-blue-600 disabled:opacity-50"
+        >
+          {analyzing ? '分析中...' : '🔄 重新分析'}
         </button>
       </div>
 
@@ -187,18 +301,45 @@ function CharactersTab({
 function ScenesTab({
   scenes,
   onSelect,
+  onNavigateUpload,
+  onAnalyze,
+  analyzing,
 }: {
   scenes: Scene[]
   onSelect: (s: Scene) => void
+  onNavigateUpload: () => void
+  onAnalyze: () => void
+  analyzing: boolean
 }) {
+  if (scenes.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-6xl mb-4">🎬</div>
+        <p className="text-gray-500 mb-4">暂无分镜信息</p>
+        <p className="text-sm text-gray-400 mb-6">点击下方按钮开始分析剧本中的分镜</p>
+        <button
+          onClick={onAnalyze}
+          disabled={analyzing}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+        >
+          {analyzing ? '分析中...' : '🔍 开始分析分镜'}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-600">
           ✅ 已完成 (共 {scenes.length} 个场景)
         </p>
-        <button className="text-sm text-blue-500 hover:text-blue-600">
-          🔄 重新分析
+        <button
+          onClick={onAnalyze}
+          disabled={analyzing}
+          className="text-sm text-blue-500 hover:text-blue-600 disabled:opacity-50"
+        >
+          {analyzing ? '分析中...' : '🔄 重新分析'}
         </button>
       </div>
 

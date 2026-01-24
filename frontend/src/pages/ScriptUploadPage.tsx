@@ -1,14 +1,20 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { projectsApi, analysisApi } from '@/api'
+import { useProjectStore } from '@/stores/projectStore'
 
 export function ScriptUploadPage() {
   const navigate = useNavigate()
+  const { setCurrentProject } = useProjectStore()
+
   const [projectName, setProjectName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [summary, setSummary] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [projectId, setProjectId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [fileInfo, setFileInfo] = useState<{
-    pages?: number
     chars?: number
   } | null>(null)
 
@@ -17,8 +23,22 @@ export function ScriptUploadPage() {
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile && (droppedFile.name.endsWith('.pdf') || droppedFile.name.endsWith('.txt'))) {
       setFile(droppedFile)
-      // 模拟文件信息
-      setFileInfo({ pages: 32, chars: 15420 })
+      setProjectId(null)
+      setSummary('')
+      setError(null)
+
+      // 自动用文件名作为项目名（去掉扩展名）
+      const nameWithoutExt = droppedFile.name.replace(/\.(pdf|txt)$/i, '')
+      setProjectName(nameWithoutExt)
+
+      // 估算字符数
+      if (droppedFile.name.endsWith('.txt')) {
+        droppedFile.text().then(text => {
+          setFileInfo({ chars: text.length })
+        })
+      } else {
+        setFileInfo({ chars: undefined })
+      }
     }
   }, [])
 
@@ -26,24 +46,90 @@ export function ScriptUploadPage() {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
       setFile(selectedFile)
-      setFileInfo({ pages: 32, chars: 15420 })
+      setProjectId(null)
+      setSummary('')
+      setError(null)
+
+      // 自动用文件名作为项目名（去掉扩展名）
+      if (!projectName) {
+        const nameWithoutExt = selectedFile.name.replace(/\.(pdf|txt)$/i, '')
+        setProjectName(nameWithoutExt)
+      }
+
+      if (selectedFile.name.endsWith('.txt')) {
+        selectedFile.text().then(text => {
+          setFileInfo({ chars: text.length })
+        })
+      } else {
+        setFileInfo({ chars: undefined })
+      }
+    }
+  }
+
+  const uploadAndCreateProject = async (): Promise<string | null> => {
+    if (!file || !projectName) return null
+
+    setUploading(true)
+    setError(null)
+    try {
+      const project = await projectsApi.create(projectName, file)
+      setProjectId(project.id)
+      setCurrentProject(project)  // 保存到全局 store
+      if (project.scriptText) {
+        setFileInfo({ chars: project.scriptText.length })
+      }
+      return project.id
+    } catch (err) {
+      setError('上传失败，请重试')
+      console.error('Upload failed:', err)
+      return null
+    } finally {
+      setUploading(false)
     }
   }
 
   const generateSummary = async () => {
     setAnalyzing(true)
-    // TODO: 调用 /api/projects/{id}/analyze/summary
-    setTimeout(() => {
-      setSummary(
-        '这是一个关于都市职场的爱情故事。女主林晓雨是一名刚入职的新人，在一次意外的咖啡店邂逅中遇到了神秘总裁陈默。两人的命运从此交织在一起...'
-      )
+    setError(null)
+
+    try {
+      // 如果还没上传，先上传
+      let id = projectId
+      if (!id) {
+        id = await uploadAndCreateProject()
+        if (!id) {
+          setAnalyzing(false)
+          return
+        }
+      }
+
+      // 调用分析简介 API
+      const response = await analysisApi.analyzeSummary(id)
+      if (response.success && response.data?.summary) {
+        setSummary(response.data.summary as string)
+      } else {
+        setError(response.message || '生成简介失败')
+      }
+    } catch (err) {
+      setError('生成简介失败，请重试')
+      console.error('Generate summary failed:', err)
+    } finally {
       setAnalyzing(false)
-    }, 2000)
+    }
   }
 
-  const startAnalysis = () => {
-    // TODO: 创建项目并跳转到分析页面
-    navigate('/analysis')
+  const startAnalysis = async () => {
+    setError(null)
+
+    // 如果还没上传，先上传
+    let id = projectId
+    if (!id) {
+      id = await uploadAndCreateProject()
+      if (!id) return
+    }
+
+    // 跳转到分析页面
+    navigate(`/analysis?project=${id}`)
   }
 
   return (
@@ -98,13 +184,13 @@ export function ScriptUploadPage() {
                   </p>
                 </div>
                 <div className="space-x-2">
-                  <button className="text-sm text-gray-500 hover:text-gray-700">
-                    📖 预览
-                  </button>
                   <button
                     onClick={() => {
                       setFile(null)
                       setFileInfo(null)
+                      setProjectId(null)
+                      setSummary('')
+                      setError(null)
                     }}
                     className="text-sm text-red-500 hover:text-red-700"
                   >
@@ -159,11 +245,20 @@ export function ScriptUploadPage() {
             <span>
               文件类型: {file?.name.endsWith('.pdf') ? 'PDF' : 'TXT'}
             </span>
-            <span>页数: {fileInfo.pages}</span>
-            <span>字符数: {fileInfo.chars?.toLocaleString()}</span>
-            <span>预估场景: 24个</span>
-            <span>预估角色: 6人</span>
+            {fileInfo.chars && (
+              <span>字符数: {fileInfo.chars.toLocaleString()}</span>
+            )}
+            {projectId && (
+              <span className="text-green-600">✅ 已上传</span>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center">
+          {error}
         </div>
       )}
 
@@ -171,10 +266,10 @@ export function ScriptUploadPage() {
       <div className="flex justify-center">
         <button
           onClick={startAnalysis}
-          disabled={!file || !projectName}
+          disabled={!file || !projectName || uploading}
           className="px-8 py-3 bg-blue-500 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
         >
-          ▶️ 开始分析剧本
+          {uploading ? '上传中...' : '▶️ 开始分析剧本'}
         </button>
       </div>
     </div>

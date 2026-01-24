@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ServiceStatus, Project } from '@/types'
 import { healthApi, projectsApi } from '@/api'
+import { useProjectStore } from '@/stores/projectStore'
 
 const defaultStatus: ServiceStatus = {
   llm: { connected: false, type: 'ollama', url: 'localhost:11434' },
-  comfyui: { connected: false, url: 'localhost:8000' },
-  flux2Loaded: false,
-  ltx2Loaded: false,
+  comfyui: { connected: false, url: 'localhost:8000', models: {} },
 }
 
 export function HomePage() {
   const navigate = useNavigate()
+  const { currentProject, reset: resetStore } = useProjectStore()
   const [status, setStatus] = useState<ServiceStatus>(defaultStatus)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
@@ -72,6 +72,42 @@ export function HomePage() {
     completed: '已完成',
   }
 
+  const isActiveStatus = (status: string) => {
+    return status === 'analyzing' || status === 'generating'
+  }
+
+  const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation()  // 阻止点击事件冒泡到父元素
+    if (!confirm('确定要删除这个项目吗？')) return
+
+    try {
+      await projectsApi.delete(projectId)
+      setRecentProjects(prev => prev.filter(p => p.id !== projectId))
+      // 如果删除的是当前项目，清空全局状态
+      if (currentProject?.id === projectId) {
+        resetStore()
+      }
+    } catch (err) {
+      console.error('Delete project failed:', err)
+      alert('删除失败，请重试')
+    }
+  }
+
+  const handleStopProject = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation()
+    if (!confirm('确定要停止这个项目的任务吗？')) return
+
+    try {
+      const result = await projectsApi.stop(projectId)
+      // 刷新项目列表以更新状态
+      await loadProjects()
+      alert(`已停止 ${result.stopped} 个任务`)
+    } catch (err) {
+      console.error('Stop project failed:', err)
+      alert('停止失败，请重试')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Hero Section */}
@@ -99,7 +135,7 @@ export function HomePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <StatusCard
             label="LLM服务"
             connected={status.llm.connected}
@@ -110,9 +146,39 @@ export function HomePage() {
             connected={status.comfyui.connected}
             detail={`:${status.comfyui.url.split(':').pop()}`}
           />
-          <StatusCard label="FLUX2" connected={status.flux2Loaded} />
-          <StatusCard label="LTX2" connected={status.ltx2Loaded} />
         </div>
+
+        {/* ComfyUI 可用模型 */}
+        {status.comfyui.connected && Object.keys(status.comfyui.models).length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">ComfyUI 可用模型</h4>
+            <div className="space-y-3">
+              {Object.entries(status.comfyui.models).map(([type, models]) => (
+                <div key={type}>
+                  <div className="text-xs font-medium text-gray-500 uppercase mb-1">
+                    {type} ({models.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {models.slice(0, 5).map((model) => (
+                      <span
+                        key={model}
+                        className="px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded"
+                        title={model}
+                      >
+                        {model.length > 30 ? model.slice(0, 27) + '...' : model}
+                      </span>
+                    ))}
+                    {models.length > 5 && (
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded">
+                        +{models.length - 5} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Start */}
@@ -149,9 +215,29 @@ export function HomePage() {
                   <span>📁</span>
                   <span className="font-medium">{project.name}</span>
                 </div>
-                <span className="text-sm text-gray-500">
-                  {statusLabels[project.status] || project.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    {statusLabels[project.status] || project.status}
+                  </span>
+                  <div className="flex gap-1">
+                    {isActiveStatus(project.status) && (
+                      <button
+                        onClick={(e) => handleStopProject(e, project.id)}
+                        className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
+                        title="停止任务"
+                      >
+                        ⏹️ 停止
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => handleDeleteProject(e, project.id)}
+                      className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                      title="删除项目"
+                    >
+                      🗑️ 删除
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

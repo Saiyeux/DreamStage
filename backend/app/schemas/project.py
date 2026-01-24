@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
 from app.models.project import ProjectStatus
+from app.schemas.common import CamelModel
 
 
 class ProjectCreate(BaseModel):
@@ -13,19 +14,17 @@ class ProjectUpdate(BaseModel):
     status: ProjectStatus | None = None
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(CamelModel):
     id: str
     name: str
-    script_path: str | None
-    summary: str | None
+    script_path: str | None = None
+    script_text: str | None = None
+    summary: str | None = None
     status: ProjectStatus
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class ProjectListResponse(BaseModel):
+class ProjectListResponse(CamelModel):
     projects: list[ProjectResponse]
     total: int

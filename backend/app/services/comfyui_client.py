@@ -11,39 +11,70 @@ from app.schemas.common import ComfyUIStatus
 class ComfyUIClient:
     """ComfyUI API 客户端"""
 
+    # 需要获取的模型类型及其对应的 ComfyUI 节点和输入字段
+    MODEL_TYPES = {
+        "checkpoints": ("CheckpointLoaderSimple", "ckpt_name"),
+        "unet": ("UNETLoader", "unet_name"),
+        "vae": ("VAELoader", "vae_name"),
+        "loras": ("LoraLoader", "lora_name"),
+        "clip": ("CLIPLoader", "clip_name"),
+    }
+
     def __init__(self):
         self.base_url = settings.COMFYUI_URL
         self.client_id = str(uuid.uuid4())
+        # 追踪每个项目的活跃任务: {project_id: [prompt_id, ...]}
+        self._active_tasks: dict[str, list[str]] = {}
 
-    async def check_connection(self) -> dict[str, Any]:
-        """检查 ComfyUI 连接状态和模型加载情况"""
-        status = ComfyUIStatus(connected=False, url=self.base_url.replace("http://", ""))
-        flux2_loaded = False
-        ltx2_loaded = False
+    async def _get_available_models(self) -> dict[str, list[str]]:
+        """通过 ComfyUI API 获取所有可用模型"""
+        models: dict[str, list[str]] = {}
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                # 检查连接
-                response = await client.get(f"{self.base_url}/system_stats")
-                if response.status_code == 200:
-                    status.connected = True
-
-                # 检查已加载的模型
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(f"{self.base_url}/object_info")
-                if response.status_code == 200:
-                    # 简化检测：假设如果 ComfyUI 可访问，模型也可用
-                    # 实际检测需要解析 object_info 或检查特定节点
-                    flux2_loaded = True
-                    ltx2_loaded = True
+                if response.status_code != 200:
+                    return models
+
+                object_info = response.json()
+
+                for model_type, (node_name, input_name) in self.MODEL_TYPES.items():
+                    node_info = object_info.get(node_name, {})
+                    model_list = (
+                        node_info.get("input", {})
+                        .get("required", {})
+                        .get(input_name, [[]])[0]
+                    )
+                    if model_list:
+                        models[model_type] = list(model_list)
 
         except Exception:
             pass
 
-        return {
-            "status": status,
-            "flux2_loaded": flux2_loaded,
-            "ltx2_loaded": ltx2_loaded,
-        }
+        return models
+
+    async def check_connection(self) -> ComfyUIStatus:
+        """检查 ComfyUI 连接状态并获取可用模型"""
+        status = ComfyUIStatus(
+            connected=False,
+            url=self.base_url.replace("http://", ""),
+            models={},
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{self.base_url}/system_stats")
+                if response.status_code == 200:
+                    status.connected = True
+
+        except Exception:
+            pass
+
+        # 获取可用模型列表
+        if status.connected:
+            status.models = await self._get_available_models()
+
+        return status
 
     async def load_workflow(self, workflow_path: str) -> dict[str, Any]:
         """加载 workflow JSON 文件"""
@@ -126,6 +157,73 @@ class ComfyUIClient:
             response.raise_for_status()
             return response.json()
 
+    async def interrupt(self) -> bool:
+        """中断当前正在执行的任务"""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(f"{self.base_url}/interrupt")
+                return response.status_code == 200
+        except Exception:
+            return False
+
+    async def delete_from_queue(self, prompt_id: str) -> bool:
+        """从队列中删除指定任务"""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/queue",
+                    json={"delete": [prompt_id]},
+                )
+                return response.status_code == 200
+        except Exception:
+            return False
+
+    async def clear_queue(self) -> bool:
+        """清空所有队列任务"""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/queue",
+                    json={"clear": True},
+                )
+                return response.status_code == 200
+        except Exception:
+            return False
+
+    def register_task(self, project_id: str, prompt_id: str):
+        """注册项目任务"""
+        if project_id not in self._active_tasks:
+            self._active_tasks[project_id] = []
+        self._active_tasks[project_id].append(prompt_id)
+
+    def unregister_task(self, project_id: str, prompt_id: str):
+        """取消注册项目任务"""
+        if project_id in self._active_tasks:
+            if prompt_id in self._active_tasks[project_id]:
+                self._active_tasks[project_id].remove(prompt_id)
+
+    async def stop_project_tasks(self, project_id: str) -> int:
+        """停止指定项目的所有任务，返回停止的任务数"""
+        stopped = 0
+        if project_id not in self._active_tasks:
+            return stopped
+
+        # 先中断当前执行
+        await self.interrupt()
+
+        # 删除队列中的任务
+        for prompt_id in self._active_tasks[project_id]:
+            if await self.delete_from_queue(prompt_id):
+                stopped += 1
+
+        # 清理追踪记录
+        del self._active_tasks[project_id]
+        return stopped
+
+    def get_project_tasks(self, project_id: str) -> list[str]:
+        """获取项目的活跃任务列表"""
+        return self._active_tasks.get(project_id, [])
+
     async def wait_for_completion(
         self,
         prompt_id: str,
@@ -155,6 +253,7 @@ class ComfyUIClient:
         width: int = 768,
         height: int = 1024,
         output_filename: str = "output",
+        project_id: str | None = None,
     ) -> str:
         """生成图像的高级封装
 
@@ -185,17 +284,26 @@ class ComfyUIClient:
         # 提交任务
         prompt_id = await self.queue_prompt(workflow)
 
-        # 等待完成
-        result = await self.wait_for_completion(prompt_id)
+        # 注册任务追踪
+        if project_id:
+            self.register_task(project_id, prompt_id)
 
-        # 返回输出图像路径
-        outputs = result.get("outputs", {})
-        for node_outputs in outputs.values():
-            images = node_outputs.get("images", [])
-            if images:
-                return images[0].get("filename", "")
+        try:
+            # 等待完成
+            result = await self.wait_for_completion(prompt_id)
 
-        raise RuntimeError("No image output found")
+            # 返回输出图像路径
+            outputs = result.get("outputs", {})
+            for node_outputs in outputs.values():
+                images = node_outputs.get("images", [])
+                if images:
+                    return images[0].get("filename", "")
+
+            raise RuntimeError("No image output found")
+        finally:
+            # 完成后取消注册
+            if project_id:
+                self.unregister_task(project_id, prompt_id)
 
 
 comfyui_client = ComfyUIClient()

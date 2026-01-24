@@ -6,6 +6,11 @@ interface ProjectListResponse {
   total: number
 }
 
+interface StopResponse {
+  message: string
+  stopped: number
+}
+
 export const projectsApi = {
   list: () => api.get<ProjectListResponse>('/projects'),
 
@@ -20,6 +25,8 @@ export const projectsApi = {
 
   update: (id: string, data: Partial<Project>) =>
     api.put<Project>(`/projects/${id}`, data),
+
+  stop: (id: string) => api.post<StopResponse>(`/projects/${id}/stop`),
 
   delete: (id: string) => api.delete<{ message: string }>(`/projects/${id}`),
 }

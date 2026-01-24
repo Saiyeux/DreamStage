@@ -1,61 +1,53 @@
 from pydantic import BaseModel
+from app.schemas.common import CamelModel
 
 
-class SceneCharacterData(BaseModel):
-    character_id: str
+class SceneCharacterData(CamelModel):
+    character_id: str | None = None
     character_name: str
-    position: str
-    action: str
-    expression: str
+    position: str | None = None
+    action: str | None = None
+    expression: str | None = None
 
 
-class SceneImageResponse(BaseModel):
+class SceneImageResponse(CamelModel):
     id: str
     scene_id: str
     image_path: str
-    prompt_used: str | None
-    seed: int | None
-    is_approved: bool
-
-    class Config:
-        from_attributes = True
+    prompt_used: str | None = None
+    seed: int | None = None
+    is_approved: bool = False
 
 
-class VideoClipResponse(BaseModel):
+class VideoClipResponse(CamelModel):
     id: str
     scene_id: str
     video_path: str
-    duration: float | None
-    fps: int | None
-    resolution: str | None
-    prompt_used: str | None
-    seed: int | None
-    is_approved: bool
-
-    class Config:
-        from_attributes = True
+    duration: float | None = None
+    fps: int | None = None
+    resolution: str | None = None
+    prompt_used: str | None = None
+    seed: int | None = None
+    is_approved: bool = False
 
 
-class SceneResponse(BaseModel):
+class SceneResponse(CamelModel):
     id: str
     project_id: str
     scene_number: int
-    location: str | None
-    time_of_day: str | None
-    atmosphere: str | None
-    environment_desc: str | None
-    characters_data: list[SceneCharacterData]
-    dialogue: str | None
-    shot_type: str | None
-    camera_movement: str | None
-    duration_seconds: int | None
-    scene_prompt: str | None
-    action_prompt: str | None
-    scene_image: SceneImageResponse | None
-    video_clip: VideoClipResponse | None
-
-    class Config:
-        from_attributes = True
+    location: str | None = None
+    time_of_day: str | None = None
+    atmosphere: str | None = None
+    environment_desc: str | None = None
+    characters_data: list[SceneCharacterData] = []
+    dialogue: str | None = None
+    shot_type: str | None = None
+    camera_movement: str | None = None
+    duration_seconds: int | None = None
+    scene_prompt: str | None = None
+    action_prompt: str | None = None
+    scene_image: SceneImageResponse | None = None
+    video_clip: VideoClipResponse | None = None
 
 
 class SceneUpdate(BaseModel):
