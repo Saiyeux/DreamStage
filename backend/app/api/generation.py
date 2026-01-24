@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db
 from app.models import Project, ProjectStatus, Character, Scene
-from app.schemas import TaskResponse
+from app.schemas import TaskResponse, GenerateCharacterImagesRequest, GenerateSceneRequest
 from app.services.comfyui_client import comfyui_client
 from app.services.generation_tasks import generation_tasks
 
@@ -18,15 +18,14 @@ router = APIRouter()
 @router.post("/{project_id}/generate/character-images", response_model=TaskResponse)
 async def generate_character_images(
     project_id: str,
-    character_id: str,
-    image_types: list[str],
+    request: GenerateCharacterImagesRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """为指定角色生成图像"""
     result = await db.execute(
         select(Character).where(
-            Character.id == character_id,
+            Character.id == request.character_id,
             Character.project_id == project_id,
         )
     )
@@ -42,7 +41,7 @@ async def generate_character_images(
         generation_tasks.generate_character_images,
         task_id=task_id,
         character=character,
-        image_types=image_types,
+        image_types=request.image_types,
     )
 
     return TaskResponse(task_id=task_id, message="Character image generation started")
@@ -88,7 +87,7 @@ async def generate_character_library(
 @router.post("/{project_id}/generate/scene-image", response_model=TaskResponse)
 async def generate_scene_image(
     project_id: str,
-    scene_id: str,
+    request: GenerateSceneRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
@@ -96,7 +95,7 @@ async def generate_scene_image(
     result = await db.execute(
         select(Scene)
         .options(selectinload(Scene.scene_image))
-        .where(Scene.id == scene_id, Scene.project_id == project_id)
+        .where(Scene.id == request.scene_id, Scene.project_id == project_id)
     )
     scene = result.scalar_one_or_none()
 
@@ -148,7 +147,7 @@ async def generate_all_scene_images(
 @router.post("/{project_id}/generate/scene-video", response_model=TaskResponse)
 async def generate_scene_video(
     project_id: str,
-    scene_id: str,
+    request: GenerateSceneRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
@@ -156,7 +155,7 @@ async def generate_scene_video(
     result = await db.execute(
         select(Scene)
         .options(selectinload(Scene.scene_image), selectinload(Scene.video_clip))
-        .where(Scene.id == scene_id, Scene.project_id == project_id)
+        .where(Scene.id == request.scene_id, Scene.project_id == project_id)
     )
     scene = result.scalar_one_or_none()
 

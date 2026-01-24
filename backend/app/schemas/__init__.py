@@ -21,6 +21,8 @@ from app.schemas.common import (
     HealthResponse,
     TaskResponse,
     AnalysisResponse,
+    GenerateCharacterImagesRequest,
+    GenerateSceneRequest,
 )
 
 __all__ = [
@@ -40,4 +42,6 @@ __all__ = [
     "HealthResponse",
     "TaskResponse",
     "AnalysisResponse",
+    "GenerateCharacterImagesRequest",
+    "GenerateSceneRequest",
 ]

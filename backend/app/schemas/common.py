@@ -48,3 +48,14 @@ class AnalysisResponse(CamelModel):
     success: bool
     message: str
     data: dict | None = None
+
+
+# ============ 生成任务请求 ============
+
+class GenerateCharacterImagesRequest(CamelModel):
+    character_id: str
+    image_types: list[str]
+
+
+class GenerateSceneRequest(CamelModel):
+    scene_id: str
