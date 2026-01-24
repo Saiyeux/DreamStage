@@ -44,6 +44,25 @@
 
 ## 已完成（本次）
 
+### ComfyUI 生成功能
+- [x] ComfyUI Workflow JSON 文件
+  - [x] character_portrait_flux2.json - 角色肖像生成
+  - [x] scene_generation_flux2.json - 场景图生成 (支持 IPAdapter)
+  - [x] video_generation_ltx2.json - LTX-Video 2.0 视频生成
+- [x] comfyui_client 增强
+  - [x] generate_video 方法 (LTX2 视频生成)
+  - [x] 模板占位符替换
+  - [x] 视频相关节点参数更新
+- [x] generation_tasks 实现
+  - [x] _build_character_prompt 角色图 prompt 构建
+  - [x] _build_scene_prompt 场景图 prompt 构建
+  - [x] _build_action_prompt 视频动作 prompt 构建
+  - [x] 生成结果保存到数据库 (CharacterImage, SceneImage, VideoClip)
+- [x] 文件服务 API (GET /api/files/images/*, GET /api/files/videos/*)
+- [x] 前端生成完成后自动刷新数据
+- [x] 前端显示已生成的角色图、场景图和视频
+
+### 之前完成
 - [x] ComfyUI 模型目录检测（动态获取可用模型列表）
 - [x] 剧本上传页对接 API
 - [x] 剧本分析页对接 API
@@ -56,22 +75,23 @@
 - [x] 后端 schemas 统一 camelCase 序列化
 - [x] ComfyUI client 任务追踪机制
 - [x] DELETE /projects/{id} 先停止任务再清理资源
+- [x] LLM 流式输出终端显示
+- [x] 页面状态刷新机制
+- [x] 角色头像性别区分
 
 ## 待完成
 
 ### 优先级高
-- [ ] 继续实现后端 LLM 分析逻辑
 - [ ] 上传剧本后同步问题（待测试反馈）
 - [ ] 停止任务功能完善（目前可用删除替代）
+- [ ] 配置 COMFYUI_OUTPUT_DIR 指向 ComfyUI 输出目录
 
 ### 前端
-- [ ] WebSocket 实时进度推送
+- [ ] WebSocket 实时进度推送 (替代轮询)
 
 ### 后端完善
-- [ ] LLM Prompt 模板文件
-- [ ] ComfyUI Workflow JSON 文件
-- [ ] 生成任务实际逻辑
-- [ ] 文件服务 (图片/视频访问)
+- [ ] 视频合成/导出功能 (FFmpeg)
+- [ ] 角色一致性控制 (自动选择参考图)
 
 ### 其他
 - [ ] 前端 UI 美化 (参考原神风格)
