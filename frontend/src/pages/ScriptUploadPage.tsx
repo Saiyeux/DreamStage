@@ -15,7 +15,22 @@ export function ScriptUploadPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 从 store 恢复状态
+  // 从后端刷新项目状态，确保显示最新状态
+  useEffect(() => {
+    const refreshProject = async () => {
+      if (currentProject?.id) {
+        try {
+          const freshProject = await projectsApi.get(currentProject.id)
+          setCurrentProject(freshProject)
+        } catch (err) {
+          console.error('Refresh project failed:', err)
+        }
+      }
+    }
+    refreshProject()
+  }, []) // 仅在页面加载时执行一次
+
+  // 从 store 恢复 summary
   useEffect(() => {
     if (currentProject) {
       setSummary(currentProject.summary || '')

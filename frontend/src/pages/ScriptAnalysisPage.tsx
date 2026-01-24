@@ -59,10 +59,9 @@ export function ScriptAnalysisPage() {
       setLoading(true)
       setError(null)
       try {
-        if (urlProjectId && (!currentProject || currentProject.id !== urlProjectId)) {
-          const projectData = await projectsApi.get(urlProjectId)
-          setCurrentProject(projectData)
-        }
+        // 始终从后端刷新项目状态
+        const projectData = await projectsApi.get(projectId)
+        setCurrentProject(projectData)
 
         const [charactersData, scenesData] = await Promise.all([
           analysisApi.getCharacters(projectId).catch(() => []),
@@ -79,7 +78,7 @@ export function ScriptAnalysisPage() {
     }
 
     loadData()
-  }, [projectId, urlProjectId])
+  }, [projectId])
 
   // 刷新项目状态
   const refreshProjectStatus = async () => {
@@ -96,15 +95,10 @@ export function ScriptAnalysisPage() {
   const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
     if (!projectId) return
 
-    // 更新状态
+    // 更新状态（仅本地 UI 状态，不修改 project.status）
     setIsStreaming(true)
     setTerminalExpanded(true)
     setError(null)
-
-    // 更新项目状态
-    if (currentProject) {
-      setCurrentProject({ ...currentProject, status: 'analyzing' })
-    }
 
     const typeName = analysisType === 'characters' ? '角色' : '场景'
     setTerminalOutput([
@@ -227,7 +221,7 @@ export function ScriptAnalysisPage() {
           <h2 className="text-xl font-bold text-gray-800">剧本分析</h2>
           <p className="text-sm text-gray-500">
             项目: {currentProject?.name || '未命名'}
-            {currentProject?.status === 'analyzing' && (
+            {isStreaming && (
               <span className="ml-2 text-yellow-600">🔄 分析中...</span>
             )}
           </p>
