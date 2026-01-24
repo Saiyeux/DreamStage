@@ -134,6 +134,38 @@ class ComfyUIClient:
                 if "output_filename" in params:
                     inputs["filename_prefix"] = params["output_filename"]
 
+            # === 视频生成相关节点 ===
+
+            # 更新 LoadImage 节点 (输入图像)
+            if class_type == "LoadImage":
+                if "input_image" in params:
+                    inputs["image"] = params["input_image"]
+
+            # 更新 LTXVImgToVideo 节点
+            if class_type == "LTXVImgToVideo":
+                if "width" in params:
+                    inputs["width"] = params["width"]
+                if "height" in params:
+                    inputs["height"] = params["height"]
+                if "video_length" in params:
+                    inputs["length"] = params["video_length"]
+
+            # 更新 LTXVSampler 节点
+            if class_type == "LTXVSampler":
+                if "seed" in params:
+                    inputs["seed"] = params["seed"]
+                if "steps" in params:
+                    inputs["steps"] = params["steps"]
+                if "cfg" in params:
+                    inputs["cfg"] = params["cfg"]
+
+            # 更新 VHS_VideoCombine 节点
+            if class_type == "VHS_VideoCombine":
+                if "output_filename" in params:
+                    inputs["filename_prefix"] = params["output_filename"]
+                if "frame_rate" in params:
+                    inputs["frame_rate"] = params["frame_rate"]
+
         return workflow
 
     async def queue_prompt(self, workflow: dict[str, Any]) -> str:
@@ -254,6 +286,7 @@ class ComfyUIClient:
         height: int = 1024,
         output_filename: str = "output",
         project_id: str | None = None,
+        reference_image: str | None = None,
     ) -> str:
         """生成图像的高级封装
 
@@ -267,6 +300,15 @@ class ComfyUIClient:
         # 加载 workflow
         workflow_path = Path("comfyui_workflows") / workflow_name
         workflow = await self.load_workflow(str(workflow_path))
+
+        # 替换模板占位符
+        workflow_str = json.dumps(workflow)
+        workflow_str = workflow_str.replace("{{positive_prompt}}", positive_prompt)
+        workflow_str = workflow_str.replace("{{negative_prompt}}", negative_prompt)
+        workflow_str = workflow_str.replace("{{output_filename}}", output_filename)
+        if reference_image:
+            workflow_str = workflow_str.replace("{{reference_image}}", reference_image)
+        workflow = json.loads(workflow_str)
 
         # 更新参数
         workflow = await self.update_workflow_params(
@@ -300,6 +342,104 @@ class ComfyUIClient:
                     return images[0].get("filename", "")
 
             raise RuntimeError("No image output found")
+        finally:
+            # 完成后取消注册
+            if project_id:
+                self.unregister_task(project_id, prompt_id)
+
+
+    async def generate_video(
+        self,
+        workflow_name: str,
+        input_image: str,
+        action_prompt: str,
+        negative_prompt: str = "",
+        seed: int = -1,
+        width: int = 768,
+        height: int = 1344,
+        video_length: int = 97,
+        steps: int = 30,
+        cfg: float = 3.0,
+        frame_rate: int = 24,
+        output_filename: str = "output",
+        project_id: str | None = None,
+    ) -> str:
+        """生成视频的高级封装
+
+        Args:
+            workflow_name: workflow 文件名
+            input_image: 输入图像路径 (ComfyUI input 目录下的文件名)
+            action_prompt: 动作描述 prompt
+            negative_prompt: 负面 prompt
+            seed: 随机种子 (-1 表示随机)
+            width: 视频宽度
+            height: 视频高度
+            video_length: 视频帧数 (97帧 ≈ 4秒 @24fps)
+            steps: 采样步数
+            cfg: CFG 值
+            frame_rate: 帧率
+            output_filename: 输出文件名前缀
+            project_id: 项目ID (用于任务追踪)
+
+        返回生成的视频路径
+        """
+        import random
+
+        if seed == -1:
+            seed = random.randint(0, 2**32 - 1)
+
+        # 加载 workflow
+        workflow_path = Path("comfyui_workflows") / workflow_name
+        workflow = await self.load_workflow(str(workflow_path))
+
+        # 更新 workflow 中的模板占位符
+        workflow_str = json.dumps(workflow)
+        workflow_str = workflow_str.replace("{{input_image}}", input_image)
+        workflow_str = workflow_str.replace("{{action_prompt}}", action_prompt)
+        workflow_str = workflow_str.replace("{{negative_prompt}}", negative_prompt)
+        workflow_str = workflow_str.replace("{{output_filename}}", output_filename)
+        workflow = json.loads(workflow_str)
+
+        # 更新参数
+        workflow = await self.update_workflow_params(
+            workflow,
+            {
+                "input_image": input_image,
+                "seed": seed,
+                "width": width,
+                "height": height,
+                "video_length": video_length,
+                "steps": steps,
+                "cfg": cfg,
+                "frame_rate": frame_rate,
+                "output_filename": output_filename,
+            },
+        )
+
+        # 提交任务
+        prompt_id = await self.queue_prompt(workflow)
+
+        # 注册任务追踪
+        if project_id:
+            self.register_task(project_id, prompt_id)
+
+        try:
+            # 等待完成 (视频生成时间较长，默认10分钟超时)
+            result = await self.wait_for_completion(prompt_id, timeout=600.0)
+
+            # 返回输出视频路径
+            outputs = result.get("outputs", {})
+            for node_outputs in outputs.values():
+                # VHS_VideoCombine 输出格式
+                gifs = node_outputs.get("gifs", [])
+                if gifs:
+                    return gifs[0].get("filename", "")
+                # 其他可能的视频输出格式
+                videos = node_outputs.get("videos", [])
+                if videos:
+                    return videos[0].get("filename", "")
+
+            raise RuntimeError("No video output found")
         finally:
             # 完成后取消注册
             if project_id:

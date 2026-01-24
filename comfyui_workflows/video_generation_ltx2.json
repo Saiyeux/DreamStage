@@ -1,0 +1,90 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "{{input_image}}"
+    }
+  },
+  "2": {
+    "class_type": "LTXVLoader",
+    "inputs": {
+      "model_name": "ltx-video-2b-v0.9.safetensors"
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "t5xxl_fp16.safetensors",
+      "type": "ltxv"
+    }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["3", 0],
+      "text": "{{action_prompt}}"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["3", 0],
+      "text": "{{negative_prompt}}"
+    }
+  },
+  "6": {
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "frame_rate": 24
+    }
+  },
+  "7": {
+    "class_type": "LTXVImgToVideo",
+    "inputs": {
+      "positive": ["6", 0],
+      "negative": ["6", 1],
+      "image": ["1", 0],
+      "vae": ["2", 1],
+      "width": 768,
+      "height": 1344,
+      "length": 97,
+      "batch_size": 1
+    }
+  },
+  "8": {
+    "class_type": "LTXVSampler",
+    "inputs": {
+      "model": ["2", 0],
+      "positive": ["6", 0],
+      "negative": ["6", 1],
+      "latent": ["7", 0],
+      "seed": 0,
+      "steps": 30,
+      "cfg": 3.0,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1.0
+    }
+  },
+  "9": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["8", 0],
+      "vae": ["2", 1]
+    }
+  },
+  "10": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["9", 0],
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "{{output_filename}}",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true
+    }
+  }
+}
