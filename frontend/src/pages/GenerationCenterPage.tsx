@@ -594,17 +594,24 @@ function SceneImageTab({
             <button
               key={scene.id}
               onClick={() => setCurrentScene(i + 1)}
-              className={`flex-shrink-0 w-12 h-12 rounded flex items-center justify-center text-xs ${
+              className={`flex-shrink-0 w-12 h-16 rounded overflow-hidden ${
                 i + 1 === currentScene ? 'ring-2 ring-blue-500' : ''
               } ${
-                i < completedScenes
-                  ? 'bg-green-100 text-green-600'
-                  : 'bg-gray-100 text-gray-400'
+                scene.sceneImage ? '' : 'bg-gray-100'
               }`}
             >
-              {i < completedScenes ? '✅' : '⬜'}
-              <br />
-              {scene.sceneNumber}
+              {scene.sceneImage ? (
+                <img
+                  src={fileUrl.image(scene.sceneImage.imagePath)}
+                  alt={`场景 ${scene.sceneNumber}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-xs text-gray-400">
+                  <span>{generating && i >= completedScenes ? '⏳' : '⬜'}</span>
+                  <span>{scene.sceneNumber}</span>
+                </div>
+              )}
             </button>
           ))}
         </div>
