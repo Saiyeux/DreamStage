@@ -1,5 +1,7 @@
 import uuid
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -16,6 +18,101 @@ from app.schemas import (
 from app.services.llm_client import llm_client
 
 router = APIRouter()
+
+
+# SSE 流式分析端点
+async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
+    """SSE 事件生成器"""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+
+    if not project or not project.script_text:
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Project or script not found'})}\n\n"
+        return
+
+    # 发送开始事件
+    yield f"data: {json.dumps({'type': 'start', 'analysis_type': analysis_type})}\n\n"
+
+    # 根据类型选择 prompt
+    if analysis_type == "summary":
+        prompt = f"""你是一位专业的剧本分析师。请阅读以下剧本内容，生成一段简洁的剧情简介。
+
+## 剧本内容
+{project.script_text[:8000]}
+
+## 输出要求
+请以JSON格式输出：
+```json
+{{
+  "summary": "100-200字的剧情简介，包含主要人物和核心冲突",
+  "main_conflict": "主要冲突点（一句话）",
+  "tone": "故事基调（如：甜宠、虐恋、悬疑、喜剧等）",
+  "estimated_duration_minutes": 预估时长（分钟，数字）
+}}
+```"""
+    elif analysis_type == "characters":
+        prompt = f"""你是一位专业的剧本分析师和角色设计师。请从以下剧本中提取所有角色的详细信息。
+
+## 剧本内容
+{project.script_text[:8000]}
+
+## 输出要求
+请以JSON格式输出所有角色：
+```json
+{{
+  "characters": [
+    {{
+      "name": "角色姓名",
+      "gender": "男/女",
+      "age": "具体年龄或年龄段",
+      "role_type": "主角/配角/龙套",
+      "appearance": {{
+        "hair": "发型和发色描述",
+        "face": "脸型和五官特征",
+        "body": "身材特征",
+        "skin": "肤色"
+      }},
+      "personality": "性格特点",
+      "clothing_style": "服装风格"
+    }}
+  ]
+}}
+```"""
+    else:
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Unknown analysis type'})}\n\n"
+        return
+
+    # 流式输出 LLM 响应
+    full_response = ""
+    try:
+        async for chunk in llm_client.chat_stream(prompt):
+            full_response += chunk
+            yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+        # 发送完成事件
+        yield f"data: {json.dumps({'type': 'done', 'full_response': full_response})}\n\n"
+    except Exception as e:
+        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+
+@router.get("/{project_id}/analyze/{analysis_type}/stream")
+async def analyze_stream(
+    project_id: str,
+    analysis_type: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """流式分析端点 (SSE)"""
+    if analysis_type not in ["summary", "characters", "scenes"]:
+        raise HTTPException(status_code=400, detail="Invalid analysis type")
+
+    return StreamingResponse(
+        sse_generator(project_id, analysis_type, db),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/{project_id}/analyze/summary", response_model=AnalysisResponse)
@@ -56,44 +153,52 @@ async def analyze_characters(project_id: str, db: AsyncSession = Depends(get_db)
     if not project.script_text:
         raise HTTPException(status_code=400, detail="No script text available")
 
-    # 更新状态
+    # 更新状态为分析中
     project.status = ProjectStatus.ANALYZING
     await db.commit()
 
-    # 调用 LLM 分析角色
-    characters_data = await llm_client.analyze_characters(project.script_text)
+    try:
+        # 调用 LLM 分析角色
+        characters_data = await llm_client.analyze_characters(project.script_text)
 
-    # 删除旧角色数据
-    await db.execute(
-        select(Character).where(Character.project_id == project_id)
-    )
-
-    # 创建新角色记录
-    for char_data in characters_data.get("characters", []):
-        character = Character(
-            id=str(uuid.uuid4()),
-            project_id=project_id,
-            name=char_data.get("name", ""),
-            gender=char_data.get("gender"),
-            age=char_data.get("age"),
-            role_type=char_data.get("role_type"),
-            hair=char_data.get("appearance", {}).get("hair"),
-            face=char_data.get("appearance", {}).get("face"),
-            body=char_data.get("appearance", {}).get("body"),
-            skin=char_data.get("appearance", {}).get("skin"),
-            personality=char_data.get("personality"),
-            clothing_style=char_data.get("clothing_style"),
-            scene_numbers=[],
+        # 删除旧角色数据
+        await db.execute(
+            select(Character).where(Character.project_id == project_id)
         )
-        db.add(character)
 
-    await db.commit()
+        # 创建新角色记录
+        for char_data in characters_data.get("characters", []):
+            character = Character(
+                id=str(uuid.uuid4()),
+                project_id=project_id,
+                name=char_data.get("name", ""),
+                gender=char_data.get("gender"),
+                age=char_data.get("age"),
+                role_type=char_data.get("role_type"),
+                hair=char_data.get("appearance", {}).get("hair"),
+                face=char_data.get("appearance", {}).get("face"),
+                body=char_data.get("appearance", {}).get("body"),
+                skin=char_data.get("appearance", {}).get("skin"),
+                personality=char_data.get("personality"),
+                clothing_style=char_data.get("clothing_style"),
+                scene_numbers=[],
+            )
+            db.add(character)
 
-    return AnalysisResponse(
-        success=True,
-        message=f"Found {len(characters_data.get('characters', []))} characters",
-        data=characters_data,
-    )
+        # 分析完成，恢复状态为草稿
+        project.status = ProjectStatus.DRAFT
+        await db.commit()
+
+        return AnalysisResponse(
+            success=True,
+            message=f"Found {len(characters_data.get('characters', []))} characters",
+            data=characters_data,
+        )
+    except Exception as e:
+        # 发生错误，恢复状态
+        project.status = ProjectStatus.DRAFT
+        await db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{project_id}/analyze/scenes", response_model=AnalysisResponse)

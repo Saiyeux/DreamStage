@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
 import { projectsApi, analysisApi } from '@/api'
@@ -20,32 +20,50 @@ export function ScriptAnalysisPage() {
     setScenes,
   } = useProjectStore()
 
-  // 优先使用 URL 参数，否则使用 store 中的项目
   const projectId = urlProjectId || currentProject?.id
 
   const [activeTab, setActiveTab] = useState<Tab>('characters')
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
   const [loading, setLoading] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 终端状态
+  const [terminalExpanded, setTerminalExpanded] = useState(false)
+  const [terminalOutput, setTerminalOutput] = useState<string[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const terminalRef = useRef<HTMLDivElement>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
+
+  // 自动滚动终端
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+    }
+  }, [terminalOutput])
+
+  // 清理 EventSource
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+    }
+  }, [])
 
   // 加载项目和数据
   useEffect(() => {
     if (!projectId) return
 
-    // 如果 store 中已有当前项目且 ID 匹配，只加载角色和场景
     const loadData = async () => {
       setLoading(true)
       setError(null)
       try {
-        // 如果 URL 指定了项目且与 store 不同，重新加载项目
         if (urlProjectId && (!currentProject || currentProject.id !== urlProjectId)) {
           const projectData = await projectsApi.get(urlProjectId)
           setCurrentProject(projectData)
         }
 
-        // 加载角色和场景
         const [charactersData, scenesData] = await Promise.all([
           analysisApi.getCharacters(projectId).catch(() => []),
           analysisApi.getScenes(projectId).catch(() => []),
@@ -74,65 +92,104 @@ export function ScriptAnalysisPage() {
     }
   }
 
-  // 分析角色
-  const analyzeCharacters = async () => {
+  // 流式分析
+  const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
     if (!projectId) return
-    setAnalyzing(true)
+
+    // 更新状态
+    setIsStreaming(true)
+    setTerminalExpanded(true)
     setError(null)
 
-    // 先更新状态为分析中
+    // 更新项目状态
     if (currentProject) {
       setCurrentProject({ ...currentProject, status: 'analyzing' })
     }
 
-    try {
-      const response = await analysisApi.analyzeCharacters(projectId)
-      if (response.success) {
-        // 重新加载角色和项目状态
-        const data = await analysisApi.getCharacters(projectId)
-        setCharacters(data)
-        await refreshProjectStatus()
-      } else {
-        setError(response.message || '分析角色失败')
-        await refreshProjectStatus()
-      }
-    } catch (err) {
-      setError('分析角色失败')
-      console.error('Analyze characters failed:', err)
-      await refreshProjectStatus()
-    } finally {
-      setAnalyzing(false)
-    }
-  }
+    const typeName = analysisType === 'characters' ? '角色' : '场景'
+    setTerminalOutput([
+      `> 开始分析${typeName}...`,
+      `[${new Date().toLocaleTimeString()}] 连接 LLM 服务...`,
+      '',
+    ])
 
-  // 分析场景
-  const analyzeScenes = async () => {
-    if (!projectId) return
-    setAnalyzing(true)
-    setError(null)
-
-    // 先更新状态为分析中
-    if (currentProject) {
-      setCurrentProject({ ...currentProject, status: 'analyzing' })
+    // 关闭之前的连接
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
     }
 
-    try {
-      const response = await analysisApi.analyzeScenes(projectId)
-      if (response.success) {
-        // 重新加载场景和项目状态
-        const data = await analysisApi.getScenes(projectId)
-        setScenes(data)
-        await refreshProjectStatus()
-      } else {
-        setError(response.message || '分析场景失败')
-        await refreshProjectStatus()
+    const url = `/api/projects/${projectId}/analyze/${analysisType}/stream`
+    const eventSource = new EventSource(url)
+    eventSourceRef.current = eventSource
+
+    eventSource.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data)
+
+        if (data.type === 'start') {
+          setTerminalOutput((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] LLM 开始响应...`,
+            '',
+          ])
+        } else if (data.type === 'chunk') {
+          setTerminalOutput((prev) => {
+            const newOutput = [...prev]
+            newOutput[newOutput.length - 1] += data.content
+            return newOutput
+          })
+        } else if (data.type === 'done') {
+          setTerminalOutput((prev) => [
+            ...prev,
+            '',
+            `[${new Date().toLocaleTimeString()}] 分析完成，正在保存...`,
+          ])
+          eventSource.close()
+          setIsStreaming(false)
+
+          // 调用后端保存并重新加载数据
+          try {
+            if (analysisType === 'characters') {
+              await analysisApi.analyzeCharacters(projectId)
+              const data = await analysisApi.getCharacters(projectId)
+              setCharacters(data)
+            } else {
+              await analysisApi.analyzeScenes(projectId)
+              const data = await analysisApi.getScenes(projectId)
+              setScenes(data)
+            }
+            setTerminalOutput((prev) => [
+              ...prev,
+              `[${new Date().toLocaleTimeString()}] 保存成功`,
+            ])
+          } catch (err) {
+            setTerminalOutput((prev) => [
+              ...prev,
+              `[错误] 保存失败: ${err}`,
+            ])
+          }
+
+          await refreshProjectStatus()
+        } else if (data.type === 'error') {
+          setTerminalOutput((prev) => [
+            ...prev,
+            '',
+            `[错误] ${data.message}`,
+          ])
+          eventSource.close()
+          setIsStreaming(false)
+          await refreshProjectStatus()
+        }
+      } catch (e) {
+        console.error('Parse SSE data failed:', e)
       }
-    } catch (err) {
-      setError('分析场景失败')
-      console.error('Analyze scenes failed:', err)
+    }
+
+    eventSource.onerror = async () => {
+      setTerminalOutput((prev) => [...prev, '', '[连接断开]'])
+      eventSource.close()
+      setIsStreaming(false)
       await refreshProjectStatus()
-    } finally {
-      setAnalyzing(false)
     }
   }
 
@@ -170,10 +227,13 @@ export function ScriptAnalysisPage() {
           <h2 className="text-xl font-bold text-gray-800">剧本分析</h2>
           <p className="text-sm text-gray-500">
             项目: {currentProject?.name || '未命名'}
+            {currentProject?.status === 'analyzing' && (
+              <span className="ml-2 text-yellow-600">🔄 分析中...</span>
+            )}
           </p>
         </div>
         <button
-          onClick={() => navigate(`/generate?project=${projectId}`)}
+          onClick={() => navigate(`/generation?project=${projectId}`)}
           disabled={characters.length === 0}
           className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
         >
@@ -187,6 +247,47 @@ export function ScriptAnalysisPage() {
           {error}
         </div>
       )}
+
+      {/* LLM Terminal */}
+      <div className="bg-gray-900 rounded-lg overflow-hidden">
+        <div
+          className="flex items-center justify-between px-4 py-2 bg-gray-800 cursor-pointer"
+          onClick={() => setTerminalExpanded(!terminalExpanded)}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-green-400 font-mono">$</span>
+            <span className="text-gray-300 text-sm font-mono">LLM Output</span>
+            {isStreaming && (
+              <span className="text-yellow-400 text-xs animate-pulse">
+                streaming...
+              </span>
+            )}
+          </div>
+          <button className="text-gray-400 hover:text-white text-sm">
+            {terminalExpanded ? '▼ 收起' : '▲ 展开'}
+          </button>
+        </div>
+
+        {terminalExpanded && (
+          <div
+            ref={terminalRef}
+            className="p-4 font-mono text-sm text-green-400 max-h-64 overflow-y-auto"
+          >
+            {terminalOutput.length === 0 ? (
+              <p className="text-gray-500">等待分析任务...</p>
+            ) : (
+              terminalOutput.map((line, i) => (
+                <div key={i} className="whitespace-pre-wrap break-all">
+                  {line || '\u00A0'}
+                </div>
+              ))
+            )}
+            {isStreaming && (
+              <span className="inline-block w-2 h-4 bg-green-400 animate-pulse ml-1" />
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm">
@@ -220,15 +321,15 @@ export function ScriptAnalysisPage() {
             <CharactersTab
               characters={characters}
               onSelect={setSelectedCharacter}
-              onAnalyze={analyzeCharacters}
-              analyzing={analyzing}
+              onAnalyze={() => analyzeWithStream('characters')}
+              analyzing={isStreaming}
             />
           ) : (
             <ScenesTab
               scenes={scenes}
               onSelect={setSelectedScene}
-              onAnalyze={analyzeScenes}
-              analyzing={analyzing}
+              onAnalyze={() => analyzeWithStream('scenes')}
+              analyzing={isStreaming}
             />
           )}
         </div>
@@ -309,7 +410,7 @@ function CharactersTab({
             <p className="font-medium text-gray-800">{character.name}</p>
             <p className="text-xs text-gray-500">{character.roleType}</p>
             <p className="text-xs text-gray-400">
-              出场: {character.sceneNumbers.length}
+              出场: {character.sceneNumbers?.length || 0}
             </p>
             <button className="mt-2 text-xs text-blue-500">详情</button>
           </div>
@@ -385,7 +486,7 @@ function ScenesTab({
                 <td className="px-4 py-3">{scene.location}</td>
                 <td className="px-4 py-3">{scene.timeOfDay}</td>
                 <td className="px-4 py-3">
-                  {scene.characters.map((c) => c.characterName).join(', ')}
+                  {scene.characters?.map((c) => c.characterName).join(', ') || '-'}
                 </td>
                 <td className="px-4 py-3">{scene.durationSeconds}s</td>
                 <td className="px-4 py-3">
@@ -518,7 +619,7 @@ function SceneModal({
             <div>
               <h4 className="font-medium text-gray-700 mb-2">角色与动作</h4>
               <div className="text-sm text-gray-600 space-y-1">
-                {scene.characters.map((c, i) => (
+                {scene.characters?.map((c, i) => (
                   <p key={i}>
                     • {c.characterName}: {c.position}，{c.action}，{c.expression}
                   </p>

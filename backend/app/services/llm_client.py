@@ -1,6 +1,6 @@
 import json
 import httpx
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from app.core.config import settings
 from app.schemas.common import LLMStatus
@@ -68,6 +68,62 @@ class LLMClient:
                 )
                 data = response.json()
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    async def chat_stream(
+        self, prompt: str, system_prompt: str = ""
+    ) -> AsyncGenerator[str, None]:
+        """流式发送对话请求，逐块返回内容"""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            if self.llm_type == "ollama":
+                async with client.stream(
+                    "POST",
+                    self.api_endpoint,
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "stream": True,
+                    },
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if line:
+                            try:
+                                data = json.loads(line)
+                                content = data.get("message", {}).get("content", "")
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                pass
+            else:  # lmstudio (OpenAI compatible)
+                async with client.stream(
+                    "POST",
+                    self.api_endpoint,
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "stream": True,
+                    },
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                data = json.loads(data_str)
+                                content = (
+                                    data.get("choices", [{}])[0]
+                                    .get("delta", {})
+                                    .get("content", "")
+                                )
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                pass
 
     async def chat_json(self, prompt: str, system_prompt: str = "") -> dict[str, Any]:
         """发送请求并解析 JSON 响应"""
