@@ -63,23 +63,43 @@ export function ScriptAnalysisPage() {
     loadData()
   }, [projectId, urlProjectId])
 
+  // 刷新项目状态
+  const refreshProjectStatus = async () => {
+    if (!projectId) return
+    try {
+      const projectData = await projectsApi.get(projectId)
+      setCurrentProject(projectData)
+    } catch (err) {
+      console.error('Refresh project status failed:', err)
+    }
+  }
+
   // 分析角色
   const analyzeCharacters = async () => {
     if (!projectId) return
     setAnalyzing(true)
     setError(null)
+
+    // 先更新状态为分析中
+    if (currentProject) {
+      setCurrentProject({ ...currentProject, status: 'analyzing' })
+    }
+
     try {
       const response = await analysisApi.analyzeCharacters(projectId)
       if (response.success) {
-        // 重新加载角色
+        // 重新加载角色和项目状态
         const data = await analysisApi.getCharacters(projectId)
         setCharacters(data)
+        await refreshProjectStatus()
       } else {
         setError(response.message || '分析角色失败')
+        await refreshProjectStatus()
       }
     } catch (err) {
       setError('分析角色失败')
       console.error('Analyze characters failed:', err)
+      await refreshProjectStatus()
     } finally {
       setAnalyzing(false)
     }
@@ -90,18 +110,27 @@ export function ScriptAnalysisPage() {
     if (!projectId) return
     setAnalyzing(true)
     setError(null)
+
+    // 先更新状态为分析中
+    if (currentProject) {
+      setCurrentProject({ ...currentProject, status: 'analyzing' })
+    }
+
     try {
       const response = await analysisApi.analyzeScenes(projectId)
       if (response.success) {
-        // 重新加载场景
+        // 重新加载场景和项目状态
         const data = await analysisApi.getScenes(projectId)
         setScenes(data)
+        await refreshProjectStatus()
       } else {
         setError(response.message || '分析场景失败')
+        await refreshProjectStatus()
       }
     } catch (err) {
       setError('分析场景失败')
       console.error('Analyze scenes failed:', err)
+      await refreshProjectStatus()
     } finally {
       setAnalyzing(false)
     }
@@ -191,7 +220,6 @@ export function ScriptAnalysisPage() {
             <CharactersTab
               characters={characters}
               onSelect={setSelectedCharacter}
-              onNavigateUpload={() => navigate('/upload')}
               onAnalyze={analyzeCharacters}
               analyzing={analyzing}
             />
@@ -199,7 +227,6 @@ export function ScriptAnalysisPage() {
             <ScenesTab
               scenes={scenes}
               onSelect={setSelectedScene}
-              onNavigateUpload={() => navigate('/upload')}
               onAnalyze={analyzeScenes}
               analyzing={analyzing}
             />
@@ -229,13 +256,11 @@ export function ScriptAnalysisPage() {
 function CharactersTab({
   characters,
   onSelect,
-  onNavigateUpload,
   onAnalyze,
   analyzing,
 }: {
   characters: Character[]
   onSelect: (c: Character) => void
-  onNavigateUpload: () => void
   onAnalyze: () => void
   analyzing: boolean
 }) {
@@ -301,13 +326,11 @@ function CharactersTab({
 function ScenesTab({
   scenes,
   onSelect,
-  onNavigateUpload,
   onAnalyze,
   analyzing,
 }: {
   scenes: Scene[]
   onSelect: (s: Scene) => void
-  onNavigateUpload: () => void
   onAnalyze: () => void
   analyzing: boolean
 }) {
