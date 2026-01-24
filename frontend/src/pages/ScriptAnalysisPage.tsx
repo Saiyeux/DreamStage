@@ -392,14 +392,17 @@ function CharactersTab({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {characters.map((character) => (
+        {characters.map((character) => {
+          const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
+          const bgColor = character.gender?.includes('女') ? 'bg-pink-100' : character.gender?.includes('男') ? 'bg-blue-100' : 'bg-gray-200'
+          return (
           <div
             key={character.id}
             onClick={() => onSelect(character)}
             className="bg-gray-50 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-100 transition-colors"
           >
-            <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl">
-              👤
+            <div className={`w-16 h-16 ${bgColor} rounded-full mx-auto mb-2 flex items-center justify-center text-2xl`}>
+              {avatar}
             </div>
             <p className="font-medium text-gray-800">{character.name}</p>
             <p className="text-xs text-gray-500">{character.roleType}</p>
@@ -408,7 +411,7 @@ function CharactersTab({
             </p>
             <button className="mt-2 text-xs text-blue-500">详情</button>
           </div>
-        ))}
+        )})}
       </div>
 
       <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
@@ -507,19 +510,22 @@ function CharacterModal({
   character: Character
   onClose: () => void
 }) {
+  const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
+  const bgColor = character.gender?.includes('女') ? 'bg-pink-100' : character.gender?.includes('男') ? 'bg-blue-100' : 'bg-gray-100'
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">👤 {character.name}</h3>
+          <h3 className="text-lg font-bold">{avatar} {character.name}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             ✕
           </button>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-gray-100 rounded-lg aspect-[3/4] flex items-center justify-center text-6xl">
-            👤
+          <div className={`${bgColor} rounded-lg aspect-[3/4] flex items-center justify-center text-6xl`}>
+            {avatar}
           </div>
 
           <div className="space-y-4">
