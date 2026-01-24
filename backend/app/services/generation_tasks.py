@@ -4,8 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.db.database import async_session_maker
 from app.models import Character, Scene, CharacterImage, SceneImage, VideoClip
 from app.services.comfyui_client import comfyui_client
 
@@ -148,7 +147,6 @@ class GenerationTasks:
         task_id: str,
         character: Character,
         image_types: list[str],
-        db: AsyncSession | None = None,
     ):
         """生成角色图像"""
         self.update_task_status(task_id, "running", 0, "准备生成...")
@@ -156,37 +154,54 @@ class GenerationTasks:
         try:
             total = len(image_types)
             generated_images = []
+            negative_prompt = "blurry, low quality, distorted, deformed"
 
-            for i, image_type in enumerate(image_types):
-                progress = int((i / total) * 100)
-                type_label = self.IMAGE_TYPE_LABELS.get(image_type, image_type)
-                self.update_task_status(
-                    task_id, "running", progress, f"生成 {character.name} {type_label}..."
-                )
-
-                # 构建 prompt
-                prompt = self._build_character_prompt(character, image_type)
-                output_filename = f"character_{character.id}_{image_type}"
-
-                try:
-                    # 调用 ComfyUI 生成
-                    image_path = await comfyui_client.generate_image(
-                        workflow_name="character_portrait_flux2.json",
-                        positive_prompt=prompt,
-                        negative_prompt="blurry, low quality, distorted, deformed",
-                        width=768,
-                        height=1024,
-                        output_filename=output_filename,
-                        project_id=character.project_id,
+            async with async_session_maker() as db:
+                for i, image_type in enumerate(image_types):
+                    progress = int((i / total) * 100)
+                    type_label = self.IMAGE_TYPE_LABELS.get(image_type, image_type)
+                    self.update_task_status(
+                        task_id, "running", progress, f"生成 {character.name} {type_label}..."
                     )
-                    generated_images.append({
-                        "type": image_type,
-                        "path": image_path,
-                    })
-                except Exception as e:
-                    # 单张图片失败不中断整个任务
-                    print(f"Generate {image_type} failed: {e}")
-                    continue
+
+                    # 构建 prompt
+                    prompt = self._build_character_prompt(character, image_type)
+                    output_filename = f"character_{character.id}_{image_type}"
+
+                    try:
+                        # 调用 ComfyUI 生成
+                        image_path = await comfyui_client.generate_image(
+                            workflow_name="character_portrait_flux2.json",
+                            positive_prompt=prompt,
+                            negative_prompt=negative_prompt,
+                            width=768,
+                            height=1024,
+                            output_filename=output_filename,
+                            project_id=character.project_id,
+                        )
+
+                        # 保存到数据库
+                        char_image = CharacterImage(
+                            id=str(uuid.uuid4()),
+                            character_id=character.id,
+                            image_type=image_type,
+                            image_path=image_path,
+                            prompt_used=prompt,
+                            negative_prompt=negative_prompt,
+                            is_selected=False,
+                        )
+                        db.add(char_image)
+                        await db.commit()
+
+                        generated_images.append({
+                            "type": image_type,
+                            "path": image_path,
+                            "id": char_image.id,
+                        })
+                    except Exception as e:
+                        # 单张图片失败不中断整个任务
+                        print(f"Generate {image_type} failed: {e}")
+                        continue
 
             self.update_task_status(
                 task_id, "completed", 100,
@@ -210,34 +225,49 @@ class GenerationTasks:
             total_chars = len(characters)
             total_images = total_chars * len(self.IMAGE_TYPES)
             completed = 0
+            negative_prompt = "blurry, low quality, distorted, deformed"
 
-            for i, character in enumerate(characters):
-                for j, image_type in enumerate(self.IMAGE_TYPES):
-                    progress = int((completed / total_images) * 100)
-                    type_label = self.IMAGE_TYPE_LABELS.get(image_type, image_type)
-                    self.update_task_status(
-                        task_id, "running", progress,
-                        f"{character.name} - {type_label}"
-                    )
-
-                    # 构建 prompt
-                    prompt = self._build_character_prompt(character, image_type)
-                    output_filename = f"char_{character.id[:8]}_{image_type}"
-
-                    try:
-                        await comfyui_client.generate_image(
-                            workflow_name="character_portrait_flux2.json",
-                            positive_prompt=prompt,
-                            negative_prompt="blurry, low quality, distorted, deformed",
-                            width=768,
-                            height=1024,
-                            output_filename=output_filename,
-                            project_id=project_id,
+            async with async_session_maker() as db:
+                for i, character in enumerate(characters):
+                    for j, image_type in enumerate(self.IMAGE_TYPES):
+                        progress = int((completed / total_images) * 100)
+                        type_label = self.IMAGE_TYPE_LABELS.get(image_type, image_type)
+                        self.update_task_status(
+                            task_id, "running", progress,
+                            f"{character.name} - {type_label}"
                         )
-                    except Exception as e:
-                        print(f"Generate {character.name} {image_type} failed: {e}")
 
-                    completed += 1
+                        # 构建 prompt
+                        prompt = self._build_character_prompt(character, image_type)
+                        output_filename = f"char_{character.id[:8]}_{image_type}"
+
+                        try:
+                            image_path = await comfyui_client.generate_image(
+                                workflow_name="character_portrait_flux2.json",
+                                positive_prompt=prompt,
+                                negative_prompt=negative_prompt,
+                                width=768,
+                                height=1024,
+                                output_filename=output_filename,
+                                project_id=project_id,
+                            )
+
+                            # 保存到数据库
+                            char_image = CharacterImage(
+                                id=str(uuid.uuid4()),
+                                character_id=character.id,
+                                image_type=image_type,
+                                image_path=image_path,
+                                prompt_used=prompt,
+                                negative_prompt=negative_prompt,
+                                is_selected=(image_type == "front"),  # 默认选择正面图
+                            )
+                            db.add(char_image)
+                            await db.commit()
+                        except Exception as e:
+                            print(f"Generate {character.name} {image_type} failed: {e}")
+
+                        completed += 1
 
             self.update_task_status(task_id, "completed", 100, "角色库生成完成")
 
@@ -261,13 +291,14 @@ class GenerationTasks:
 
         try:
             prompt = self._build_scene_prompt(scene)
+            negative_prompt = "blurry, low quality, distorted, ugly"
             output_filename = f"scene_{scene.project_id[:8]}_{scene.scene_number}"
 
             # 调用 ComfyUI (scene workflow 使用 IPAdapter 保持角色一致性)
             image_path = await comfyui_client.generate_image(
                 workflow_name="scene_generation_flux2.json",
                 positive_prompt=prompt,
-                negative_prompt="blurry, low quality, distorted, ugly",
+                negative_prompt=negative_prompt,
                 width=768,
                 height=1344,
                 output_filename=output_filename,
@@ -275,10 +306,22 @@ class GenerationTasks:
                 reference_image=reference_image,
             )
 
+            # 保存到数据库
+            async with async_session_maker() as db:
+                scene_image = SceneImage(
+                    id=str(uuid.uuid4()),
+                    scene_id=scene.id,
+                    image_path=image_path,
+                    prompt_used=prompt,
+                    is_approved=False,
+                )
+                db.add(scene_image)
+                await db.commit()
+
             self.update_task_status(
                 task_id, "completed", 100,
                 "场景图生成完成",
-                result={"path": image_path}
+                result={"path": image_path, "id": scene_image.id}
             )
 
         except Exception as e:
@@ -295,29 +338,48 @@ class GenerationTasks:
 
         try:
             total = len(scenes)
-            for i, scene in enumerate(scenes):
-                progress = int((i / total) * 100)
-                self.update_task_status(
-                    task_id, "running", progress, f"场景 #{scene.scene_number}"
-                )
+            generated = 0
+            negative_prompt = "blurry, low quality, distorted, ugly"
 
-                prompt = self._build_scene_prompt(scene)
-                output_filename = f"scene_{project_id[:8]}_{scene.scene_number}"
-
-                try:
-                    await comfyui_client.generate_image(
-                        workflow_name="scene_generation_flux2.json",
-                        positive_prompt=prompt,
-                        negative_prompt="blurry, low quality, distorted, ugly",
-                        width=768,
-                        height=1344,
-                        output_filename=output_filename,
-                        project_id=project_id,
+            async with async_session_maker() as db:
+                for i, scene in enumerate(scenes):
+                    progress = int((i / total) * 100)
+                    self.update_task_status(
+                        task_id, "running", progress, f"场景 #{scene.scene_number}"
                     )
-                except Exception as e:
-                    print(f"Generate scene {scene.scene_number} failed: {e}")
 
-            self.update_task_status(task_id, "completed", 100, "全部场景图生成完成")
+                    prompt = self._build_scene_prompt(scene)
+                    output_filename = f"scene_{project_id[:8]}_{scene.scene_number}"
+
+                    try:
+                        image_path = await comfyui_client.generate_image(
+                            workflow_name="scene_generation_flux2.json",
+                            positive_prompt=prompt,
+                            negative_prompt=negative_prompt,
+                            width=768,
+                            height=1344,
+                            output_filename=output_filename,
+                            project_id=project_id,
+                        )
+
+                        # 保存到数据库
+                        scene_image = SceneImage(
+                            id=str(uuid.uuid4()),
+                            scene_id=scene.id,
+                            image_path=image_path,
+                            prompt_used=prompt,
+                            is_approved=False,
+                        )
+                        db.add(scene_image)
+                        await db.commit()
+                        generated += 1
+                    except Exception as e:
+                        print(f"Generate scene {scene.scene_number} failed: {e}")
+
+            self.update_task_status(
+                task_id, "completed", 100,
+                f"完成 {generated}/{total} 张场景图"
+            )
 
         except Exception as e:
             self.update_task_status(task_id, "failed", 0, "", error=str(e))
@@ -343,7 +405,10 @@ class GenerationTasks:
                 input_image = f"scene_{scene.project_id[:8]}_{scene.scene_number}.png"
 
             action_prompt = self._build_action_prompt(scene)
+            negative_prompt = "blurry, low quality, distorted, jittery, unstable"
             output_filename = f"video_{scene.project_id[:8]}_{scene.scene_number}"
+            video_length = 97  # ~4秒 @24fps
+            frame_rate = 24
 
             self.update_task_status(task_id, "running", 10, "准备视频生成...")
 
@@ -352,21 +417,36 @@ class GenerationTasks:
                 workflow_name="video_generation_ltx2.json",
                 input_image=input_image,
                 action_prompt=action_prompt,
-                negative_prompt="blurry, low quality, distorted, jittery, unstable",
+                negative_prompt=negative_prompt,
                 width=768,
                 height=1344,
-                video_length=97,  # ~4秒 @24fps
+                video_length=video_length,
                 steps=30,
                 cfg=3.0,
-                frame_rate=24,
+                frame_rate=frame_rate,
                 output_filename=output_filename,
                 project_id=scene.project_id,
             )
 
+            # 保存到数据库
+            async with async_session_maker() as db:
+                video_clip = VideoClip(
+                    id=str(uuid.uuid4()),
+                    scene_id=scene.id,
+                    video_path=video_path,
+                    duration=video_length / frame_rate,  # ~4秒
+                    fps=frame_rate,
+                    resolution="768x1344",
+                    prompt_used=action_prompt,
+                    is_approved=False,
+                )
+                db.add(video_clip)
+                await db.commit()
+
             self.update_task_status(
                 task_id, "completed", 100,
                 "视频生成完成",
-                result={"path": video_path}
+                result={"path": video_path, "id": video_clip.id}
             )
 
         except Exception as e:
@@ -384,36 +464,54 @@ class GenerationTasks:
         try:
             total = len(scenes)
             generated = 0
+            negative_prompt = "blurry, low quality, distorted, jittery, unstable"
+            video_length = 97
+            frame_rate = 24
 
-            for i, scene in enumerate(scenes):
-                progress = int((i / total) * 100)
-                self.update_task_status(
-                    task_id, "running", progress, f"视频 #{scene.scene_number}"
-                )
-
-                # 输入图像为之前生成的场景图
-                input_image = f"scene_{project_id[:8]}_{scene.scene_number}.png"
-                action_prompt = self._build_action_prompt(scene)
-                output_filename = f"video_{project_id[:8]}_{scene.scene_number}"
-
-                try:
-                    await comfyui_client.generate_video(
-                        workflow_name="video_generation_ltx2.json",
-                        input_image=input_image,
-                        action_prompt=action_prompt,
-                        negative_prompt="blurry, low quality, distorted, jittery, unstable",
-                        width=768,
-                        height=1344,
-                        video_length=97,
-                        steps=30,
-                        cfg=3.0,
-                        frame_rate=24,
-                        output_filename=output_filename,
-                        project_id=project_id,
+            async with async_session_maker() as db:
+                for i, scene in enumerate(scenes):
+                    progress = int((i / total) * 100)
+                    self.update_task_status(
+                        task_id, "running", progress, f"视频 #{scene.scene_number}"
                     )
-                    generated += 1
-                except Exception as e:
-                    print(f"Generate video {scene.scene_number} failed: {e}")
+
+                    # 输入图像为之前生成的场景图
+                    input_image = f"scene_{project_id[:8]}_{scene.scene_number}.png"
+                    action_prompt = self._build_action_prompt(scene)
+                    output_filename = f"video_{project_id[:8]}_{scene.scene_number}"
+
+                    try:
+                        video_path = await comfyui_client.generate_video(
+                            workflow_name="video_generation_ltx2.json",
+                            input_image=input_image,
+                            action_prompt=action_prompt,
+                            negative_prompt=negative_prompt,
+                            width=768,
+                            height=1344,
+                            video_length=video_length,
+                            steps=30,
+                            cfg=3.0,
+                            frame_rate=frame_rate,
+                            output_filename=output_filename,
+                            project_id=project_id,
+                        )
+
+                        # 保存到数据库
+                        video_clip = VideoClip(
+                            id=str(uuid.uuid4()),
+                            scene_id=scene.id,
+                            video_path=video_path,
+                            duration=video_length / frame_rate,
+                            fps=frame_rate,
+                            resolution="768x1344",
+                            prompt_used=action_prompt,
+                            is_approved=False,
+                        )
+                        db.add(video_clip)
+                        await db.commit()
+                        generated += 1
+                    except Exception as e:
+                        print(f"Generate video {scene.scene_number} failed: {e}")
 
             self.update_task_status(
                 task_id, "completed", 100,
