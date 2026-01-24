@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # ComfyUI 配置
     COMFYUI_URL: str = "http://localhost:8000"
     COMFYUI_PATH: str = ""  # ComfyUI 安装目录，用于检测本地模型
+    COMFYUI_OUTPUT_DIR: str = ""  # ComfyUI 输出目录，用于服务生成的文件
 
     # 存储配置
     DATA_DIR: Path = Path("./data")

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
 import { projectsApi, analysisApi, generationApi } from '@/api'
+import { fileUrl } from '@/api/client'
 import { useProjectStore } from '@/stores/projectStore'
 
 type Tab = 'characters' | 'scenes' | 'videos'
@@ -26,35 +27,36 @@ export function GenerationCenterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 加载数据
-  useEffect(() => {
+  // 加载数据 (可复用)
+  const loadData = useCallback(async () => {
     if (!projectId) return
 
-    const loadData = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        if (urlProjectId && (!currentProject || currentProject.id !== urlProjectId)) {
-          const projectData = await projectsApi.get(urlProjectId)
-          setCurrentProject(projectData)
-        }
-
-        const [charactersData, scenesData] = await Promise.all([
-          analysisApi.getCharacters(projectId).catch(() => []),
-          analysisApi.getScenes(projectId).catch(() => []),
-        ])
-        setCharacters(charactersData)
-        setScenes(scenesData)
-      } catch (err) {
-        setError('加载项目失败')
-        console.error('Load project failed:', err)
-      } finally {
-        setLoading(false)
+    setLoading(true)
+    setError(null)
+    try {
+      if (urlProjectId && (!currentProject || currentProject.id !== urlProjectId)) {
+        const projectData = await projectsApi.get(urlProjectId)
+        setCurrentProject(projectData)
       }
-    }
 
+      const [charactersData, scenesData] = await Promise.all([
+        analysisApi.getCharacters(projectId).catch(() => []),
+        analysisApi.getScenes(projectId).catch(() => []),
+      ])
+      setCharacters(charactersData)
+      setScenes(scenesData)
+    } catch (err) {
+      setError('加载项目失败')
+      console.error('Load project failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId, urlProjectId, currentProject, setCurrentProject, setCharacters, setScenes])
+
+  // 初始加载
+  useEffect(() => {
     loadData()
-  }, [projectId, urlProjectId])
+  }, [loadData])
 
   // 无项目时的空状态
   if (!projectId) {
@@ -154,6 +156,7 @@ export function GenerationCenterPage() {
               projectId={projectId}
               characters={characters}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
+              onRefresh={loadData}
             />
           )}
           {activeTab === 'scenes' && (
@@ -162,6 +165,7 @@ export function GenerationCenterPage() {
               scenes={scenes}
               hasCharacterLibrary={hasCharacterLibrary}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
+              onRefresh={loadData}
             />
           )}
           {activeTab === 'videos' && (
@@ -170,6 +174,7 @@ export function GenerationCenterPage() {
               scenes={scenes}
               hasSceneImages={hasSceneImages}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
+              onRefresh={loadData}
             />
           )}
         </div>
@@ -185,10 +190,12 @@ function CharacterLibraryTab({
   projectId,
   characters,
   onNavigateAnalysis,
+  onRefresh,
 }: {
   projectId: string
   characters: Character[]
   onNavigateAnalysis: () => void
+  onRefresh: () => void
 }) {
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -259,6 +266,7 @@ function CharacterLibraryTab({
           if (status.status === 'completed') {
             setGenerating(false)
             if (pollingRef.current) clearInterval(pollingRef.current)
+            onRefresh() // 刷新数据
           } else if (status.status === 'failed') {
             setGenerating(false)
             setError(status.error || '生成失败')
@@ -312,8 +320,7 @@ function CharacterLibraryTab({
           <CharacterGenerationCard
             key={character.id}
             character={character}
-            status={character.images && character.images.length > 0 ? 'completed' : 'pending'}
-            images={character.images?.length || 0}
+            status={character.images && character.images.length > 0 ? 'completed' : generating ? 'generating' : 'pending'}
           />
         ))}
       </div>
@@ -325,24 +332,37 @@ function CharacterLibraryTab({
   )
 }
 
+// 图片类型映射 (中文 -> 英文)
+const IMAGE_TYPE_MAP: Record<string, string> = {
+  '正面': 'front',
+  '侧面': 'side',
+  '微笑': 'smile',
+  '惊讶': 'surprised',
+  '思考': 'thinking',
+}
+
 function CharacterGenerationCard({
   character,
   status,
-  images,
-  progress,
 }: {
   character: Character
   status: 'pending' | 'generating' | 'completed'
-  images: number
-  progress?: number
 }) {
   const statusLabel = {
     pending: '⬜ 待生成',
-    generating: `🔄 生成中 ${progress}%`,
+    generating: '🔄 生成中',
     completed: '✅ 完成',
   }
 
   const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
+  const images = character.images || []
+  const imageCount = images.length
+
+  // 根据类型查找图片
+  const getImageByType = (type: string) => {
+    const typeKey = IMAGE_TYPE_MAP[type]
+    return images.find(img => img.imageType === typeKey)
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg p-4">
@@ -356,29 +376,40 @@ function CharacterGenerationCard({
       </div>
 
       <div className="flex gap-2">
-        {CHARACTER_IMAGE_TYPES.map((type, i) => (
-          <div
-            key={type}
-            className={`w-16 h-20 rounded-lg flex items-center justify-center text-xs ${
-              i < images
-                ? 'bg-gray-200'
-                : status === 'generating' && i === images
-                ? 'bg-blue-100 text-blue-500'
-                : 'bg-gray-100 text-gray-400'
-            }`}
-          >
-            {i < images ? (
-              <span>{type} {i === 0 && '⭐'}</span>
-            ) : status === 'generating' && i === images ? (
-              '生成中'
-            ) : (
-              type
-            )}
-          </div>
-        ))}
+        {CHARACTER_IMAGE_TYPES.map((type) => {
+          const img = getImageByType(type)
+          return (
+            <div
+              key={type}
+              className={`w-16 h-20 rounded-lg flex items-center justify-center text-xs overflow-hidden ${
+                img
+                  ? 'bg-gray-100'
+                  : status === 'generating'
+                  ? 'bg-blue-100 text-blue-500'
+                  : 'bg-gray-100 text-gray-400'
+              }`}
+            >
+              {img ? (
+                <img
+                  src={fileUrl.image(img.imagePath)}
+                  alt={`${character.name} ${type}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // 图片加载失败时显示占位符
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+              ) : status === 'generating' ? (
+                '⏳'
+              ) : (
+                type
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      {status === 'completed' && (
+      {status === 'completed' && imageCount > 0 && (
         <div className="flex gap-2 mt-3">
           <button className="text-sm text-blue-500 hover:text-blue-600">
             🔄 重新生成
@@ -400,11 +431,13 @@ function SceneImageTab({
   scenes,
   hasCharacterLibrary,
   onNavigateAnalysis,
+  onRefresh,
 }: {
   projectId: string
   scenes: Scene[]
   hasCharacterLibrary: boolean
   onNavigateAnalysis: () => void
+  onRefresh: () => void
 }) {
   const [currentScene, setCurrentScene] = useState(1)
   const [generating, setGenerating] = useState(false)
@@ -456,6 +489,7 @@ function SceneImageTab({
             setGenerating(false)
             if (status.status === 'failed') setError(status.error || '生成失败')
             if (pollingRef.current) clearInterval(pollingRef.current)
+            if (status.status === 'completed') onRefresh() // 刷新数据
           }
         } catch (err) {
           console.error('Poll status failed:', err)
@@ -466,6 +500,9 @@ function SceneImageTab({
       setError('启动任务失败')
     }
   }
+
+  // 当前场景
+  const currentSceneData = scenes[currentScene - 1]
 
   return (
     <div>
@@ -506,11 +543,29 @@ function SceneImageTab({
       )}
 
       {/* Main Preview */}
-      <div className="bg-gray-100 rounded-lg aspect-[9/16] max-w-md mx-auto flex items-center justify-center mb-4">
-        <div className="text-center">
-          <div className="text-6xl mb-2">🖼️</div>
-          <p className="text-gray-500">场景 #{currentScene} 预览</p>
-        </div>
+      <div className="bg-gray-100 rounded-lg aspect-[9/16] max-w-md mx-auto flex items-center justify-center mb-4 overflow-hidden">
+        {currentSceneData?.sceneImage ? (
+          <img
+            src={fileUrl.image(currentSceneData.sceneImage.imagePath)}
+            alt={`场景 #${currentScene}`}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+              e.currentTarget.parentElement!.innerHTML = `
+                <div class="text-center">
+                  <div class="text-6xl mb-2">🖼️</div>
+                  <p class="text-gray-500">图片加载失败</p>
+                </div>
+              `
+            }}
+          />
+        ) : (
+          <div className="text-center">
+            <div className="text-6xl mb-2">🖼️</div>
+            <p className="text-gray-500">场景 #{currentScene} 预览</p>
+            {generating && <p className="text-sm text-blue-500 mt-2">生成中...</p>}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -567,11 +622,13 @@ function VideoGenerationTab({
   scenes,
   hasSceneImages,
   onNavigateAnalysis,
+  onRefresh,
 }: {
   projectId: string
   scenes: Scene[]
   hasSceneImages: boolean
   onNavigateAnalysis: () => void
+  onRefresh: () => void
 }) {
   const [currentScene, setCurrentScene] = useState(1)
   const [generating, setGenerating] = useState(false)
@@ -623,6 +680,7 @@ function VideoGenerationTab({
             setGenerating(false)
             if (status.status === 'failed') setError(status.error || '生成失败')
             if (pollingRef.current) clearInterval(pollingRef.current)
+            if (status.status === 'completed') onRefresh() // 刷新数据
           }
         } catch (err) {
           console.error('Poll status failed:', err)
@@ -633,6 +691,9 @@ function VideoGenerationTab({
       setError('启动任务失败')
     }
   }
+
+  // 当前场景
+  const currentSceneData = scenes[currentScene - 1]
 
   return (
     <div>
@@ -673,12 +734,22 @@ function VideoGenerationTab({
       )}
 
       {/* Video Preview */}
-      <div className="bg-black rounded-lg aspect-[9/16] max-w-md mx-auto flex items-center justify-center mb-4">
-        <div className="text-center text-white">
-          <div className="text-6xl mb-2">🎬</div>
-          <p className="text-gray-400">场景 #{currentScene} 视频</p>
-          <p className="text-sm text-gray-500 mt-2">768x1344 | 24fps | 4s</p>
-        </div>
+      <div className="bg-black rounded-lg aspect-[9/16] max-w-md mx-auto flex items-center justify-center mb-4 overflow-hidden">
+        {currentSceneData?.videoClip ? (
+          <video
+            src={fileUrl.video(currentSceneData.videoClip.videoPath)}
+            controls
+            className="w-full h-full object-cover"
+            poster={currentSceneData.sceneImage ? fileUrl.image(currentSceneData.sceneImage.imagePath) : undefined}
+          />
+        ) : (
+          <div className="text-center text-white">
+            <div className="text-6xl mb-2">🎬</div>
+            <p className="text-gray-400">场景 #{currentScene} 视频</p>
+            <p className="text-sm text-gray-500 mt-2">768x1344 | 24fps | 4s</p>
+            {generating && <p className="text-sm text-blue-400 mt-2">生成中...</p>}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}

@@ -1,5 +1,11 @@
 const BASE_URL = '/api'
 
+// 文件 URL 构建器
+export const fileUrl = {
+  image: (filename: string) => `${BASE_URL}/files/images/${filename}`,
+  video: (filename: string) => `${BASE_URL}/files/videos/${filename}`,
+}
+
 export class ApiError extends Error {
   status: number
 
