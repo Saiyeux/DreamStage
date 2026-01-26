@@ -57,5 +57,9 @@ class GenerateCharacterImagesRequest(CamelModel):
     image_types: list[str]
 
 
+class GenerateCharacterLibraryRequest(CamelModel):
+    image_types: list[str] | None = None  # 可选，默认使用后端配置
+
+
 class GenerateSceneRequest(CamelModel):
     scene_id: str

@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db
 from app.models import Project, ProjectStatus, Character, Scene
-from app.schemas import TaskResponse, GenerateCharacterImagesRequest, GenerateSceneRequest
+from app.schemas import TaskResponse, GenerateCharacterImagesRequest, GenerateCharacterLibraryRequest, GenerateSceneRequest
 from app.services.comfyui_client import comfyui_client
 from app.services.generation_tasks import generation_tasks
 
@@ -50,6 +50,7 @@ async def generate_character_images(
 @router.post("/{project_id}/generate/character-library", response_model=TaskResponse)
 async def generate_character_library(
     project_id: str,
+    request: GenerateCharacterLibraryRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
@@ -70,6 +71,7 @@ async def generate_character_library(
         task_id=task_id,
         project_id=project_id,
         characters=list(characters),
+        image_types=request.image_types,
     )
 
     # 更新项目状态

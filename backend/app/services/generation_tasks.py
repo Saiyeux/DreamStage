@@ -1,6 +1,7 @@
 """后台生成任务"""
 import uuid
 import asyncio
+import json
 from pathlib import Path
 from typing import Any
 
@@ -9,21 +10,45 @@ from app.models import Character, Scene, CharacterImage, SceneImage, VideoClip
 from app.services.comfyui_client import comfyui_client
 
 
+# 配置文件路径
+CONFIG_DIR = Path(__file__).parent.parent / "config"
+
+
 class GenerationTasks:
     """生成任务管理"""
 
     # 任务状态存储 (简化版，生产环境应使用 Redis)
     _task_status: dict[str, dict[str, Any]] = {}
 
-    # 角色图类型
-    IMAGE_TYPES = ["front", "side", "smile", "surprised", "thinking"]
-    IMAGE_TYPE_LABELS = {
-        "front": "正面",
-        "side": "侧面",
-        "smile": "微笑",
-        "surprised": "惊讶",
-        "thinking": "思考",
-    }
+    # 加载图片类型配置
+    @staticmethod
+    def _load_image_type_config() -> dict:
+        """从配置文件加载图片类型"""
+        config_file = CONFIG_DIR / "character_image_templates.json"
+        if config_file.exists():
+            with open(config_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        # 默认配置
+        return {
+            "default_types": [
+                {"id": "front", "label": "正面", "prompt_suffix": "front view, facing camera"},
+                {"id": "side", "label": "侧面", "prompt_suffix": "side view, profile"},
+                {"id": "back", "label": "背面", "prompt_suffix": "back view, from behind"},
+            ],
+            "available_types": [],
+        }
+
+    def _get_image_type_info(self, type_id: str) -> dict:
+        """获取指定类型的信息"""
+        config = self._load_image_type_config()
+        for t in config.get("available_types", []):
+            if t["id"] == type_id:
+                return t
+        for t in config.get("default_types", []):
+            if t["id"] == type_id:
+                return t
+        # 未找到时返回默认
+        return {"id": type_id, "label": type_id, "prompt_suffix": type_id}
 
     def get_task_status(self, task_id: str) -> dict[str, Any]:
         """获取任务状态"""
@@ -70,16 +95,9 @@ class GenerationTasks:
 
         base = ", ".join(parts) if parts else "a person"
 
-        # 根据图像类型添加修饰
-        type_modifiers = {
-            "front": "front view, portrait, looking at viewer, centered",
-            "side": "side view, profile portrait, 3/4 view",
-            "smile": "smiling, happy expression, gentle warm smile",
-            "surprised": "surprised expression, wide eyes, open mouth slightly",
-            "thinking": "thinking, contemplative expression, hand on chin",
-        }
-
-        modifier = type_modifiers.get(image_type, "portrait")
+        # 从配置文件获取类型修饰
+        type_info = self._get_image_type_info(image_type)
+        modifier = type_info.get("prompt_suffix", "portrait")
         quality = "high quality, detailed, professional portrait, 8k, sharp focus, studio lighting"
 
         return f"{base}, {modifier}, {quality}"
@@ -217,21 +235,40 @@ class GenerationTasks:
         task_id: str,
         project_id: str,
         characters: list[Character],
+        image_types: list[str] | None = None,
     ):
-        """批量生成角色库"""
+        """批量生成角色库
+
+        Args:
+            task_id: 任务ID
+            project_id: 项目ID
+            characters: 角色列表
+            image_types: 要生成的图片类型列表，为None时使用默认配置
+        """
         self.update_task_status(task_id, "running", 0, "开始生成角色库...")
 
         try:
+            # 获取要生成的图片类型
+            if image_types is None:
+                config = self._load_image_type_config()
+                types_to_generate = [t["id"] for t in config.get("default_types", [])]
+            else:
+                types_to_generate = image_types
+
+            if not types_to_generate:
+                types_to_generate = ["front", "side", "back"]  # 最终回退
+
             total_chars = len(characters)
-            total_images = total_chars * len(self.IMAGE_TYPES)
+            total_images = total_chars * len(types_to_generate)
             completed = 0
             negative_prompt = "blurry, low quality, distorted, deformed"
 
             async with async_session_maker() as db:
                 for i, character in enumerate(characters):
-                    for j, image_type in enumerate(self.IMAGE_TYPES):
+                    for j, image_type in enumerate(types_to_generate):
                         progress = int((completed / total_images) * 100)
-                        type_label = self.IMAGE_TYPE_LABELS.get(image_type, image_type)
+                        type_info = self._get_image_type_info(image_type)
+                        type_label = type_info.get("label", image_type)
                         self.update_task_status(
                             task_id, "running", progress,
                             f"{character.name} - {type_label}"
@@ -260,7 +297,7 @@ class GenerationTasks:
                                 image_path=image_path,
                                 prompt_used=prompt,
                                 negative_prompt=negative_prompt,
-                                is_selected=(image_type == "front"),  # 默认选择正面图
+                                is_selected=(j == 0),  # 第一个类型作为默认选择
                             )
                             db.add(char_image)
                             await db.commit()

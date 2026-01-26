@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
-import { projectsApi, analysisApi, generationApi } from '@/api'
+import { projectsApi, analysisApi, generationApi, configApi } from '@/api'
+import type { ImageType, CharacterImageTemplates } from '@/api'
 import { fileUrl } from '@/api/client'
 import { useProjectStore } from '@/stores/projectStore'
 
@@ -183,9 +184,6 @@ export function GenerationCenterPage() {
   )
 }
 
-// 角色图类型选项
-const CHARACTER_IMAGE_TYPES = ['正面', '侧面', '微笑', '惊讶', '思考']
-
 function CharacterLibraryTab({
   projectId,
   characters,
@@ -203,6 +201,22 @@ function CharacterLibraryTab({
   const [error, setError] = useState<string | null>(null)
   const pollingRef = useRef<number | null>(null)
 
+  // 模板配置
+  const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
+  const [selectedTypes, setSelectedTypes] = useState<ImageType[]>([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+
+  // 角色特定的类型配置
+  const [characterCustomTypes, setCharacterCustomTypes] = useState<Record<string, ImageType[]>>({})
+
+  // 加载模板配置
+  useEffect(() => {
+    configApi.getCharacterImageTemplates().then((data) => {
+      setTemplates(data)
+      setSelectedTypes(data.default_types)
+    }).catch(console.error)
+  }, [])
+
   // 清理轮询
   useEffect(() => {
     return () => {
@@ -211,6 +225,43 @@ function CharacterLibraryTab({
       }
     }
   }, [])
+
+  // 添加类型
+  const addType = (type: ImageType) => {
+    if (!selectedTypes.find(t => t.id === type.id)) {
+      setSelectedTypes([...selectedTypes, type])
+    }
+  }
+
+  // 删除类型
+  const removeType = (typeId: string) => {
+    setSelectedTypes(selectedTypes.filter(t => t.id !== typeId))
+  }
+
+  // 保存角色特定的类型配置
+  const saveCharacterCustomTypes = (characterId: string, types: ImageType[]) => {
+    setCharacterCustomTypes(prev => ({
+      ...prev,
+      [characterId]: types,
+    }))
+  }
+
+  // 获取角色的有效类型配置（优先使用角色特定的，没有则使用全局）
+  const getCharacterEffectiveTypes = (characterId: string): ImageType[] => {
+    const customTypes = characterCustomTypes[characterId]
+    if (customTypes && customTypes.length > 0) {
+      return customTypes
+    }
+    return selectedTypes
+  }
+
+  // 应用模板
+  const applyTemplate = (templateName: string) => {
+    if (templates?.templates[templateName]) {
+      setSelectedTypes([...templates.templates[templateName]])
+    }
+    setShowTemplateModal(false)
+  }
 
   // 空状态
   if (characters.length === 0) {
@@ -230,14 +281,14 @@ function CharacterLibraryTab({
           <h4 className="font-medium text-gray-700 mb-2">角色图类型说明</h4>
           <p className="text-sm text-gray-500 mb-2">每个角色将生成以下类型的参考图：</p>
           <div className="flex flex-wrap gap-2">
-            {CHARACTER_IMAGE_TYPES.map((type, i) => (
+            {selectedTypes.map((type, i) => (
               <span
-                key={type}
+                key={type.id}
                 className={`px-2 py-1 text-xs rounded ${
                   i === 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                {type} {i === 0 && '⭐'}
+                {type.label} {i === 0 && '⭐'}
               </span>
             ))}
           </div>
@@ -253,7 +304,9 @@ function CharacterLibraryTab({
     setStatusMessage('正在启动生成任务...')
 
     try {
-      const response = await generationApi.generateCharacterLibrary(projectId)
+      // 传递选中的类型到后端
+      const imageTypes = selectedTypes.map(t => t.id)
+      const response = await generationApi.generateCharacterLibrary(projectId, imageTypes)
       const taskId = response.task_id
 
       // 轮询任务状态
@@ -285,6 +338,67 @@ function CharacterLibraryTab({
 
   return (
     <div>
+      {/* 类型配置区 */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-medium text-gray-700">图片类型配置</h4>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              className="text-sm text-blue-500 hover:text-blue-600"
+            >
+              📋 选择模板
+            </button>
+          </div>
+        </div>
+
+        {/* 已选类型 */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {selectedTypes.map((type) => (
+            <span
+              key={type.id}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded"
+            >
+              {type.label}
+              <button
+                onClick={() => removeType(type.id)}
+                className="ml-1 text-blue-500 hover:text-red-500"
+                title="删除"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {selectedTypes.length === 0 && (
+            <span className="text-sm text-gray-400">请添加至少一个类型</span>
+          )}
+        </div>
+
+        {/* 添加类型下拉 */}
+        {templates && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">添加类型:</span>
+            <select
+              className="text-sm border border-gray-300 rounded px-2 py-1"
+              value=""
+              onChange={(e) => {
+                const type = templates.available_types.find(t => t.id === e.target.value)
+                if (type) addType(type)
+              }}
+            >
+              <option value="">选择类型...</option>
+              {templates.available_types
+                .filter(t => !selectedTypes.find(s => s.id === t.id))
+                .map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.label}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {/* Status Bar */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm text-gray-600">
@@ -292,7 +406,7 @@ function CharacterLibraryTab({
         </div>
         <button
           onClick={startGeneration}
-          disabled={generating}
+          disabled={generating || selectedTypes.length === 0}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600"
         >
           {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
@@ -320,6 +434,8 @@ function CharacterLibraryTab({
           <CharacterGenerationCard
             key={character.id}
             character={character}
+            selectedTypes={getCharacterEffectiveTypes(character.id)}
+            onSaveCharacterTypes={(types) => saveCharacterCustomTypes(character.id, types)}
             status={character.images && character.images.length > 0 ? 'completed' : generating ? 'generating' : 'pending'}
           />
         ))}
@@ -328,24 +444,216 @@ function CharacterLibraryTab({
       <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
         💡 角色库完成后，系统将使用这些参考图保持场景中角色一致性
       </div>
+
+      {/* 模板选择弹窗 */}
+      {showTemplateModal && templates && (
+        <TemplateSelectionModal
+          templates={templates}
+          selectedTypes={selectedTypes}
+          onSelect={(types) => {
+            // 合并所选模板的类型
+            const allTypes = new Map<string, ImageType>()
+            types.forEach(type => {
+              if (!allTypes.has(type.id)) {
+                allTypes.set(type.id, type)
+              }
+            })
+            setSelectedTypes(Array.from(allTypes.values()))
+            setShowTemplateModal(false)
+          }}
+          onClose={() => setShowTemplateModal(false)}
+        />
+      )}
     </div>
   )
 }
 
-// 图片类型映射 (中文 -> 英文)
-const IMAGE_TYPE_MAP: Record<string, string> = {
-  '正面': 'front',
-  '侧面': 'side',
-  '微笑': 'smile',
-  '惊讶': 'surprised',
-  '思考': 'thinking',
+// 模板选择弹窗组件 - 多选打勾类型
+function TemplateSelectionModal({
+  templates,
+  selectedTypes,
+  onSelect,
+  onClose,
+}: {
+  templates: CharacterImageTemplates
+  selectedTypes: ImageType[]
+  onSelect: (types: ImageType[]) => void
+  onClose: () => void
+}) {
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
+  const [customTypes, setCustomTypes] = useState<string[]>(
+    selectedTypes.filter(t => {
+      // 检查是否属于某个模板
+      return !Object.values(templates.templates).some(templateTypes =>
+        templateTypes.some(templateType => templateType.id === t.id)
+      )
+    }).map(t => t.id)
+  )
+
+  // 计算当前选中的所有类型
+  const currentSelectedTypes = useCallback(() => {
+    const typeMap = new Map<string, ImageType>()
+
+    // 添加自定义类型
+    customTypes.forEach(typeId => {
+      const type = templates.available_types.find(t => t.id === typeId)
+      if (type) typeMap.set(typeId, type)
+    })
+
+    // 添加模板中的类型
+    selectedTemplates.forEach(templateName => {
+      templates.templates[templateName]?.forEach(type => {
+        if (!typeMap.has(type.id)) {
+          typeMap.set(type.id, type)
+        }
+      })
+    })
+
+    return Array.from(typeMap.values())
+  }, [templates, selectedTemplates, customTypes])
+
+  // 切换模板选择
+  const toggleTemplate = (templateName: string) => {
+    setSelectedTemplates(prev =>
+      prev.includes(templateName)
+        ? prev.filter(t => t !== templateName)
+        : [...prev, templateName]
+    )
+  }
+
+  // 切换自定义类型
+  const toggleCustomType = (typeId: string) => {
+    setCustomTypes(prev =>
+      prev.includes(typeId)
+        ? prev.filter(t => t !== typeId)
+        : [...prev, typeId]
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold">选择图片类型模板</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* 模板选择区 - 打勾类型 */}
+        <div className="mb-6">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">模板组合（可多选）</h4>
+          <div className="space-y-2">
+            {Object.entries(templates.templates).map(([name, types]) => (
+              <label
+                key={name}
+                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedTemplates.includes(name)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedTemplates.includes(name)}
+                  onChange={() => toggleTemplate(name)}
+                  className="w-4 h-4 text-blue-500 rounded"
+                />
+                <div className="flex-1">
+                  <div className="font-medium">{name}</div>
+                  <div className="text-sm text-gray-500">
+                    {types.map(t => t.label).join('、')}
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 自定义类型 - 打勾选择 */}
+        <div className="mb-6">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">自定义类型</h4>
+          <div className="flex flex-wrap gap-2">
+            {templates.available_types.map((type) => {
+              // 排除已在模板中的类型
+              const isInTemplate = Object.values(templates.templates).some(templateTypes =>
+                templateTypes.some(t => t.id === type.id)
+              )
+              if (isInTemplate) return null
+
+              const isSelected = customTypes.includes(type.id)
+              return (
+                <label
+                  key={type.id}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleCustomType(type.id)}
+                    className="w-3 h-3 text-blue-500 rounded"
+                  />
+                  <span className="text-sm">{type.label}</span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 预览当前选择 */}
+        <div className="mb-6 p-3 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">当前选择预览</h4>
+          <div className="flex flex-wrap gap-2">
+            {currentSelectedTypes().map((type) => (
+              <span
+                key={type.id}
+                className="px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded"
+              >
+                {type.label}
+              </span>
+            ))}
+            {currentSelectedTypes().length === 0 && (
+              <span className="text-sm text-gray-400">未选择任何类型</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+          >
+            取消
+          </button>
+          <button
+            onClick={() => onSelect(currentSelectedTypes())}
+            disabled={currentSelectedTypes().length === 0}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          >
+            应用选择
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function CharacterGenerationCard({
   character,
+  selectedTypes,
+  onSaveCharacterTypes,
   status,
 }: {
   character: Character
+  selectedTypes: ImageType[]
+  onSaveCharacterTypes?: (types: ImageType[]) => void
   status: 'pending' | 'generating' | 'completed'
 }) {
   const statusLabel = {
@@ -359,9 +667,50 @@ function CharacterGenerationCard({
   const imageCount = images.length
 
   // 根据类型查找图片
-  const getImageByType = (type: string) => {
-    const typeKey = IMAGE_TYPE_MAP[type]
-    return images.find(img => img.imageType === typeKey)
+  const getImageByType = (typeId: string) => {
+    return images.find(img => img.imageType === typeId)
+  }
+
+  // 角色特定的类型配置
+  const [showTypeConfig, setShowTypeConfig] = useState(false)
+  const [localSelectedTypes, setLocalSelectedTypes] = useState<ImageType[]>(selectedTypes)
+  const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
+
+  // 同步父组件传来的 selectedTypes
+  useEffect(() => {
+    setLocalSelectedTypes(selectedTypes)
+  }, [selectedTypes])
+
+  useEffect(() => {
+    if (showTypeConfig) {
+      configApi.getCharacterImageTemplates().then(setTemplates).catch(console.error)
+    }
+  }, [showTypeConfig])
+
+  // 添加类型
+  const addLocalType = (type: ImageType) => {
+    if (!localSelectedTypes.find(t => t.id === type.id)) {
+      setLocalSelectedTypes([...localSelectedTypes, type])
+    }
+  }
+
+  // 删除类型
+  const removeLocalType = (typeId: string) => {
+    setLocalSelectedTypes(localSelectedTypes.filter(t => t.id !== typeId))
+  }
+
+  // 应用模板到角色
+  const applyTemplateToCharacter = (templateName: string) => {
+    if (templates?.templates[templateName]) {
+      // 合并现有类型和模板类型
+      const newTypes = [...localSelectedTypes]
+      templates.templates[templateName].forEach(type => {
+        if (!newTypes.find(t => t.id === type.id)) {
+          newTypes.push(type)
+        }
+      })
+      setLocalSelectedTypes(newTypes)
+    }
   }
 
   return (
@@ -372,15 +721,24 @@ function CharacterGenerationCard({
           <span className="font-medium">{character.name}</span>
           <span className="text-sm text-gray-500">({character.roleType})</span>
         </div>
-        <span className="text-sm">{statusLabel[status]}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{statusLabel[status]}</span>
+          <button
+            onClick={() => setShowTypeConfig(true)}
+            className="text-sm px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+            title="配置该角色的图片类型"
+          >
+            ⚙️ 类型
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        {CHARACTER_IMAGE_TYPES.map((type) => {
-          const img = getImageByType(type)
+      <div className="flex gap-2 flex-wrap">
+        {selectedTypes.map((type) => {
+          const img = getImageByType(type.id)
           return (
             <div
-              key={type}
+              key={type.id}
               className={`w-16 h-20 rounded-lg flex items-center justify-center text-xs overflow-hidden ${
                 img
                   ? 'bg-gray-100'
@@ -388,21 +746,21 @@ function CharacterGenerationCard({
                   ? 'bg-blue-100 text-blue-500'
                   : 'bg-gray-100 text-gray-400'
               }`}
+              title={type.label}
             >
               {img ? (
                 <img
                   src={fileUrl.image(img.imagePath)}
-                  alt={`${character.name} ${type}`}
+                  alt={`${character.name} ${type.label}`}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    // 图片加载失败时显示占位符
                     e.currentTarget.style.display = 'none'
                   }}
                 />
               ) : status === 'generating' ? (
                 '⏳'
               ) : (
-                type
+                type.label
               )}
             </div>
           )
@@ -420,6 +778,105 @@ function CharacterGenerationCard({
           <button className="text-sm text-blue-500 hover:text-blue-600">
             📥 导出角色
           </button>
+        </div>
+      )}
+
+      {/* 角色类型配置弹窗 */}
+      {showTypeConfig && templates && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">配置 {character.name} 的图片类型</h3>
+              <button
+                onClick={() => setShowTypeConfig(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 已选类型 */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">已选类型</h4>
+              <div className="flex flex-wrap gap-2">
+                {localSelectedTypes.map((type) => (
+                  <span
+                    key={type.id}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded"
+                  >
+                    {type.label}
+                    <button
+                      onClick={() => removeLocalType(type.id)}
+                      className="ml-1 text-blue-500 hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {localSelectedTypes.length === 0 && (
+                  <span className="text-sm text-gray-400">请添加至少一个类型</span>
+                )}
+              </div>
+            </div>
+
+            {/* 快速添加模板 */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">快速添加模板</h4>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(templates.templates).map(([name, types]) => (
+                  <button
+                    key={name}
+                    onClick={() => applyTemplateToCharacter(name)}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 添加可用类型 */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">添加类型</h4>
+              <div className="flex flex-wrap gap-2">
+                {templates.available_types
+                  .filter(t => !localSelectedTypes.find(s => s.id === t.id))
+                  .map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => addLocalType(type)}
+                      className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200"
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setLocalSelectedTypes(selectedTypes)
+                  setShowTypeConfig(false)
+                }}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  // 保存角色特定的类型配置
+                  if (onSaveCharacterTypes) {
+                    onSaveCharacterTypes(localSelectedTypes)
+                  }
+                  setShowTypeConfig(false)
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                保存
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -3,11 +3,12 @@ import json
 import re
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db
+from app.db.database import async_session_maker
 from app.models import Project, ProjectStatus, Character, Scene
 from app.schemas import (
     AnalysisResponse,
@@ -140,7 +141,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
             full_response += chunk
             yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
-        # 解析并保存数据
+        # 解析并保存数据（使用新的数据库会话以避免长连接问题）
         saved_count = 0
         try:
             # 提取 JSON 内容
@@ -153,54 +154,71 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
 
             parsed_data = json.loads(json_str)
 
-            if analysis_type == "characters":
-                # 保存角色数据
-                for char_data in parsed_data.get("characters", []):
-                    character = Character(
-                        id=str(uuid.uuid4()),
-                        project_id=project_id,
-                        name=char_data.get("name", ""),
-                        gender=char_data.get("gender"),
-                        age=char_data.get("age"),
-                        role_type=char_data.get("role_type"),
-                        hair=char_data.get("appearance", {}).get("hair"),
-                        face=char_data.get("appearance", {}).get("face"),
-                        body=char_data.get("appearance", {}).get("body"),
-                        skin=char_data.get("appearance", {}).get("skin"),
-                        personality=char_data.get("personality"),
-                        clothing_style=char_data.get("clothing_style"),
-                        scene_numbers=[],
+            # 使用新的数据库会话保存数据
+            async with async_session_maker() as save_db:
+                if analysis_type == "characters":
+                    # 删除旧角色数据
+                    await save_db.execute(
+                        delete(Character).where(Character.project_id == project_id)
                     )
-                    db.add(character)
-                    saved_count += 1
-                await db.commit()
+                    # 保存角色数据
+                    for char_data in parsed_data.get("characters", []):
+                        character = Character(
+                            id=str(uuid.uuid4()),
+                            project_id=project_id,
+                            name=char_data.get("name", ""),
+                            gender=char_data.get("gender"),
+                            age=char_data.get("age"),
+                            role_type=char_data.get("role_type"),
+                            hair=char_data.get("appearance", {}).get("hair"),
+                            face=char_data.get("appearance", {}).get("face"),
+                            body=char_data.get("appearance", {}).get("body"),
+                            skin=char_data.get("appearance", {}).get("skin"),
+                            personality=char_data.get("personality"),
+                            clothing_style=char_data.get("clothing_style"),
+                            scene_numbers=[],
+                        )
+                        save_db.add(character)
+                        saved_count += 1
+                    await save_db.commit()
 
-            elif analysis_type == "scenes":
-                # 保存场景数据
-                for scene_data in parsed_data.get("scenes", []):
-                    scene = Scene(
-                        id=str(uuid.uuid4()),
-                        project_id=project_id,
-                        scene_number=scene_data.get("scene_number", 0),
-                        location=scene_data.get("location"),
-                        time_of_day=scene_data.get("time_of_day"),
-                        atmosphere=scene_data.get("atmosphere"),
-                        environment_desc=scene_data.get("environment", {}).get("description"),
-                        characters_data=scene_data.get("characters", []),
-                        dialogue=scene_data.get("dialogue"),
-                        shot_type=scene_data.get("camera", {}).get("shot_type"),
-                        camera_movement=scene_data.get("camera", {}).get("movement"),
-                        duration_seconds=scene_data.get("duration_seconds"),
+                elif analysis_type == "scenes":
+                    # 删除旧场景数据
+                    await save_db.execute(
+                        delete(Scene).where(Scene.project_id == project_id)
                     )
-                    db.add(scene)
-                    saved_count += 1
-                project.status = ProjectStatus.ANALYZED
-                await db.commit()
+                    # 保存场景数据
+                    for scene_data in parsed_data.get("scenes", []):
+                        scene = Scene(
+                            id=str(uuid.uuid4()),
+                            project_id=project_id,
+                            scene_number=scene_data.get("scene_number", 0),
+                            location=scene_data.get("location"),
+                            time_of_day=scene_data.get("time_of_day"),
+                            atmosphere=scene_data.get("atmosphere"),
+                            environment_desc=scene_data.get("environment", {}).get("description"),
+                            characters_data=scene_data.get("characters", []),
+                            dialogue=scene_data.get("dialogue"),
+                            shot_type=scene_data.get("camera", {}).get("shot_type"),
+                            camera_movement=scene_data.get("camera", {}).get("movement"),
+                            duration_seconds=scene_data.get("duration_seconds"),
+                        )
+                        save_db.add(scene)
+                        saved_count += 1
+                    # 更新项目状态
+                    result = await save_db.execute(select(Project).where(Project.id == project_id))
+                    project_to_update = result.scalar_one_or_none()
+                    if project_to_update:
+                        project_to_update.status = ProjectStatus.ANALYZED
+                    await save_db.commit()
 
-            elif analysis_type == "summary":
-                project.summary = parsed_data.get("summary", "")
-                await db.commit()
-                saved_count = 1
+                elif analysis_type == "summary":
+                    result = await save_db.execute(select(Project).where(Project.id == project_id))
+                    project_to_update = result.scalar_one_or_none()
+                    if project_to_update:
+                        project_to_update.summary = parsed_data.get("summary", "")
+                    await save_db.commit()
+                    saved_count = 1
 
             yield f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n"
 

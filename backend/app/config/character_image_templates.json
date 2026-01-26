@@ -1,0 +1,50 @@
+{
+  "default_types": [
+    {"id": "front", "label": "正面", "prompt_suffix": "front view, facing camera"},
+    {"id": "side", "label": "侧面", "prompt_suffix": "side view, profile"},
+    {"id": "back", "label": "背面", "prompt_suffix": "back view, from behind"}
+  ],
+  "templates": {
+    "三视图": [
+      {"id": "front", "label": "正面", "prompt_suffix": "front view, facing camera"},
+      {"id": "side", "label": "侧面", "prompt_suffix": "side view, profile"},
+      {"id": "back", "label": "背面", "prompt_suffix": "back view, from behind"}
+    ],
+    "表情系列": [
+      {"id": "neutral", "label": "平静", "prompt_suffix": "neutral expression, calm face"},
+      {"id": "smile", "label": "微笑", "prompt_suffix": "smiling, happy expression"},
+      {"id": "surprised", "label": "惊讶", "prompt_suffix": "surprised expression, wide eyes"},
+      {"id": "angry", "label": "愤怒", "prompt_suffix": "angry expression, frowning"},
+      {"id": "sad", "label": "悲伤", "prompt_suffix": "sad expression, melancholy"}
+    ],
+    "动作系列": [
+      {"id": "standing", "label": "站立", "prompt_suffix": "standing pose, full body"},
+      {"id": "sitting", "label": "坐姿", "prompt_suffix": "sitting pose"},
+      {"id": "walking", "label": "行走", "prompt_suffix": "walking pose, in motion"},
+      {"id": "running", "label": "奔跑", "prompt_suffix": "running pose, dynamic"}
+    ],
+    "完整角色库": [
+      {"id": "front", "label": "正面", "prompt_suffix": "front view, facing camera"},
+      {"id": "side", "label": "侧面", "prompt_suffix": "side view, profile"},
+      {"id": "back", "label": "背面", "prompt_suffix": "back view, from behind"},
+      {"id": "smile", "label": "微笑", "prompt_suffix": "smiling, happy expression"},
+      {"id": "thinking", "label": "思考", "prompt_suffix": "thinking pose, contemplative"}
+    ]
+  },
+  "available_types": [
+    {"id": "front", "label": "正面", "prompt_suffix": "front view, facing camera"},
+    {"id": "side", "label": "侧面", "prompt_suffix": "side view, profile"},
+    {"id": "back", "label": "背面", "prompt_suffix": "back view, from behind"},
+    {"id": "neutral", "label": "平静", "prompt_suffix": "neutral expression, calm face"},
+    {"id": "smile", "label": "微笑", "prompt_suffix": "smiling, happy expression"},
+    {"id": "surprised", "label": "惊讶", "prompt_suffix": "surprised expression, wide eyes"},
+    {"id": "angry", "label": "愤怒", "prompt_suffix": "angry expression, frowning"},
+    {"id": "sad", "label": "悲伤", "prompt_suffix": "sad expression, melancholy"},
+    {"id": "thinking", "label": "思考", "prompt_suffix": "thinking pose, contemplative"},
+    {"id": "standing", "label": "站立", "prompt_suffix": "standing pose, full body"},
+    {"id": "sitting", "label": "坐姿", "prompt_suffix": "sitting pose"},
+    {"id": "walking", "label": "行走", "prompt_suffix": "walking pose, in motion"},
+    {"id": "closeup", "label": "特写", "prompt_suffix": "close-up shot, face detail"},
+    {"id": "fullbody", "label": "全身", "prompt_suffix": "full body shot, head to toe"}
+  ]
+}

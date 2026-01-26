@@ -30,8 +30,10 @@ export const generationApi = {
     }),
 
   // 批量生成角色库
-  generateCharacterLibrary: (projectId: string) =>
-    api.post<TaskResponse>(`/projects/${projectId}/generate/character-library`),
+  generateCharacterLibrary: (projectId: string, imageTypes?: string[]) =>
+    api.post<TaskResponse>(`/projects/${projectId}/generate/character-library`, {
+      image_types: imageTypes,
+    }),
 
   // 生成单个场景图
   generateSceneImage: (projectId: string, sceneId: string) =>

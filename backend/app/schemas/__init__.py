@@ -22,6 +22,7 @@ from app.schemas.common import (
     TaskResponse,
     AnalysisResponse,
     GenerateCharacterImagesRequest,
+    GenerateCharacterLibraryRequest,
     GenerateSceneRequest,
 )
 
@@ -43,5 +44,6 @@ __all__ = [
     "TaskResponse",
     "AnalysisResponse",
     "GenerateCharacterImagesRequest",
+    "GenerateCharacterLibraryRequest",
     "GenerateSceneRequest",
 ]
