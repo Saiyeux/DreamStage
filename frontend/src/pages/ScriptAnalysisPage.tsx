@@ -32,6 +32,9 @@ export function ScriptAnalysisPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 当前正在分析的类型 (null表示没有分析任务)
+  const [currentAnalyzing, setCurrentAnalyzing] = useState<'characters' | 'scenes' | null>(null)
+
   // 从 store 获取终端状态
   const { terminalOutput, isStreaming, terminalExpanded } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
@@ -97,7 +100,11 @@ export function ScriptAnalysisPage() {
   const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
     if (!projectId) return
 
+    // 如果已有分析任务在进行，不允许启动新任务
+    if (isStreaming) return
+
     // 更新状态
+    setCurrentAnalyzing(analysisType)
     setAnalysisState({
       isStreaming: true,
       terminalExpanded: true,
@@ -141,6 +148,7 @@ export function ScriptAnalysisPage() {
           appendTerminalOutput('')
           appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 分析完成`)
           eventSource.close()
+          setCurrentAnalyzing(null)
           setAnalysisState({ isStreaming: false })
 
           // 重新加载数据 (数据已在后端保存)
@@ -161,6 +169,7 @@ export function ScriptAnalysisPage() {
           appendTerminalOutput('')
           appendTerminalOutput(`[错误] ${data.message}`)
           eventSource.close()
+          setCurrentAnalyzing(null)
           setAnalysisState({ isStreaming: false })
           await refreshProjectStatus()
         }
@@ -173,6 +182,7 @@ export function ScriptAnalysisPage() {
       appendTerminalOutput('')
       appendTerminalOutput('[连接断开]')
       eventSource.close()
+      setCurrentAnalyzing(null)
       setAnalysisState({ isStreaming: false })
       await refreshProjectStatus()
     }
@@ -307,14 +317,16 @@ export function ScriptAnalysisPage() {
               characters={characters}
               onSelect={setSelectedCharacter}
               onAnalyze={() => analyzeWithStream('characters')}
-              analyzing={isStreaming}
+              isAnalyzing={currentAnalyzing === 'characters'}
+              isWaiting={currentAnalyzing === 'scenes'}
             />
           ) : (
             <ScenesTab
               scenes={scenes}
               onSelect={setSelectedScene}
               onAnalyze={() => analyzeWithStream('scenes')}
-              analyzing={isStreaming}
+              isAnalyzing={currentAnalyzing === 'scenes'}
+              isWaiting={currentAnalyzing === 'characters'}
             />
           )}
         </div>
@@ -343,13 +355,19 @@ function CharactersTab({
   characters,
   onSelect,
   onAnalyze,
-  analyzing,
+  isAnalyzing,
+  isWaiting,
 }: {
   characters: Character[]
   onSelect: (c: Character) => void
   onAnalyze: () => void
-  analyzing: boolean
+  isAnalyzing: boolean
+  isWaiting: boolean
 }) {
+  const disabled = isAnalyzing || isWaiting
+  const buttonText = isAnalyzing ? '角色分析中...' : isWaiting ? '等待分镜分析完成...' : '🔍 开始分析角色'
+  const reanalyzeText = isAnalyzing ? '角色分析中...' : isWaiting ? '等待中...' : '🔄 重新分析'
+
   if (characters.length === 0) {
     return (
       <div className="text-center py-12">
@@ -358,10 +376,10 @@ function CharactersTab({
         <p className="text-sm text-gray-400 mb-6">点击下方按钮开始分析剧本中的角色</p>
         <button
           onClick={onAnalyze}
-          disabled={analyzing}
+          disabled={disabled}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
         >
-          {analyzing ? '分析中...' : '🔍 开始分析角色'}
+          {buttonText}
         </button>
       </div>
     )
@@ -375,10 +393,10 @@ function CharactersTab({
         </p>
         <button
           onClick={onAnalyze}
-          disabled={analyzing}
+          disabled={disabled}
           className="text-sm text-blue-500 hover:text-blue-600 disabled:opacity-50"
         >
-          {analyzing ? '分析中...' : '🔄 重新分析'}
+          {reanalyzeText}
         </button>
       </div>
 
@@ -416,13 +434,19 @@ function ScenesTab({
   scenes,
   onSelect,
   onAnalyze,
-  analyzing,
+  isAnalyzing,
+  isWaiting,
 }: {
   scenes: Scene[]
   onSelect: (s: Scene) => void
   onAnalyze: () => void
-  analyzing: boolean
+  isAnalyzing: boolean
+  isWaiting: boolean
 }) {
+  const disabled = isAnalyzing || isWaiting
+  const buttonText = isAnalyzing ? '分镜分析中...' : isWaiting ? '等待角色分析完成...' : '🔍 开始分析分镜'
+  const reanalyzeText = isAnalyzing ? '分镜分析中...' : isWaiting ? '等待中...' : '🔄 重新分析'
+
   if (scenes.length === 0) {
     return (
       <div className="text-center py-12">
@@ -431,10 +455,10 @@ function ScenesTab({
         <p className="text-sm text-gray-400 mb-6">点击下方按钮开始分析剧本中的分镜</p>
         <button
           onClick={onAnalyze}
-          disabled={analyzing}
+          disabled={disabled}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
         >
-          {analyzing ? '分析中...' : '🔍 开始分析分镜'}
+          {buttonText}
         </button>
       </div>
     )
@@ -448,10 +472,10 @@ function ScenesTab({
         </p>
         <button
           onClick={onAnalyze}
-          disabled={analyzing}
+          disabled={disabled}
           className="text-sm text-blue-500 hover:text-blue-600 disabled:opacity-50"
         >
-          {analyzing ? '分析中...' : '🔄 重新分析'}
+          {reanalyzeText}
         </button>
       </div>
 
