@@ -32,11 +32,8 @@ export function ScriptAnalysisPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 当前正在分析的类型 (null表示没有分析任务)
-  const [currentAnalyzing, setCurrentAnalyzing] = useState<'characters' | 'scenes' | null>(null)
-
-  // 从 store 获取终端状态
-  const { terminalOutput, isStreaming, terminalExpanded } = analysisState
+  // 从 store 获取终端状态和当前分析类型
+  const { terminalOutput, isStreaming, terminalExpanded, currentAnalyzing } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
 
@@ -55,6 +52,19 @@ export function ScriptAnalysisPage() {
       }
     }
   }, [])
+
+  // 页面加载时检查是否有未完成的流式任务（防止刷新后状态不一致）
+  useEffect(() => {
+    if (isStreaming && !eventSourceRef.current) {
+      // 页面刷新后 EventSource 连接丢失，清除流式状态
+      appendTerminalOutput('')
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 检测到连接中断，已重置状态`)
+      setAnalysisState({
+        isStreaming: false,
+        currentAnalyzing: null
+      })
+    }
+  }, []) // 仅在首次加载时执行
 
   // 加载项目和数据
   useEffect(() => {
@@ -96,6 +106,23 @@ export function ScriptAnalysisPage() {
     }
   }
 
+  // 停止流式分析
+  const stopStream = async () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+
+    appendTerminalOutput('')
+    appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已手动停止`)
+
+    setAnalysisState({
+      isStreaming: false,
+      currentAnalyzing: null
+    })
+    await refreshProjectStatus()
+  }
+
   // 流式分析
   const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
     if (!projectId) return
@@ -104,10 +131,10 @@ export function ScriptAnalysisPage() {
     if (isStreaming) return
 
     // 更新状态
-    setCurrentAnalyzing(analysisType)
     setAnalysisState({
       isStreaming: true,
       terminalExpanded: true,
+      currentAnalyzing: analysisType,
     })
     setError(null)
 
@@ -148,8 +175,10 @@ export function ScriptAnalysisPage() {
           appendTerminalOutput('')
           appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 分析完成`)
           eventSource.close()
-          setCurrentAnalyzing(null)
-          setAnalysisState({ isStreaming: false })
+          setAnalysisState({
+            isStreaming: false,
+            currentAnalyzing: null
+          })
 
           // 重新加载数据 (数据已在后端保存)
           try {
@@ -169,8 +198,10 @@ export function ScriptAnalysisPage() {
           appendTerminalOutput('')
           appendTerminalOutput(`[错误] ${data.message}`)
           eventSource.close()
-          setCurrentAnalyzing(null)
-          setAnalysisState({ isStreaming: false })
+          setAnalysisState({
+            isStreaming: false,
+            currentAnalyzing: null
+          })
           await refreshProjectStatus()
         }
       } catch (e) {
@@ -182,8 +213,10 @@ export function ScriptAnalysisPage() {
       appendTerminalOutput('')
       appendTerminalOutput('[连接断开]')
       eventSource.close()
-      setCurrentAnalyzing(null)
-      setAnalysisState({ isStreaming: false })
+      setAnalysisState({
+        isStreaming: false,
+        currentAnalyzing: null
+      })
       await refreshProjectStatus()
     }
   }
@@ -245,11 +278,11 @@ export function ScriptAnalysisPage() {
 
       {/* LLM Terminal */}
       <div className="bg-gray-900 rounded-lg overflow-hidden">
-        <div
-          className="flex items-center justify-between px-4 py-2 bg-gray-800 cursor-pointer"
-          onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
-        >
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-800">
+          <div
+            className="flex items-center gap-2 flex-1 cursor-pointer"
+            onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
+          >
             <span className="text-green-400 font-mono">$</span>
             <span className="text-gray-300 text-sm font-mono">LLM Output</span>
             {isStreaming && (
@@ -258,9 +291,23 @@ export function ScriptAnalysisPage() {
               </span>
             )}
           </div>
-          <button className="text-gray-400 hover:text-white text-sm">
-            {terminalExpanded ? '▼ 收起' : '▲ 展开'}
-          </button>
+          <div className="flex items-center gap-2">
+            {isStreaming && (
+              <button
+                onClick={stopStream}
+                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                title="停止当前分析"
+              >
+                ⏹ 停止
+              </button>
+            )}
+            <button
+              onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              {terminalExpanded ? '▼ 收起' : '▲ 展开'}
+            </button>
+          </div>
         </div>
 
         {terminalExpanded && (

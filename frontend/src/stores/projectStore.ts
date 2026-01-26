@@ -16,6 +16,7 @@ interface ProjectState {
     terminalOutput: string[]
     isStreaming: boolean
     terminalExpanded: boolean
+    currentAnalyzing: 'characters' | 'scenes' | null
   }
 
   // Actions
@@ -35,6 +36,7 @@ const initialAnalysisState = {
   terminalOutput: [],
   isStreaming: false,
   terminalExpanded: false,
+  currentAnalyzing: null as 'characters' | 'scenes' | null,
 }
 
 export const useProjectStore = create<ProjectState>()(

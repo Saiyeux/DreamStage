@@ -255,13 +255,13 @@ function CharacterLibraryTab({
     return selectedTypes
   }
 
-  // 应用模板
-  const applyTemplate = (templateName: string) => {
-    if (templates?.templates[templateName]) {
-      setSelectedTypes([...templates.templates[templateName]])
-    }
-    setShowTemplateModal(false)
-  }
+  // 应用模板（预留功能）
+  // const applyTemplate = (templateName: string) => {
+  //   if (templates?.templates[templateName]) {
+  //     setSelectedTypes([...templates.templates[templateName]])
+  //   }
+  //   setShowTemplateModal(false)
+  // }
 
   // 空状态
   if (characters.length === 0) {
@@ -823,7 +823,7 @@ function CharacterGenerationCard({
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">快速添加模板</h4>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(templates.templates).map(([name, types]) => (
+                {Object.entries(templates.templates).map(([name]) => (
                   <button
                     key={name}
                     onClick={() => applyTemplateToCharacter(name)}
