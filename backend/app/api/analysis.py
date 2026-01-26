@@ -1,5 +1,6 @@
 import uuid
 import json
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -22,8 +23,12 @@ router = APIRouter()
 
 # SSE 流式分析端点
 async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
-    """SSE 事件生成器"""
-    result = await db.execute(select(Project).where(Project.id == project_id))
+    """SSE 事件生成器 - 流式输出并在完成后保存数据"""
+    result = await db.execute(
+        select(Project)
+        .options(selectinload(Project.characters))
+        .where(Project.id == project_id)
+    )
     project = result.scalar_one_or_none()
 
     if not project or not project.script_text:
@@ -78,6 +83,52 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
   ]
 }}
 ```"""
+    elif analysis_type == "scenes":
+        # 获取角色信息
+        characters_info = [
+            {"name": c.name, "role_type": c.role_type}
+            for c in project.characters
+        ]
+        characters_json = json.dumps(characters_info, ensure_ascii=False)
+        prompt = f"""你是一位专业的分镜设计师。请根据以下剧本内容和角色信息，设计详细的分镜方案。
+
+## 剧本内容
+{project.script_text[:8000]}
+
+## 角色列表
+{characters_json}
+
+## 输出要求
+请以JSON格式输出所有场景：
+```json
+{{
+  "scenes": [
+    {{
+      "scene_number": 场景序号,
+      "location": "场景地点",
+      "time_of_day": "时间（白天/黄昏/夜晚等）",
+      "atmosphere": "氛围描述",
+      "environment": {{
+        "description": "环境详细描述"
+      }},
+      "characters": [
+        {{
+          "character_name": "角色名",
+          "position": "位置",
+          "action": "动作",
+          "expression": "表情"
+        }}
+      ],
+      "dialogue": "对白内容",
+      "camera": {{
+        "shot_type": "镜头类型（近景/中景/远景等）",
+        "movement": "镜头运动（固定/推/拉/摇等）"
+      }},
+      "duration_seconds": 预估时长秒数
+    }}
+  ]
+}}
+```"""
     else:
         yield f"data: {json.dumps({'type': 'error', 'message': 'Unknown analysis type'})}\n\n"
         return
@@ -89,8 +140,75 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
             full_response += chunk
             yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
+        # 解析并保存数据
+        saved_count = 0
+        try:
+            # 提取 JSON 内容
+            json_match = re.search(r'```json\s*([\s\S]*?)\s*```', full_response)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # 尝试直接解析
+                json_str = full_response
+
+            parsed_data = json.loads(json_str)
+
+            if analysis_type == "characters":
+                # 保存角色数据
+                for char_data in parsed_data.get("characters", []):
+                    character = Character(
+                        id=str(uuid.uuid4()),
+                        project_id=project_id,
+                        name=char_data.get("name", ""),
+                        gender=char_data.get("gender"),
+                        age=char_data.get("age"),
+                        role_type=char_data.get("role_type"),
+                        hair=char_data.get("appearance", {}).get("hair"),
+                        face=char_data.get("appearance", {}).get("face"),
+                        body=char_data.get("appearance", {}).get("body"),
+                        skin=char_data.get("appearance", {}).get("skin"),
+                        personality=char_data.get("personality"),
+                        clothing_style=char_data.get("clothing_style"),
+                        scene_numbers=[],
+                    )
+                    db.add(character)
+                    saved_count += 1
+                await db.commit()
+
+            elif analysis_type == "scenes":
+                # 保存场景数据
+                for scene_data in parsed_data.get("scenes", []):
+                    scene = Scene(
+                        id=str(uuid.uuid4()),
+                        project_id=project_id,
+                        scene_number=scene_data.get("scene_number", 0),
+                        location=scene_data.get("location"),
+                        time_of_day=scene_data.get("time_of_day"),
+                        atmosphere=scene_data.get("atmosphere"),
+                        environment_desc=scene_data.get("environment", {}).get("description"),
+                        characters_data=scene_data.get("characters", []),
+                        dialogue=scene_data.get("dialogue"),
+                        shot_type=scene_data.get("camera", {}).get("shot_type"),
+                        camera_movement=scene_data.get("camera", {}).get("movement"),
+                        duration_seconds=scene_data.get("duration_seconds"),
+                    )
+                    db.add(scene)
+                    saved_count += 1
+                project.status = ProjectStatus.ANALYZED
+                await db.commit()
+
+            elif analysis_type == "summary":
+                project.summary = parsed_data.get("summary", "")
+                await db.commit()
+                saved_count = 1
+
+            yield f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n"
+
+        except (json.JSONDecodeError, Exception) as parse_error:
+            yield f"data: {json.dumps({'type': 'parse_error', 'message': str(parse_error)})}\n\n"
+
         # 发送完成事件
-        yield f"data: {json.dumps({'type': 'done', 'full_response': full_response})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'saved_count': saved_count})}\n\n"
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 

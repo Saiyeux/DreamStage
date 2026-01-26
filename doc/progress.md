@@ -39,10 +39,15 @@
 
 ## 进行中
 
-- [ ] 后端 LLM 分析逻辑实现
-- [ ] 上传剧本同步问题调试
+- [ ] 原神风格 UI 美化
 
 ## 已完成（本次）
+
+### Bug 修复
+- [x] 首页状态显示 bug - SSE 流式端点直接解析保存数据，避免重复 LLM 调用
+- [x] 页面切换状态丢失 - 分析状态 (terminalOutput, isStreaming) 迁移到 Zustand store 持久化
+
+### 之前完成
 
 ### ComfyUI 生成功能
 - [x] ComfyUI Workflow JSON 文件

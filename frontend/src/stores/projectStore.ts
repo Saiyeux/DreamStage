@@ -11,6 +11,13 @@ interface ProjectState {
   // 项目列表
   projects: Project[]
 
+  // 分析状态 (用于页面切换时保持状态)
+  analysisState: {
+    terminalOutput: string[]
+    isStreaming: boolean
+    terminalExpanded: boolean
+  }
+
   // Actions
   setCurrentProject: (project: Project | null) => void
   setCharacters: (characters: Character[]) => void
@@ -18,7 +25,16 @@ interface ProjectState {
   setProjects: (projects: Project[]) => void
   updateCharacter: (id: string, updates: Partial<Character>) => void
   updateScene: (id: string, updates: Partial<Scene>) => void
+  setAnalysisState: (state: Partial<ProjectState['analysisState']>) => void
+  appendTerminalOutput: (line: string) => void
+  updateLastTerminalLine: (content: string) => void
   reset: () => void
+}
+
+const initialAnalysisState = {
+  terminalOutput: [],
+  isStreaming: false,
+  terminalExpanded: false,
 }
 
 export const useProjectStore = create<ProjectState>()(
@@ -28,6 +44,7 @@ export const useProjectStore = create<ProjectState>()(
       characters: [],
       scenes: [],
       projects: [],
+      analysisState: { ...initialAnalysisState },
 
       setCurrentProject: (project) => set({ currentProject: project }),
 
@@ -51,11 +68,39 @@ export const useProjectStore = create<ProjectState>()(
           ),
         })),
 
+      setAnalysisState: (newState) =>
+        set((state) => ({
+          analysisState: { ...state.analysisState, ...newState },
+        })),
+
+      appendTerminalOutput: (line) =>
+        set((state) => ({
+          analysisState: {
+            ...state.analysisState,
+            terminalOutput: [...state.analysisState.terminalOutput, line],
+          },
+        })),
+
+      updateLastTerminalLine: (content) =>
+        set((state) => {
+          const output = [...state.analysisState.terminalOutput]
+          if (output.length > 0) {
+            output[output.length - 1] += content
+          }
+          return {
+            analysisState: {
+              ...state.analysisState,
+              terminalOutput: output,
+            },
+          }
+        }),
+
       reset: () =>
         set({
           currentProject: null,
           characters: [],
           scenes: [],
+          analysisState: { ...initialAnalysisState },
         }),
     }),
     {
@@ -66,6 +111,7 @@ export const useProjectStore = create<ProjectState>()(
         currentProject: state.currentProject,
         characters: state.characters,
         scenes: state.scenes,
+        analysisState: state.analysisState,
       }),
     }
   )

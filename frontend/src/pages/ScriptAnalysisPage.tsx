@@ -15,9 +15,13 @@ export function ScriptAnalysisPage() {
     currentProject,
     characters,
     scenes,
+    analysisState,
     setCurrentProject,
     setCharacters,
     setScenes,
+    setAnalysisState,
+    appendTerminalOutput,
+    updateLastTerminalLine,
   } = useProjectStore()
 
   const projectId = urlProjectId || currentProject?.id
@@ -28,10 +32,8 @@ export function ScriptAnalysisPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 终端状态
-  const [terminalExpanded, setTerminalExpanded] = useState(false)
-  const [terminalOutput, setTerminalOutput] = useState<string[]>([])
-  const [isStreaming, setIsStreaming] = useState(false)
+  // 从 store 获取终端状态
+  const { terminalOutput, isStreaming, terminalExpanded } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
 
@@ -95,17 +97,21 @@ export function ScriptAnalysisPage() {
   const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
     if (!projectId) return
 
-    // 更新状态（仅本地 UI 状态，不修改 project.status）
-    setIsStreaming(true)
-    setTerminalExpanded(true)
+    // 更新状态
+    setAnalysisState({
+      isStreaming: true,
+      terminalExpanded: true,
+    })
     setError(null)
 
     const typeName = analysisType === 'characters' ? '角色' : '场景'
-    setTerminalOutput([
-      `> 开始分析${typeName}...`,
-      `[${new Date().toLocaleTimeString()}] 连接 LLM 服务...`,
-      '',
-    ])
+    setAnalysisState({
+      terminalOutput: [
+        `> 开始分析${typeName}...`,
+        `[${new Date().toLocaleTimeString()}] 连接 LLM 服务...`,
+        '',
+      ],
+    })
 
     // 关闭之前的连接
     if (eventSourceRef.current) {
@@ -121,57 +127,41 @@ export function ScriptAnalysisPage() {
         const data = JSON.parse(event.data)
 
         if (data.type === 'start') {
-          setTerminalOutput((prev) => [
-            ...prev,
-            `[${new Date().toLocaleTimeString()}] LLM 开始响应...`,
-            '',
-          ])
+          appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM 开始响应...`)
+          appendTerminalOutput('')
         } else if (data.type === 'chunk') {
-          setTerminalOutput((prev) => {
-            const newOutput = [...prev]
-            newOutput[newOutput.length - 1] += data.content
-            return newOutput
-          })
+          updateLastTerminalLine(data.content)
+        } else if (data.type === 'saved') {
+          appendTerminalOutput('')
+          appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已保存 ${data.count} 条数据`)
+        } else if (data.type === 'parse_error') {
+          appendTerminalOutput('')
+          appendTerminalOutput(`[警告] 解析JSON失败: ${data.message}`)
         } else if (data.type === 'done') {
-          setTerminalOutput((prev) => [
-            ...prev,
-            '',
-            `[${new Date().toLocaleTimeString()}] 分析完成，正在保存...`,
-          ])
+          appendTerminalOutput('')
+          appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 分析完成`)
           eventSource.close()
-          setIsStreaming(false)
+          setAnalysisState({ isStreaming: false })
 
-          // 调用后端保存并重新加载数据
+          // 重新加载数据 (数据已在后端保存)
           try {
             if (analysisType === 'characters') {
-              await analysisApi.analyzeCharacters(projectId)
               const data = await analysisApi.getCharacters(projectId)
               setCharacters(data)
             } else {
-              await analysisApi.analyzeScenes(projectId)
               const data = await analysisApi.getScenes(projectId)
               setScenes(data)
             }
-            setTerminalOutput((prev) => [
-              ...prev,
-              `[${new Date().toLocaleTimeString()}] 保存成功`,
-            ])
           } catch (err) {
-            setTerminalOutput((prev) => [
-              ...prev,
-              `[错误] 保存失败: ${err}`,
-            ])
+            console.error('Reload data failed:', err)
           }
 
           await refreshProjectStatus()
         } else if (data.type === 'error') {
-          setTerminalOutput((prev) => [
-            ...prev,
-            '',
-            `[错误] ${data.message}`,
-          ])
+          appendTerminalOutput('')
+          appendTerminalOutput(`[错误] ${data.message}`)
           eventSource.close()
-          setIsStreaming(false)
+          setAnalysisState({ isStreaming: false })
           await refreshProjectStatus()
         }
       } catch (e) {
@@ -180,9 +170,10 @@ export function ScriptAnalysisPage() {
     }
 
     eventSource.onerror = async () => {
-      setTerminalOutput((prev) => [...prev, '', '[连接断开]'])
+      appendTerminalOutput('')
+      appendTerminalOutput('[连接断开]')
       eventSource.close()
-      setIsStreaming(false)
+      setAnalysisState({ isStreaming: false })
       await refreshProjectStatus()
     }
   }
@@ -246,7 +237,7 @@ export function ScriptAnalysisPage() {
       <div className="bg-gray-900 rounded-lg overflow-hidden">
         <div
           className="flex items-center justify-between px-4 py-2 bg-gray-800 cursor-pointer"
-          onClick={() => setTerminalExpanded(!terminalExpanded)}
+          onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
         >
           <div className="flex items-center gap-2">
             <span className="text-green-400 font-mono">$</span>
