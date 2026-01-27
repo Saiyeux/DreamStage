@@ -41,3 +41,7 @@ data/
 .eslintcache
 shots/
 .serena/
+
+# Claude Code
+.claude/
+NUL
