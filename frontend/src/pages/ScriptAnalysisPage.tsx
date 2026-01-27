@@ -83,6 +83,12 @@ export function ScriptAnalysisPage() {
           analysisApi.getCharacters(projectId).catch(() => []),
           analysisApi.getScenes(projectId).catch(() => []),
         ])
+        console.log('[DEBUG] 加载的角色数据:', charactersData.length, '个')
+        console.log('[DEBUG] 加载的场景数据:', scenesData.length, '个')
+        if (scenesData.length > 0) {
+          console.log('[DEBUG] 场景编号范围:', scenesData.map(s => s.sceneNumber))
+          console.log('[DEBUG] 第一个场景:', scenesData[0])
+        }
         setCharacters(charactersData)
         setScenes(scenesData)
       } catch (err) {
@@ -136,10 +142,18 @@ export function ScriptAnalysisPage() {
       if (projectId) {
         try {
           if (analysisType === 'characters') {
+            console.log('[DEBUG] 重新加载角色数据...')
             const data = await analysisApi.getCharacters(projectId)
+            console.log('[DEBUG] 加载到', data.length, '个角色')
             setCharacters(data)
           } else {
+            console.log('[DEBUG] 重新加载场景数据...')
             const data = await analysisApi.getScenes(projectId)
+            console.log('[DEBUG] 加载到', data.length, '个场景')
+            if (data.length > 0) {
+              console.log('[DEBUG] 场景编号:', data.map(s => s.sceneNumber))
+              console.log('[DEBUG] 第一个场景:', data[0])
+            }
             setScenes(data)
           }
         } catch (err) {
@@ -148,7 +162,9 @@ export function ScriptAnalysisPage() {
         }
       }
 
+      console.log('[DEBUG] 开始刷新项目状态...')
       await refreshProjectStatus()
+      console.log('[DEBUG] 刷新完成')
     },
     onError: (message: string) => {
       appendTerminalOutput('')
