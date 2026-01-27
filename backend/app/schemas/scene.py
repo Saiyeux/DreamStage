@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.schemas.common import CamelModel
 
 
@@ -39,7 +39,7 @@ class SceneResponse(CamelModel):
     time_of_day: str | None = None
     atmosphere: str | None = None
     environment_desc: str | None = None
-    characters_data: list[SceneCharacterData] = []
+    characters_data: list[SceneCharacterData] = Field(default=[], alias="characters")
     dialogue: str | None = None
     shot_type: str | None = None
     camera_movement: str | None = None

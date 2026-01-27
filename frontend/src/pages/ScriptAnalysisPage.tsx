@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
 import { projectsApi, analysisApi } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
+import { analysisService } from '@/services/analysisService'
 
 type Tab = 'characters' | 'scenes'
 
@@ -35,7 +36,6 @@ export function ScriptAnalysisPage() {
   // 从 store 获取终端状态和当前分析类型
   const { terminalOutput, isStreaming, terminalExpanded, currentAnalyzing } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
-  const eventSourceRef = useRef<EventSource | null>(null)
 
   // 自动滚动终端
   useEffect(() => {
@@ -44,19 +44,17 @@ export function ScriptAnalysisPage() {
     }
   }, [terminalOutput])
 
-  // 清理 EventSource
+  // 页面加载时检查分析服务状态
   useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
+    // 检查是否有正在进行的分析（由 analysisService 管理）
+    if (analysisService.isAnalyzing()) {
+      // 分析正在进行，更新回调以恢复接收数据
+      const analysisType = analysisService.getCurrentAnalysisType()
+      if (analysisType && projectId) {
+        analysisService.updateCallbacks(createAnalysisCallbacks(analysisType))
       }
-    }
-  }, [])
-
-  // 页面加载时检查是否有未完成的流式任务（防止刷新后状态不一致）
-  useEffect(() => {
-    if (isStreaming && !eventSourceRef.current) {
-      // 页面刷新后 EventSource 连接丢失，清除流式状态
+    } else if (isStreaming) {
+      // store 显示正在分析，但 service 没有连接（页面刷新导致）
       appendTerminalOutput('')
       appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 检测到连接中断，已重置状态`)
       setAnalysisState({
@@ -64,7 +62,7 @@ export function ScriptAnalysisPage() {
         currentAnalyzing: null
       })
     }
-  }, []) // 仅在首次加载时执行
+  }, [projectId]) // 仅在 projectId 变化或首次加载时执行
 
   // 加载项目和数据
   useEffect(() => {
@@ -106,12 +104,72 @@ export function ScriptAnalysisPage() {
     }
   }
 
+  // 创建分析回调函数
+  const createAnalysisCallbacks = useCallback((analysisType: 'characters' | 'scenes') => ({
+    onStart: () => {
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM 开始响应...`)
+      appendTerminalOutput('')
+    },
+    onChunk: (content: string) => {
+      updateLastTerminalLine(content)
+    },
+    onSaved: (count: number) => {
+      appendTerminalOutput('')
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已保存 ${count} 条数据`)
+    },
+    onParseError: (message: string) => {
+      appendTerminalOutput('')
+      appendTerminalOutput(`[警告] 解析JSON失败: ${message}`)
+    },
+    onDone: async () => {
+      appendTerminalOutput('')
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 分析完成`)
+      setAnalysisState({
+        isStreaming: false,
+        currentAnalyzing: null
+      })
+
+      // 重新加载数据 (数据已在后端保存)
+      if (projectId) {
+        try {
+          if (analysisType === 'characters') {
+            const data = await analysisApi.getCharacters(projectId)
+            setCharacters(data)
+          } else {
+            const data = await analysisApi.getScenes(projectId)
+            setScenes(data)
+          }
+        } catch (err) {
+          console.error('Reload data failed:', err)
+          appendTerminalOutput(`[错误] 加载数据失败: ${err}`)
+        }
+      }
+
+      await refreshProjectStatus()
+    },
+    onError: (message: string) => {
+      appendTerminalOutput('')
+      appendTerminalOutput(`[错误] ${message}`)
+      setAnalysisState({
+        isStreaming: false,
+        currentAnalyzing: null
+      })
+      refreshProjectStatus()
+    },
+    onConnectionLost: () => {
+      appendTerminalOutput('')
+      appendTerminalOutput('[连接断开]')
+      setAnalysisState({
+        isStreaming: false,
+        currentAnalyzing: null
+      })
+      refreshProjectStatus()
+    }
+  }), [projectId, appendTerminalOutput, updateLastTerminalLine, setAnalysisState, setCharacters, setScenes, refreshProjectStatus])
+
   // 停止流式分析
   const stopStream = async () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
-    }
+    analysisService.stop()
 
     appendTerminalOutput('')
     appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已手动停止`)
@@ -128,7 +186,7 @@ export function ScriptAnalysisPage() {
     if (!projectId) return
 
     // 如果已有分析任务在进行，不允许启动新任务
-    if (isStreaming) return
+    if (isStreaming || analysisService.isAnalyzing()) return
 
     // 更新状态
     setAnalysisState({
@@ -147,78 +205,9 @@ export function ScriptAnalysisPage() {
       ],
     })
 
-    // 关闭之前的连接
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-    }
-
-    const url = `/api/projects/${projectId}/analyze/${analysisType}/stream`
-    const eventSource = new EventSource(url)
-    eventSourceRef.current = eventSource
-
-    eventSource.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data)
-
-        if (data.type === 'start') {
-          appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM 开始响应...`)
-          appendTerminalOutput('')
-        } else if (data.type === 'chunk') {
-          updateLastTerminalLine(data.content)
-        } else if (data.type === 'saved') {
-          appendTerminalOutput('')
-          appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已保存 ${data.count} 条数据`)
-        } else if (data.type === 'parse_error') {
-          appendTerminalOutput('')
-          appendTerminalOutput(`[警告] 解析JSON失败: ${data.message}`)
-        } else if (data.type === 'done') {
-          appendTerminalOutput('')
-          appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 分析完成`)
-          eventSource.close()
-          setAnalysisState({
-            isStreaming: false,
-            currentAnalyzing: null
-          })
-
-          // 重新加载数据 (数据已在后端保存)
-          try {
-            if (analysisType === 'characters') {
-              const data = await analysisApi.getCharacters(projectId)
-              setCharacters(data)
-            } else {
-              const data = await analysisApi.getScenes(projectId)
-              setScenes(data)
-            }
-          } catch (err) {
-            console.error('Reload data failed:', err)
-          }
-
-          await refreshProjectStatus()
-        } else if (data.type === 'error') {
-          appendTerminalOutput('')
-          appendTerminalOutput(`[错误] ${data.message}`)
-          eventSource.close()
-          setAnalysisState({
-            isStreaming: false,
-            currentAnalyzing: null
-          })
-          await refreshProjectStatus()
-        }
-      } catch (e) {
-        console.error('Parse SSE data failed:', e)
-      }
-    }
-
-    eventSource.onerror = async () => {
-      appendTerminalOutput('')
-      appendTerminalOutput('[连接断开]')
-      eventSource.close()
-      setAnalysisState({
-        isStreaming: false,
-        currentAnalyzing: null
-      })
-      await refreshProjectStatus()
-    }
+    // 启动分析服务
+    const callbacks = createAnalysisCallbacks(analysisType)
+    analysisService.start(projectId, analysisType, callbacks)
   }
 
   // 无项目时的空状态

@@ -39,3 +39,5 @@ data/
 .cache/
 .npm/
 .eslintcache
+shots/
+.serena/
