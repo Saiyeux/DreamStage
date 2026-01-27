@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db
+from app.core.logging_config import get_logger
 from app.db.database import async_session_maker
 from app.models import Project, ProjectStatus, Character, Scene
 from app.schemas import (
@@ -21,6 +22,7 @@ from app.services.llm_client import llm_client
 from app.api.config import get_llm_chunk_size
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 def split_script_into_chunks(script_text: str, chunk_size: int) -> list[str]:
@@ -225,7 +227,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     new_scenes = parsed_data.get("scenes", [])
                     # 调试：输出每个块返回的场景信息
                     scene_numbers = [s.get("scene_number", "?") for s in new_scenes]
-                    print(f"[DEBUG] 块 {chunk_idx} 返回 {len(new_scenes)} 个场景，编号: {scene_numbers}")
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} 返回 {len(new_scenes)} 个场景，编号: {scene_numbers}")
                     all_scenes.extend(new_scenes)
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n"
                 elif analysis_type == "summary":
@@ -273,21 +275,25 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                 elif analysis_type == "scenes":
                     # 检查是否有场景数据
                     if not all_scenes:
+                        logger.warning(f"项目 {project_id} 未识别到任何场景")
                         yield f"data: {json.dumps({'type': 'error', 'message': '未识别到任何场景，请检查剧本格式或重新分析'})}\n\n"
                         return
 
                     # 调试：输出所有场景的原始编号
                     original_numbers = [s.get("scene_number", "?") for s in all_scenes]
-                    print(f"[DEBUG] 合并后共 {len(all_scenes)} 个场景")
-                    print(f"[DEBUG] 原始编号: {original_numbers}")
+                    logger.info(f"项目 {project_id} - 合并后共 {len(all_scenes)} 个场景")
+                    logger.debug(f"原始编号列表: {original_numbers}")
 
                     await save_db.execute(
                         delete(Scene).where(Scene.project_id == project_id)
                     )
+
+                    logger.info(f"开始保存 {len(all_scenes)} 个场景到数据库...")
                     for idx, scene_data in enumerate(all_scenes, 1):
                         # 调试：输出每个场景的编号映射
                         original_num = scene_data.get("scene_number", "?")
-                        print(f"[DEBUG] 保存场景: 原编号 {original_num} -> 新编号 {idx}, 地点: {scene_data.get('location', 'N/A')}")
+                        location = scene_data.get('location', 'N/A')
+                        logger.debug(f"保存场景 {idx}/{len(all_scenes)}: 原编号 {original_num} -> 新编号 {idx}, 地点: {location}")
 
                         scene = Scene(
                             id=str(uuid.uuid4()),
@@ -312,6 +318,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     if project_to_update:
                         project_to_update.status = ProjectStatus.ANALYZED
                     await save_db.commit()
+                    logger.info(f"项目 {project_id} - 成功保存 {saved_count} 个场景，状态已更新为 ANALYZED")
 
                 elif analysis_type == "summary":
                     result = await save_db.execute(select(Project).where(Project.id == project_id))
@@ -321,13 +328,16 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     await save_db.commit()
                     saved_count = 1
 
+            logger.info(f"分析完成 - 类型: {analysis_type}, 保存条目: {saved_count}")
             yield f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n"
 
         except (json.JSONDecodeError, Exception) as parse_error:
+            logger.error(f"解析错误: {str(parse_error)}", exc_info=True)
             yield f"data: {json.dumps({'type': 'parse_error', 'message': str(parse_error)})}\n\n"
 
         yield f"data: {json.dumps({'type': 'done', 'saved_count': saved_count})}\n\n"
     except Exception as e:
+        logger.error(f"分析过程出错: {str(e)}", exc_info=True)
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
 

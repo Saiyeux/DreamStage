@@ -4,18 +4,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+from app.core.logging_config import setup_logging, get_logger
 from app.db.database import init_db, close_db
 from app.api import router as api_router
+
+# 初始化日志系统
+setup_logging()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时
+    logger.info("应用启动中...")
     await init_db()
+    logger.info("数据库初始化完成")
     yield
     # 关闭时
+    logger.info("应用关闭中...")
     await close_db()
+    logger.info("数据库连接已关闭")
 
 
 app = FastAPI(
