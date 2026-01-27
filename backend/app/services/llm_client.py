@@ -54,6 +54,9 @@ class LLMClient:
                         "model": self.model,
                         "messages": messages,
                         "stream": False,
+                        "options": {
+                            "num_predict": 8192,  # 最大输出token数
+                        },
                     },
                 )
                 data = response.json()
@@ -64,6 +67,7 @@ class LLMClient:
                     json={
                         "model": self.model,
                         "messages": messages,
+                        "max_tokens": 8192,  # 最大输出token数
                     },
                 )
                 data = response.json()
@@ -89,6 +93,9 @@ class LLMClient:
                         "model": self.model,
                         "messages": messages,
                         "stream": True,
+                        "options": {
+                            "num_predict": 8192,  # 最大输出token数（Ollama参数）
+                        },
                     },
                 ) as response:
                     async for line in response.aiter_lines():
@@ -108,6 +115,7 @@ class LLMClient:
                         "model": self.model,
                         "messages": messages,
                         "stream": True,
+                        "max_tokens": 8192,  # 最大输出token数（OpenAI兼容参数）
                     },
                 ) as response:
                     async for line in response.aiter_lines():
