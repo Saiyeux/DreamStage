@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = "http://localhost:11434"
     LMSTUDIO_URL: str = "http://localhost:1234"
     LLM_MODEL: str = "qwen2.5:14b"
+    LLM_CHUNK_SIZE: int = 8000  # 文本分块长度（字符数）
+    LLM_CONTEXT_LENGTH: int = 32000  # 上下文长度（字符数）
 
     # ComfyUI 配置
     COMFYUI_URL: str = "http://localhost:8000"

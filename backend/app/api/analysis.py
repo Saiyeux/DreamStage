@@ -18,6 +18,7 @@ from app.schemas import (
     SceneUpdate,
 )
 from app.services.llm_client import llm_client
+from app.api.config import get_llm_chunk_size
 
 router = APIRouter()
 
@@ -44,7 +45,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
         prompt = f"""你是一位专业的剧本分析师。请阅读以下剧本内容，生成一段简洁的剧情简介。
 
 ## 剧本内容
-{project.script_text[:8000]}
+{project.script_text[:get_llm_chunk_size()]}
 
 ## 输出要求
 请以JSON格式输出：
@@ -60,7 +61,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
         prompt = f"""你是一位专业的剧本分析师和角色设计师。请从以下剧本中提取所有角色的详细信息。
 
 ## 剧本内容
-{project.script_text[:8000]}
+{project.script_text[:get_llm_chunk_size()]}
 
 ## 输出要求
 请以JSON格式输出所有角色：
@@ -94,7 +95,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
         prompt = f"""你是一位专业的分镜设计师。请根据以下剧本内容和角色信息，设计详细的分镜方案。
 
 ## 剧本内容
-{project.script_text[:8000]}
+{project.script_text[:get_llm_chunk_size()]}
 
 ## 角色列表
 {characters_json}

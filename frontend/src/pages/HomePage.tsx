@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ServiceStatus, Project } from '@/types'
-import { healthApi, projectsApi } from '@/api'
+import { healthApi, projectsApi, configApi } from '@/api'
+import type { LLMConfig } from '@/api/config'
 import { useProjectStore } from '@/stores/projectStore'
 
 const defaultStatus: ServiceStatus = {
@@ -16,6 +17,13 @@ export function HomePage() {
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // LLM 配置
+  const [llmConfig, setLLMConfig] = useState<LLMConfig | null>(null)
+  const [showLLMConfig, setShowLLMConfig] = useState(false)
+  const [editingChunkSize, setEditingChunkSize] = useState('')
+  const [editingContextLength, setEditingContextLength] = useState('')
+  const [savingConfig, setSavingConfig] = useState(false)
 
   const checkServices = async () => {
     setLoading(true)
@@ -40,9 +48,38 @@ export function HomePage() {
     }
   }
 
+  const loadLLMConfig = async () => {
+    try {
+      const config = await configApi.getLLMConfig()
+      setLLMConfig(config)
+      setEditingChunkSize(String(config.chunkSize))
+      setEditingContextLength(String(config.contextLength))
+    } catch (err) {
+      console.error('Failed to load LLM config:', err)
+    }
+  }
+
+  const saveLLMConfig = async () => {
+    setSavingConfig(true)
+    try {
+      const config = await configApi.updateLLMConfig({
+        chunkSize: parseInt(editingChunkSize) || 8000,
+        contextLength: parseInt(editingContextLength) || 32000,
+      })
+      setLLMConfig(config)
+      setShowLLMConfig(false)
+    } catch (err) {
+      console.error('Failed to save LLM config:', err)
+      alert('保存失败')
+    } finally {
+      setSavingConfig(false)
+    }
+  }
+
   useEffect(() => {
     checkServices()
     loadProjects()
+    loadLLMConfig()
   }, [])
 
   const StatusCard = ({
@@ -136,17 +173,36 @@ export function HomePage() {
         )}
 
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <StatusCard
-            label="LLM服务"
-            connected={status.llm.connected}
-            detail={`${status.llm.type} :${status.llm.url.split(':').pop()}`}
-          />
+          <div className="relative">
+            <StatusCard
+              label="LLM服务"
+              connected={status.llm.connected}
+              detail={`${status.llm.type} :${status.llm.url.split(':').pop()}`}
+            />
+            <button
+              onClick={() => setShowLLMConfig(true)}
+              className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+              title="LLM 配置"
+            >
+              ⚙️
+            </button>
+          </div>
           <StatusCard
             label="ComfyUI"
             connected={status.comfyui.connected}
             detail={`:${status.comfyui.url.split(':').pop()}`}
           />
         </div>
+
+        {/* LLM 配置信息 */}
+        {llmConfig && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">文本分块: <span className="font-medium">{llmConfig.chunkSize.toLocaleString()}</span> 字符</span>
+              <span className="text-gray-600">上下文: <span className="font-medium">{llmConfig.contextLength.toLocaleString()}</span> 字符</span>
+            </div>
+          </div>
+        )}
 
         {/* ComfyUI 可用模型 */}
         {status.comfyui.connected && Object.keys(status.comfyui.models).length > 0 && (
@@ -243,6 +299,73 @@ export function HomePage() {
           </div>
         )}
       </div>
+
+      {/* LLM 配置弹窗 */}
+      {showLLMConfig && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">LLM 配置</h3>
+              <button
+                onClick={() => setShowLLMConfig(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  文本分块长度（字符）
+                </label>
+                <input
+                  type="number"
+                  value={editingChunkSize}
+                  onChange={(e) => setEditingChunkSize(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="8000"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  每次发送给 LLM 的剧本文本长度，增大可分析更多内容
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  上下文长度（字符）
+                </label>
+                <input
+                  type="number"
+                  value={editingContextLength}
+                  onChange={(e) => setEditingContextLength(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="32000"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  LLM 模型的上下文窗口大小，根据模型能力设置
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => setShowLLMConfig(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                取消
+              </button>
+              <button
+                onClick={saveLLMConfig}
+                disabled={savingConfig}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                {savingConfig ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
