@@ -91,13 +91,17 @@ export function HomePage() {
     connected: boolean
     detail?: string
   }) => (
-    <div className="bg-white rounded-lg p-4 border border-gray-200 text-center">
-      <div className="text-3xl mb-2">{connected ? '🟢' : '🔴'}</div>
-      <div className="font-medium text-gray-800">{label}</div>
-      <div className="text-sm text-gray-500">
-        {connected ? '已连接' : '未连接'}
+    <div className={`glass-effect rounded-xl p-5 text-center transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+      connected ? 'border-2 border-green-200' : 'border-2 border-red-200'
+    }`}>
+      <div className={`text-4xl mb-3 transition-all duration-300 ${connected ? 'animate-pulse' : ''}`}>
+        {connected ? '🟢' : '🔴'}
       </div>
-      {detail && <div className="text-xs text-gray-400 mt-1">{detail}</div>}
+      <div className="font-semibold text-gray-800 text-lg mb-1">{label}</div>
+      <div className={`text-sm font-medium ${connected ? 'text-green-600' : 'text-red-500'}`}>
+        {connected ? '✓ 已连接' : '✗ 未连接'}
+      </div>
+      {detail && <div className="text-xs text-gray-500 mt-2 font-mono bg-gray-50 px-2 py-1 rounded">{detail}</div>}
     </div>
   )
 
@@ -146,23 +150,33 @@ export function HomePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-8 text-white text-center">
-        <h2 className="text-3xl font-bold mb-2">🎬 AI短剧制作系统</h2>
-        <p className="text-blue-100">从剧本到视频，一站式AI创作</p>
+      <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 rounded-2xl p-10 text-white text-center shadow-2xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative z-10">
+          <h2 className="text-4xl md:text-5xl font-bold mb-3 animate-fade-in">
+            🎬 AI短剧制作系统
+          </h2>
+          <p className="text-xl text-purple-100 mb-2">从剧本到视频，一站式AI创作平台</p>
+          <p className="text-sm text-purple-200">ComfyUI + FLUX2 + LTX-Video 2.0</p>
+        </div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24"></div>
       </div>
 
       {/* Service Status */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">服务状态</h3>
+      <div className="glass-effect rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+            ⚡ 服务状态
+          </h3>
           <button
             onClick={checkServices}
             disabled={loading}
-            className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
           >
-            {loading ? '检测中...' : '🔄 刷新'}
+            {loading ? '🔍 检测中...' : '🔄 刷新状态'}
           </button>
         </div>
 
@@ -238,61 +252,88 @@ export function HomePage() {
       </div>
 
       {/* Quick Start */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">快速开始</h3>
-        <div className="space-y-2 text-gray-600 mb-6">
-          <p>1. 上传剧本 PDF/TXT 文件</p>
-          <p>2. 系统自动分析角色和分镜</p>
-          <p>3. 生成角色库和场景图</p>
-          <p>4. 生成视频片段</p>
+      <div className="glass-effect rounded-2xl p-8 shadow-xl">
+        <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-6">
+          🚀 快速开始
+        </h3>
+        <div className="space-y-4 mb-8">
+          {[
+            { num: '1', text: '上传剧本 PDF/TXT 文件', icon: '📄' },
+            { num: '2', text: '系统自动分析角色和分镜', icon: '🤖' },
+            { num: '3', text: '生成角色库和场景图', icon: '🎨' },
+            { num: '4', text: '生成视频片段', icon: '🎬' },
+          ].map((step) => (
+            <div key={step.num} className="flex items-center gap-4 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg hover:shadow-md transition-all duration-300">
+              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center font-bold shadow-lg">
+                {step.num}
+              </div>
+              <span className="text-lg">{step.icon}</span>
+              <p className="text-gray-700 font-medium">{step.text}</p>
+            </div>
+          ))}
         </div>
         <button
           onClick={() => navigate('/upload')}
-          className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+          className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold text-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
         >
           ▶️ 开始创作
         </button>
       </div>
 
       {/* Recent Projects */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">最近项目</h3>
+      <div className="glass-effect rounded-2xl p-6 shadow-xl">
+        <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-6">
+          📂 最近项目
+        </h3>
         {recentProjects.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">暂无项目</p>
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">📭</div>
+            <p className="text-gray-500">暂无项目</p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {recentProjects.map((project) => (
               <div
                 key={project.id}
                 onClick={() => navigate(`/analysis?project=${project.id}`)}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+                className="group flex items-center justify-between p-4 bg-gradient-to-r from-white to-gray-50 rounded-xl hover:from-purple-50 hover:to-indigo-50 cursor-pointer border-2 border-transparent hover:border-purple-200 transition-all duration-300 hover:shadow-lg"
               >
-                <div className="flex items-center gap-3">
-                  <span>📁</span>
-                  <span className="font-medium">{project.name}</span>
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl group-hover:scale-110 transition-transform duration-300">📁</div>
+                  <div>
+                    <span className="font-semibold text-gray-800 group-hover:text-purple-700 transition-colors">
+                      {project.name}
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        isActiveStatus(project.status)
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : project.status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {statusLabels[project.status] || project.status}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">
-                    {statusLabels[project.status] || project.status}
-                  </span>
-                  <div className="flex gap-1">
-                    {isActiveStatus(project.status) && (
-                      <button
-                        onClick={(e) => handleStopProject(e, project.id)}
-                        className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
-                        title="停止任务"
-                      >
-                        ⏹️ 停止
-                      </button>
-                    )}
+                  {isActiveStatus(project.status) && (
                     <button
-                      onClick={(e) => handleDeleteProject(e, project.id)}
-                      className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
-                      title="删除项目"
+                      onClick={(e) => handleStopProject(e, project.id)}
+                      className="px-3 py-1.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-all duration-300 hover:shadow-md"
+                      title="停止任务"
                     >
-                      🗑️ 删除
+                      ⏹️ 停止
                     </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={(e) => handleDeleteProject(e, project.id)}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all duration-300 hover:shadow-md"
+                    title="删除项目"
+                  >
+                    🗑️ 删除
+                  </button>
                 </div>
               </div>
             ))}

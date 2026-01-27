@@ -223,6 +223,9 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_chars), 'total_found': len(all_characters)})}\n\n"
                 elif analysis_type == "scenes":
                     new_scenes = parsed_data.get("scenes", [])
+                    # 调试：输出每个块返回的场景信息
+                    scene_numbers = [s.get("scene_number", "?") for s in new_scenes]
+                    print(f"[DEBUG] 块 {chunk_idx} 返回 {len(new_scenes)} 个场景，编号: {scene_numbers}")
                     all_scenes.extend(new_scenes)
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n"
                 elif analysis_type == "summary":
@@ -268,10 +271,24 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     await save_db.commit()
 
                 elif analysis_type == "scenes":
+                    # 检查是否有场景数据
+                    if not all_scenes:
+                        yield f"data: {json.dumps({'type': 'error', 'message': '未识别到任何场景，请检查剧本格式或重新分析'})}\n\n"
+                        return
+
+                    # 调试：输出所有场景的原始编号
+                    original_numbers = [s.get("scene_number", "?") for s in all_scenes]
+                    print(f"[DEBUG] 合并后共 {len(all_scenes)} 个场景")
+                    print(f"[DEBUG] 原始编号: {original_numbers}")
+
                     await save_db.execute(
                         delete(Scene).where(Scene.project_id == project_id)
                     )
                     for idx, scene_data in enumerate(all_scenes, 1):
+                        # 调试：输出每个场景的编号映射
+                        original_num = scene_data.get("scene_number", "?")
+                        print(f"[DEBUG] 保存场景: 原编号 {original_num} -> 新编号 {idx}, 地点: {scene_data.get('location', 'N/A')}")
+
                         scene = Scene(
                             id=str(uuid.uuid4()),
                             project_id=project_id,
@@ -288,6 +305,8 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                         )
                         save_db.add(scene)
                         saved_count += 1
+
+                    # 只有在成功保存场景后才更新项目状态
                     result = await save_db.execute(select(Project).where(Project.id == project_id))
                     project_to_update = result.scalar_one_or_none()
                     if project_to_update:

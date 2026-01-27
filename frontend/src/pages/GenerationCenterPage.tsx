@@ -92,19 +92,23 @@ export function GenerationCenterPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">生成中心</h2>
-          <p className="text-sm text-gray-500">
-            项目: {currentProject?.name || '未命名'}
-          </p>
+      <div className="glass-effect rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              🎨 生成中心
+            </h2>
+            <p className="text-sm text-gray-600 mt-2">
+              项目: <span className="font-semibold text-gray-800">{currentProject?.name || '未命名'}</span>
+            </p>
+          </div>
+          <button
+            onClick={() => navigate(`/analysis?project=${projectId}`)}
+            className="px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl font-semibold hover:from-gray-600 hover:to-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          >
+            ← 返回分析
+          </button>
         </div>
-        <button
-          onClick={() => navigate(`/analysis?project=${projectId}`)}
-          className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
-        >
-          ← 返回分析
-        </button>
       </div>
 
       {/* Error */}
@@ -115,38 +119,47 @@ export function GenerationCenterPage() {
       )}
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="border-b border-gray-200">
-          <div className="flex">
+      <div className="glass-effect rounded-2xl shadow-xl overflow-hidden">
+        <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <div className="flex gap-2 p-2">
             <button
               onClick={() => setActiveTab('characters')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+              className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-300 ${
                 activeTab === 'characters'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-105'
+                  : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
               }`}
             >
-              📸 角色库
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">📸</span>
+                <span>角色库</span>
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('scenes')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+              className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-300 ${
                 activeTab === 'scenes'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-105'
+                  : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
               }`}
             >
-              🖼️ 场景图
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">🖼️</span>
+                <span>场景图</span>
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('videos')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+              className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-300 ${
                 activeTab === 'videos'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-105'
+                  : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
               }`}
             >
-              🎬 视频生成
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">🎬</span>
+                <span>视频生成</span>
+              </span>
             </button>
           </div>
         </div>
@@ -407,7 +420,7 @@ function CharacterLibraryTab({
         <button
           onClick={startGeneration}
           disabled={generating || selectedTypes.length === 0}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600"
+          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
         >
           {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
         </button>
@@ -420,11 +433,13 @@ function CharacterLibraryTab({
       )}
 
       {generating && (
-        <div className="h-2 bg-gray-200 rounded-full mb-6">
+        <div className="relative h-3 bg-gray-200 rounded-full mb-6 overflow-hidden shadow-inner">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-full transition-all duration-300 relative"
             style={{ width: `${progress}%` }}
-          />
+          >
+            <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+          </div>
         </div>
       )}
 
@@ -714,18 +729,30 @@ function CharacterGenerationCard({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{avatar}</span>
-          <span className="font-medium">{character.name}</span>
-          <span className="text-sm text-gray-500">({character.roleType})</span>
+    <div className="glass-effect border-2 border-gray-200 hover:border-purple-300 rounded-xl p-5 transition-all duration-300 hover:shadow-xl">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">{avatar}</span>
+          <div>
+            <span className="font-bold text-gray-800">{character.name}</span>
+            <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+              {character.roleType}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm">{statusLabel[status]}</span>
+          <span className={`text-sm font-medium px-3 py-1 rounded-full ${
+            status === 'completed'
+              ? 'bg-green-100 text-green-700'
+              : status === 'generating'
+              ? 'bg-blue-100 text-blue-700 animate-pulse'
+              : 'bg-gray-100 text-gray-600'
+          }`}>
+            {statusLabel[status]}
+          </span>
           <button
             onClick={() => setShowTypeConfig(true)}
-            className="text-sm px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+            className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-medium transition-all duration-300"
             title="配置该角色的图片类型"
           >
             ⚙️ 类型

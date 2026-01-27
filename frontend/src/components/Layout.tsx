@@ -21,22 +21,22 @@ export function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
+      <header className="glass-effect sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            <h1 className="text-xl font-bold text-gray-800">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
               🎬 AI短剧制作系统
             </h1>
 
             {/* 当前项目指示 */}
             {currentProject && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">
-                  当前项目: <span className="font-medium text-gray-700">{currentProject.name}</span>
+              <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-2 rounded-full">
+                <span className="text-sm text-gray-600">
+                  当前项目: <span className="font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">{currentProject.name}</span>
                 </span>
                 <button
                   onClick={reset}
-                  className="text-xs text-gray-400 hover:text-red-500"
+                  className="text-xs text-gray-400 hover:text-red-500 hover:rotate-90 transition-transform duration-300"
                   title="关闭项目"
                 >
                   ✕
@@ -48,20 +48,23 @@ export function Layout() {
 
         {/* Navigation Tabs */}
         <nav className="max-w-7xl mx-auto px-4">
-          <div className="flex space-x-1">
+          <div className="flex space-x-2">
             {navItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={getNavPath(item.path)}
                 className={({ isActive }) =>
-                  `px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  `px-5 py-3 text-sm font-medium rounded-t-lg transition-all duration-300 ${
                     isActive
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg transform scale-105'
+                      : 'text-gray-600 hover:bg-white/50 hover:text-purple-600'
                   }`
                 }
               >
-                {item.icon} {item.label}
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">{item.icon}</span>
+                  <span>{item.label}</span>
+                </span>
               </NavLink>
             ))}
           </div>
@@ -69,8 +72,8 @@ export function Layout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+      <main className="flex-1">
+        <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
           <Outlet />
         </div>
       </main>
