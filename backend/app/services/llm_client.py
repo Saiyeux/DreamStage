@@ -78,7 +78,9 @@ class LLMClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        # 使用较长的超时：连接 30 秒，读取 300 秒（5分钟，LLM 响应可能很慢）
+        timeout = httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             if self.llm_type == "ollama":
                 async with client.stream(
                     "POST",
@@ -147,12 +149,52 @@ class LLMClient:
 
             raise ValueError(f"Failed to parse JSON from response: {response_text[:200]}")
 
+    def _split_script_into_chunks(self, script_text: str, chunk_size: int = 8000) -> list[str]:
+        """将剧本文本分割成多个块，尽量在段落边界处分割"""
+        if len(script_text) <= chunk_size:
+            return [script_text]
+
+        chunks = []
+        start = 0
+        while start < len(script_text):
+            end = start + chunk_size
+            if end >= len(script_text):
+                chunks.append(script_text[start:])
+                break
+
+            # 尝试在段落边界处分割
+            split_pos = script_text.rfind('\n\n', start, end)
+            if split_pos == -1 or split_pos <= start:
+                split_pos = script_text.rfind('\n', start, end)
+            if split_pos == -1 or split_pos <= start:
+                split_pos = end
+
+            chunks.append(script_text[start:split_pos])
+            start = split_pos
+            while start < len(script_text) and script_text[start] in '\n':
+                start += 1
+
+        return chunks
+
+    def _merge_characters(self, existing: list[dict], new_chars: list[dict]) -> list[dict]:
+        """合并角色列表，根据名字去重"""
+        char_dict = {c.get("name", ""): c for c in existing}
+        for char in new_chars:
+            name = char.get("name", "")
+            if name and name not in char_dict:
+                char_dict[name] = char
+        return list(char_dict.values())
+
     async def analyze_summary(self, script_text: str) -> dict[str, Any]:
         """生成剧情简介"""
+        # 摘要使用较大的文本块以获取完整概览
+        chunk_size = 16000
+        text_to_analyze = script_text[:chunk_size]
+
         prompt = f"""你是一位专业的剧本分析师。请阅读以下剧本内容，生成一段简洁的剧情简介。
 
 ## 剧本内容
-{script_text[:8000]}
+{text_to_analyze}
 
 ## 输出要求
 请以JSON格式输出：
@@ -166,15 +208,24 @@ class LLMClient:
 ```"""
         return await self.chat_json(prompt)
 
-    async def analyze_characters(self, script_text: str) -> dict[str, Any]:
-        """分析角色信息"""
-        prompt = f"""你是一位专业的剧本分析师和角色设计师。请从以下剧本中提取所有角色的详细信息。
+    async def analyze_characters(self, script_text: str, chunk_size: int = 8000) -> dict[str, Any]:
+        """分析角色信息 - 支持多块文本处理"""
+        chunks = self._split_script_into_chunks(script_text, chunk_size)
+        all_characters = []
 
-## 剧本内容
-{script_text[:8000]}
+        for chunk_idx, chunk in enumerate(chunks, 1):
+            existing_names = [c.get("name", "") for c in all_characters]
+            existing_hint = ""
+            if existing_names:
+                existing_hint = f"\n\n## 已识别的角色（请勿重复）\n{', '.join(existing_names)}"
+
+            prompt = f"""你是一位专业的剧本分析师和角色设计师。请从以下剧本片段中提取所有角色的详细信息。
+
+## 剧本内容（第{chunk_idx}部分，共{len(chunks)}部分）
+{chunk}{existing_hint}
 
 ## 输出要求
-请以JSON格式输出所有角色：
+请以JSON格式输出本片段中出现的所有角色（不要重复已识别的角色）：
 ```json
 {{
   "characters": [
@@ -196,30 +247,44 @@ class LLMClient:
 }}
 ```
 
-外貌描述要具体，适合AI图像生成。如果剧本未明确描述，请根据角色身份合理推断。"""
-        return await self.chat_json(prompt)
+外貌描述要具体，适合AI图像生成。如果剧本未明确描述，请根据角色身份合理推断。
+如果本片段没有新角色，返回空数组。"""
+
+            try:
+                result = await self.chat_json(prompt)
+                new_chars = result.get("characters", [])
+                all_characters = self._merge_characters(all_characters, new_chars)
+            except Exception:
+                continue
+
+        return {"characters": all_characters}
 
     async def analyze_scenes(
-        self, script_text: str, characters_info: list[dict]
+        self, script_text: str, characters_info: list[dict], chunk_size: int = 8000
     ) -> dict[str, Any]:
-        """分析分镜信息"""
+        """分析分镜信息 - 支持多块文本处理"""
         characters_str = json.dumps(characters_info, ensure_ascii=False)
+        chunks = self._split_script_into_chunks(script_text, chunk_size)
+        all_scenes = []
 
-        prompt = f"""你是一位专业的分镜脚本师和导演。请将以下剧本分解为详细的分镜信息。
+        for chunk_idx, chunk in enumerate(chunks, 1):
+            scene_start_num = len(all_scenes) + 1
 
-## 剧本内容
-{script_text[:8000]}
+            prompt = f"""你是一位专业的分镜脚本师和导演。请将以下剧本片段分解为详细的分镜信息。
+
+## 剧本内容（第{chunk_idx}部分，共{len(chunks)}部分）
+{chunk}
 
 ## 已识别的角色
 {characters_str}
 
 ## 输出要求
-请以JSON格式输出所有场景分镜：
+请以JSON格式输出本片段的所有场景分镜（场景序号从{scene_start_num}开始）：
 ```json
 {{
   "scenes": [
     {{
-      "scene_number": 1,
+      "scene_number": {scene_start_num},
       "location": "地点名称",
       "time_of_day": "白天/黄昏/夜晚",
       "atmosphere": "场景氛围",
@@ -244,7 +309,19 @@ class LLMClient:
   ]
 }}
 ```"""
-        return await self.chat_json(prompt)
+
+            try:
+                result = await self.chat_json(prompt)
+                new_scenes = result.get("scenes", [])
+                all_scenes.extend(new_scenes)
+            except Exception:
+                continue
+
+        # 重新编号确保连续
+        for idx, scene in enumerate(all_scenes, 1):
+            scene["scene_number"] = idx
+
+        return {"scenes": all_scenes}
 
 
 llm_client = LLMClient()
