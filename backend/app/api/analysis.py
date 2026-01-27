@@ -86,6 +86,11 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
     script_chunks = split_script_into_chunks(project.script_text, chunk_size)
     total_chunks = len(script_chunks)
 
+    # 调试：记录分块信息
+    logger.info(f"项目 {project_id} - 剧本长度: {len(project.script_text)} 字符，分块大小: {chunk_size}，总块数: {total_chunks}")
+    for i, chunk in enumerate(script_chunks, 1):
+        logger.debug(f"块 {i}/{total_chunks} 长度: {len(chunk)} 字符，前80字符: {chunk[:80].replace(chr(10), ' ')}")
+
     # 通知前端总块数
     yield f"data: {json.dumps({'type': 'info', 'total_chunks': total_chunks})}\n\n"
 
@@ -209,15 +214,24 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     full_response += chunk
                     yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
+                # 调试：记录LLM返回的完整内容
+                logger.debug(f"块 {chunk_idx}/{total_chunks} - LLM返回内容长度: {len(full_response)} 字符")
+                logger.debug(f"块 {chunk_idx}/{total_chunks} - LLM返回内容前500字符: {full_response[:500]}")
+
                 # 解析当前块的结果
                 json_match = re.search(r'```json\s*([\s\S]*?)\s*```', full_response)
                 if json_match:
                     json_str = json_match.group(1)
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} - 从markdown代码块中提取JSON")
                 else:
                     # 尝试直接查找 JSON 对象
                     json_match = re.search(r'(\{[\s\S]*\})', full_response)
                     json_str = json_match.group(1) if json_match else full_response
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} - 直接提取JSON对象，是否找到: {json_match is not None}")
+
+                logger.debug(f"块 {chunk_idx}/{total_chunks} - 提取的JSON字符串前300字符: {json_str[:300]}")
                 parsed_data = json.loads(json_str)
+                logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，顶级keys: {list(parsed_data.keys())}")
 
                 if analysis_type == "characters":
                     new_chars = parsed_data.get("characters", [])
@@ -237,11 +251,23 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
 
             except Exception as chunk_error:
                 # 捕获 LLM 调用或 JSON 解析错误，但继续处理下一块
+                logger.error(f"块 {chunk_idx}/{total_chunks} 处理失败: {str(chunk_error)}", exc_info=True)
+                logger.error(f"块 {chunk_idx}/{total_chunks} 错误类型: {type(chunk_error).__name__}")
+
+                # 尝试记录LLM响应内容（如果有）
+                try:
+                    if 'full_response' in locals():
+                        logger.error(f"块 {chunk_idx}/{total_chunks} - 出错时的LLM响应内容: {full_response[:1000]}")
+                except:
+                    pass
+
                 yield f"data: {json.dumps({'type': 'chunk_error', 'chunk': chunk_idx, 'message': str(chunk_error)})}\n\n"
                 # 如果已有部分数据，保存并退出
                 if all_characters or all_scenes or summary_data:
+                    logger.info(f"块 {chunk_idx}/{total_chunks} 出错，但已有部分数据，准备保存")
                     yield f"data: {json.dumps({'type': 'partial_save', 'message': '部分数据将被保存'})}\n\n"
                     break
+                logger.warning(f"块 {chunk_idx}/{total_chunks} 出错且无部分数据，继续下一块")
                 continue
 
         # 保存所有数据到数据库
