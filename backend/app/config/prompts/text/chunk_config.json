@@ -1,0 +1,30 @@
+{
+  "chunk_mode": "chapter",
+  "chapter_delimiters": [
+    "Chapter",
+    "CHAPTER",
+    "第.{1,3}章",
+    "第.{1,3}节",
+    "Part",
+    "PART",
+    "Episode",
+    "EPISODE",
+    "Act",
+    "ACT",
+    "Scene",
+    "SCENE",
+    "---",
+    "***",
+    "==="
+  ],
+  "fallback_chunk_size": 8000,
+  "min_chunk_size": 1000,
+  "max_chunk_size": 16000,
+  "description": {
+    "chunk_mode": "分块模式: chapter(按章节) 或 size(按字符数)",
+    "chapter_delimiters": "章节分隔符列表，支持正则表达式",
+    "fallback_chunk_size": "找不到章节分隔符时的默认分块大小",
+    "min_chunk_size": "最小分块大小，避免过小的块",
+    "max_chunk_size": "最大分块大小，超过时强制分割"
+  }
+}

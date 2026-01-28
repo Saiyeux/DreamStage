@@ -16,6 +16,7 @@ export function Layout() {
     { path: '/upload', label: '剧本上传', icon: '📄' },
     { path: '/analysis', label: '剧本分析', icon: '📊' },
     { path: '/generation', label: '生成中心', icon: '🎨' },
+    { path: '/config', label: '配置管理', icon: '⚙️' },
   ]
 
   return (

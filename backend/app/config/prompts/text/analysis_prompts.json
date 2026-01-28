@@ -1,0 +1,15 @@
+{
+  "summary": {
+    "system": "你是一位专业的剧本分析师。",
+    "template": "请阅读以下剧本内容，生成一段简洁的剧情简介。\n\n## 剧本内容\n{{script_text}}\n\n## 输出要求\n请以JSON格式输出：\n```json\n{\n  \"summary\": \"100-200字的剧情简介，包含主要人物和核心冲突\",\n  \"main_conflict\": \"主要冲突点（一句话）\",\n  \"tone\": \"故事基调（如：甜宠、虐恋、悬疑、喜剧等）\",\n  \"estimated_duration_minutes\": \"预估时长（分钟，数字）\"\n}\n```"
+  },
+  "characters": {
+    "system": "你是一位专业的剧本分析师和角色设计师。",
+    "template": "请从以下剧本片段中提取所有角色的详细信息。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}{{existing_hint}}\n\n## 输出要求\n请以JSON格式输出本片段中出现的所有角色（不要重复已识别的角色）：\n```json\n{\n  \"characters\": [\n    {\n      \"name\": \"角色姓名\",\n      \"gender\": \"男/女\",\n      \"age\": \"具体年龄或年龄段\",\n      \"role_type\": \"主角/配角/龙套\",\n      \"appearance\": {\n        \"hair\": \"发型和发色描述\",\n        \"face\": \"脸型和五官特征\",\n        \"body\": \"身材特征\",\n        \"skin\": \"肤色\"\n      },\n      \"personality\": \"性格特点\",\n      \"clothing_style\": \"服装风格\"\n    }\n  ]\n}\n```\n如果本片段没有新角色，返回空数组。",
+    "existing_hint_template": "\n\n## 已识别的角色（请勿重复）\n{{existing_names}}"
+  },
+  "scenes": {
+    "system": "你是一位专业的分镜设计师。",
+    "template": "请根据以下剧本片段和角色信息，设计详细的分镜方案。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 角色列表\n{{characters_json}}\n\n## 输出要求\n请以JSON格式输出本片段的所有场景（场景序号从{{scene_start_num}}开始）：\n```json\n{\n  \"scenes\": [\n    {\n      \"scene_number\": {{scene_start_num}},\n      \"location\": \"场景地点\",\n      \"time_of_day\": \"时间（白天/黄昏/夜晚等）\",\n      \"atmosphere\": \"氛围描述\",\n      \"environment\": {\n        \"description\": \"环境详细描述\"\n      },\n      \"characters\": [\n        {\n          \"character_name\": \"角色名\",\n          \"position\": \"位置\",\n          \"action\": \"动作\",\n          \"expression\": \"表情\"\n        }\n      ],\n      \"dialogue\": \"对白内容\",\n      \"camera\": {\n        \"shot_type\": \"镜头类型（近景/中景/远景等）\",\n        \"movement\": \"镜头运动（固定/推/拉/摇等）\"\n      },\n      \"duration_seconds\": \"预估时长秒数\"\n    }\n  ]\n}\n```"
+  }
+}

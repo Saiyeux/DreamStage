@@ -5,6 +5,7 @@ import {
   ScriptUploadPage,
   ScriptAnalysisPage,
   GenerationCenterPage,
+  ConfigPage,
 } from './pages'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <Route path="upload" element={<ScriptUploadPage />} />
           <Route path="analysis" element={<ScriptAnalysisPage />} />
           <Route path="generation" element={<GenerationCenterPage />} />
+          <Route path="config" element={<ConfigPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

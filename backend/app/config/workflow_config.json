@@ -1,0 +1,63 @@
+{
+  "character_workflows": [
+    {
+      "id": "flux2_portrait",
+      "name": "FLUX2 角色肖像",
+      "description": "使用 FLUX.1-dev 生成高质量角色肖像",
+      "workflow_file": "character_portrait_flux2.json",
+      "default": true,
+      "params": {
+        "width": 768,
+        "height": 1024,
+        "steps": 20,
+        "cfg": 1.0,
+        "guidance": 3.5,
+        "model": "flux1-dev-fp8.safetensors"
+      }
+    }
+  ],
+  "scene_workflows": [
+    {
+      "id": "flux2_scene",
+      "name": "FLUX2 场景图",
+      "description": "使用 FLUX.1-dev + IPAdapter 生成场景图",
+      "workflow_file": "scene_generation_flux2.json",
+      "default": true,
+      "params": {
+        "width": 768,
+        "height": 1344,
+        "steps": 25,
+        "cfg": 1.0,
+        "guidance": 3.5,
+        "ip_adapter_weight": 0.6,
+        "model": "flux1-dev-fp8.safetensors"
+      }
+    }
+  ],
+  "video_workflows": [
+    {
+      "id": "ltx2_video",
+      "name": "LTX-Video 2.0",
+      "description": "使用 LTX-Video 2.0 从图片生成视频",
+      "workflow_file": "video_generation_ltx2.json",
+      "default": true,
+      "params": {
+        "width": 768,
+        "height": 1344,
+        "video_length": 97,
+        "steps": 30,
+        "cfg": 3.0,
+        "frame_rate": 24,
+        "model": "ltx-video-2b-v0.9.safetensors"
+      }
+    }
+  ],
+  "workflow_directory": "comfyui_workflows",
+  "description": {
+    "character_workflows": "角色图生成工作流",
+    "scene_workflows": "场景图生成工作流",
+    "video_workflows": "视频生成工作流",
+    "workflow_file": "工作流 JSON 文件名（相对于 workflow_directory）",
+    "params": "工作流参数，会覆盖 JSON 中的默认值"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "scene_image": {
+    "description": "场景图生成提示词模板",
+    "base_template": "{{location}}, {{time_of_day}}, {{atmosphere}}, {{environment_desc}}",
+    "character_template": "{{character_name}} at {{position}}, {{action}}, {{expression}}",
+    "quality_suffix": "cinematic, high quality, detailed environment, professional cinematography, 9:16 aspect ratio",
+    "negative_prompt": "blurry, low quality, distorted, ugly, bad composition, amateur"
+  },
+  "time_of_day_mapping": {
+    "白天": "daytime, bright natural lighting, sunny",
+    "黄昏": "golden hour, sunset, warm orange lighting",
+    "夜晚": "nighttime, dark, moonlight, artificial lighting",
+    "清晨": "early morning, soft light, misty",
+    "傍晚": "evening, dim light, twilight"
+  },
+  "atmosphere_enhancements": {
+    "温馨": "warm, cozy, comfortable atmosphere",
+    "紧张": "tense, dramatic, suspenseful atmosphere",
+    "浪漫": "romantic, soft, dreamy atmosphere",
+    "悲伤": "melancholic, somber, emotional atmosphere",
+    "欢乐": "joyful, bright, cheerful atmosphere"
+  }
+}
