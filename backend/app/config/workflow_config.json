@@ -1,11 +1,24 @@
 {
   "character_workflows": [
     {
+      "id": "flux2_text_to_image",
+      "name": "FLUX2 文生图",
+      "description": "使用 FLUX2-dev 文生图工作流生成角色图像",
+      "workflow_file": "image_flux2_text_to_image.json",
+      "default": true,
+      "params": {
+        "width": 1008,
+        "height": 1024,
+        "steps": 20,
+        "guidance": 4.0
+      }
+    },
+    {
       "id": "flux2_portrait",
-      "name": "FLUX2 角色肖像",
+      "name": "FLUX2 角色肖像 (旧版)",
       "description": "使用 FLUX.1-dev 生成高质量角色肖像",
       "workflow_file": "character_portrait_flux2.json",
-      "default": true,
+      "default": false,
       "params": {
         "width": 768,
         "height": 1024,
