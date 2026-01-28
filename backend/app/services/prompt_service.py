@@ -323,15 +323,23 @@ class PromptService:
         # 合并所有分隔符为一个正则模式
         patterns = []
         for d in delimiters:
-            # 转义非正则的分隔符
-            if not any(c in d for c in r".*+?^${}[]|\()"):
-                d = re.escape(d)
-            patterns.append(d)
+            # 尝试编译为正则表达式，如果失败则转义
+            try:
+                re.compile(d)
+                # 编译成功，可能是有效的正则表达式
+                patterns.append(d)
+            except re.error:
+                # 编译失败，转义为字面量
+                patterns.append(re.escape(d))
 
         combined_pattern = "|".join(f"({p})" for p in patterns)
 
         # 查找所有分隔符位置
-        matches = list(re.finditer(combined_pattern, script_text, re.IGNORECASE))
+        try:
+            matches = list(re.finditer(combined_pattern, script_text, re.IGNORECASE))
+        except re.error:
+            # 正则表达式错误，回退到按大小分割
+            return self._split_by_size(script_text, fallback_size)
 
         if not matches:
             # 没有找到分隔符，回退到按大小分割

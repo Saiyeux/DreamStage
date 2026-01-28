@@ -2,91 +2,215 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目概述
+## Project Overview
 
-AI短剧制作系统 - 基于 ComfyUI + FLUX2 + LTX-Video 2.0 的可视化短剧制作流水线。
+AI Drama Studio - A visual AI drama production pipeline based on ComfyUI + FLUX2 + LTX-Video 2.0.
 
-**核心流程**: 剧本上传 → LLM分析(角色/分镜) → FLUX2生成角色库 → FLUX2生成场景图 → LTX2生成视频片段 → FFmpeg合成最终视频
+**Core Workflow**: Script Upload → LLM Analysis (Characters/Scenes) → FLUX2 Character Generation → FLUX2 Scene Images → LTX2 Video Clips → FFmpeg Video Composition
 
-**当前状态**: 设计阶段，仅包含设计文档，尚未开始代码实现。
+**Current Status**: Core features implemented. Frontend and backend fully functional with script analysis, character/scene generation, and video generation capabilities.
 
-## 技术栈
+## Tech Stack
 
-| 模块 | 技术 |
-|------|------|
-| 前端 | React + TypeScript + Tailwind + Vite + Zustand |
-| 后端 | FastAPI + Python 3.10+ + SQLite |
-| LLM | Ollama (localhost:11434) 或 LM Studio (localhost:1234) |
-| 图像生成 | ComfyUI (localhost:8188) + FLUX.1-dev/schnell |
-| 视频生成 | ComfyUI + LTX-Video-2B |
-| 视频合成 | FFmpeg |
+| Module | Technology |
+|--------|-----------|
+| Frontend | React 19 + TypeScript + Tailwind 4 + Vite 7 + Zustand |
+| Backend | FastAPI + SQLAlchemy + SQLite (async with aiosqlite) |
+| LLM | Ollama (localhost:11434) or LM Studio (localhost:1234) |
+| Image Gen | ComfyUI (localhost:8000) + FLUX.1-dev/FLUX2 |
+| Video Gen | ComfyUI + LTX-Video-2B |
+| Video Merge | FFmpeg (planned) |
 
-## 系统架构
+## Development Commands
 
+### Frontend (Port 5173)
+```bash
+cd frontend
+npm install              # Install dependencies
+npm run dev              # Start dev server
+npm run build            # Build for production
+npm run lint             # Run ESLint
+npm run preview          # Preview production build
 ```
-Frontend (React :3000)
-    │ HTTP/WebSocket
+
+### Backend (Port 8001)
+```bash
+cd backend
+
+# Setup environment
+conda env create -f environment.yaml  # Or manually create
+conda activate ai-drama-studio
+pip install -r requirements.txt
+
+# Configure .env (copy from .env.example)
+# Set LLM_TYPE, OLLAMA_URL/LMSTUDIO_URL, COMFYUI_URL, etc.
+
+# Run server
+python -m uvicorn app.main:app --reload --port 8001
+
+# Or directly
+python app/main.py
+```
+
+### Required External Services
+- **Ollama**: `ollama serve` (port 11434), then `ollama pull qwen2.5:14b`
+- **LM Studio**: Start local server (port 1234)
+- **ComfyUI**: `python main.py --listen` (port 8000)
+  - Required models: FLUX.1-dev/schnell, LTX-Video-2B, IPAdapter models
+
+## Architecture
+
+### System Flow
+```
+Frontend (Vite :5173)
+    │ HTTP + Server-Sent Events (SSE)
     ▼
-Backend (FastAPI :8000)
+Backend (FastAPI :8001)
     │
-    ├── Ollama/LM Studio (:11434/:1234) - 剧本分析
-    ├── ComfyUI (:8188) - FLUX2图像/LTX2视频
-    └── SQLite + Filesystem - 数据存储
+    ├── Ollama/LM Studio (:11434/:1234) - Script analysis
+    ├── ComfyUI (:8000) - FLUX2 images / LTX2 videos
+    └── SQLite + Filesystem - Data storage
 ```
 
-## 目录结构规范 (实现时遵循)
-
+### Directory Structure
 ```
-ai-drama-studio/
-├── frontend/src/
-│   ├── pages/          # HomePage, ScriptUploadPage, ScriptAnalysisPage, GenerationCenterPage
-│   ├── components/     # 通用组件
-│   ├── hooks/          # useProject, useWebSocket, useTaskProgress
-│   ├── stores/         # Zustand: projectStore, taskStore
-│   └── api/            # API调用封装
-├── backend/app/
-│   ├── api/            # 路由: health, projects, analysis, generation, export
-│   ├── services/       # script_parser, llm_client, prompt_generator, comfyui_client, video_composer
-│   ├── models/         # project, character, scene, task
-│   └── prompts/        # LLM prompt模板
-├── comfyui_workflows/  # JSON工作流文件
-└── data/projects/      # 项目数据: {project_id}/script, characters/, scenes/, videos/, output/
+frontend/src/
+├── pages/           # HomePage, ScriptUploadPage, ScriptAnalysisPage, GenerationCenterPage
+├── components/      # CharacterShowcase, SceneShowcase, etc.
+├── stores/          # Zustand: projectStore (persisted to sessionStorage)
+├── api/             # API client with typed calls
+└── types/           # TypeScript interfaces
+
+backend/app/
+├── api/             # Routes: health, projects, analysis, generation, files
+├── services/        # script_parser, llm_client, comfyui_client, generation_tasks, prompt_service
+├── models/          # SQLAlchemy: Project, Character, Scene, CharacterImage, SceneImage, VideoClip
+├── schemas/         # Pydantic with camelCase serialization
+├── config/          # JSON configs: workflow_config, prompts (text/img/video)
+├── core/            # Config, dependencies, logging
+└── db/              # Database initialization
+
+comfyui_workflows/   # JSON workflow files
+data/projects/{id}/  # Per-project: script.{pdf,txt}, characters/, scenes/, videos/
 ```
 
-## 关键API端点
+## Key Implementation Details
 
-- `GET /api/health` - 服务状态检测
-- `POST /api/projects/{id}/analyze/summary|characters|scenes` - LLM分析
-- `POST /api/projects/{id}/generate/character-library|scene-image|scene-video` - 生成任务
-- `WS /ws/projects/{id}/tasks` - 实时进度推送
+### State Management
+- **Frontend**: Zustand store (`projectStore`) persists to `sessionStorage`
+- Preserves analysis state (terminal output, streaming status) across page navigation
+- Characters and scenes are cached to avoid refetching
 
-## ComfyUI Workflow参数
+### LLM Analysis with Chunking
+- Long scripts are split into chunks (~8000 chars) at paragraph boundaries
+- Characters: Deduplicated across chunks by name, merged into unified list
+- Scenes: Cumulative across chunks with automatic renumbering for continuity
+- Streaming: Server-Sent Events (SSE) with event types: `chunk_start`, `chunk_done`, `chunk_error`, `partial_save`
+- Timeout: 300s for LLM reads to handle slow responses
 
-**角色图 (FLUX2)**:
-- 分辨率: 768x1024 (竖版半身)
-- Steps: 20, CFG: 1.0, Guidance: 3.5
+### Configurable Prompt System
+- All prompts stored in `backend/app/config/prompts/`:
+  - `text/analysis_prompts.json` - Summary, character, scene analysis
+  - `img/character_prompts.json` - Character image generation
+  - `img/scene_prompts.json` - Scene image generation
+  - `video/action_prompts.json` - Video motion prompts
+- Workflows configurable in `workflow_config.json` (multiple workflow options per type)
+- `PromptService` loads/caches prompts from JSON, supports template variables
 
-**场景图 (FLUX2 + IPAdapter)**:
-- 分辨率: 768x1344 (9:16竖屏)
-- Steps: 25, IPAdapter权重: 0.5-0.7
+### ComfyUI Integration
+- `ComfyUIClient` handles workflow submission, progress polling, output retrieval
+- Workflows stored as JSON files with placeholder substitution
+- Three workflow types: character (FLUX2), scene (FLUX2 + IPAdapter), video (LTX2)
+- Task tracking in database with status updates
+- Output files copied from ComfyUI output dir to project directories
 
-**视频 (LTX2 Image-to-Video)**:
-- 分辨率: 768x1344
-- 帧数: 97 (≈4秒@24fps), CFG: 2.5-3.5, Steps: 25-35
-- image_cond_noise_scale: 0.1-0.2
+### Generation Pipeline
+1. **Character Library**: Batch generates all character portraits using FLUX2
+2. **Scene Images**: For each scene, generates image with IPAdapter (character consistency)
+3. **Scene Videos**: Image-to-video using LTX2 (from scene images)
 
-## 设计文档
+### API Endpoints
+- `GET /api/health` - Check service status (LLM, ComfyUI, models)
+- `POST /api/projects` - Create project, upload script
+- `GET /api/projects/{id}` - Get project details
+- `GET /api/projects/{id}/characters` - List characters
+- `GET /api/projects/{id}/scenes` - List scenes
+- `POST /api/projects/{id}/analyze/summary` - Generate script summary (SSE stream)
+- `POST /api/projects/{id}/analyze/characters` - Extract characters (SSE stream)
+- `POST /api/projects/{id}/analyze/scenes` - Extract scene breakdown (SSE stream)
+- `POST /api/projects/{id}/generate/character-library` - Batch generate character images
+- `POST /api/projects/{id}/generate/scene-image/{scene_id}` - Generate scene image
+- `POST /api/projects/{id}/generate/scene-video/{scene_id}` - Generate scene video
+- `GET /api/files/images/{project_id}/*` - Serve generated images
+- `GET /api/files/videos/{project_id}/*` - Serve generated videos
 
-完整设计规范见 `doc/ai-drama-studio-design.md`，包含:
-- 详细页面UI设计 (ASCII mockups)
-- 完整数据模型 (Python dataclasses)
-- 6种LLM Prompt模板 (剧情简介/角色分析/分镜分析/角色图/场景图/动作)
-- ComfyUI Workflow节点连接图
-- API规范 (YAML格式)
+### Database Models
+- **Project**: Basic info, script path, summary
+- **Character**: Name, age, gender, appearance, personality, clothing, image references
+- **Scene**: Scene number, time/location/duration, camera, characters, dialogue, image/video references
+- **CharacterImage**: Generated character portraits (foreign key to Character)
+- **SceneImage**: Generated scene images (foreign key to Scene)
+- **VideoClip**: Generated video clips (foreign key to Scene)
 
-## 实现注意事项
+## Configuration
 
-1. **角色一致性**: 使用IPAdapter/PuLID保持角色在不同场景中的外貌一致
-2. **视频稳定性**: 控制动作幅度，单个片段4-8秒，避免画面崩坏
-3. **异步任务**: 图像/视频生成耗时长，需WebSocket实时推送进度
-4. **显存管理**: FLUX2推荐FP8量化(12GB+)，LTX2需16GB+
+### Environment Variables (.env)
+```bash
+# LLM Configuration
+LLM_TYPE=ollama                           # or "lmstudio"
+OLLAMA_URL=http://localhost:11434
+LLM_MODEL=qwen2.5:14b
+LLM_CHUNK_SIZE=8000                       # Characters per chunk
+LLM_CONTEXT_LENGTH=32000
+
+# ComfyUI Configuration
+COMFYUI_URL=http://localhost:8000
+COMFYUI_PATH=                             # Path to ComfyUI install (for model detection)
+COMFYUI_OUTPUT_DIR=                       # Output dir to copy files from
+
+# Storage
+DATA_DIR=./data
+DATABASE_URL=sqlite+aiosqlite:///./data/database.sqlite
+
+# Server
+HOST=0.0.0.0
+PORT=8001
+```
+
+### Workflow Parameters (workflow_config.json)
+
+**Character Image (FLUX2 Text-to-Image)**:
+- Resolution: 1008x1024
+- Steps: 20, Guidance: 4.0
+
+**Scene Image (FLUX2 + IPAdapter)**:
+- Resolution: 768x1344 (9:16)
+- Steps: 25, Guidance: 3.5, IPAdapter weight: 0.6
+
+**Video (LTX2 Image-to-Video)**:
+- Resolution: 768x1344
+- Frames: 97 (~4 sec @ 24fps), Steps: 30, CFG: 3.0
+
+## Important Implementation Notes
+
+1. **Character Consistency**: Use IPAdapter with character reference images for scene generation
+2. **Error Handling**: Partial saves on chunk failures - successful data is preserved
+3. **Async Tasks**: ComfyUI generation is async; frontend polls for status updates
+4. **Memory Management**: FLUX2 requires 12GB+ VRAM (FP8 quantized), LTX2 needs 16GB+
+5. **Script Parsing**: Supports both PDF (via pypdf) and TXT files
+6. **CORS**: Frontend dev server (5173) is whitelisted in backend CORS config
+
+## Known Issues / TODOs
+
+- SSE chunk progress events (`chunk_start`, `chunk_done`, etc.) not yet displayed in frontend
+- Video composition/export (FFmpeg) not yet implemented
+- Task stop/cancel functionality incomplete (use delete project as workaround)
+- `COMFYUI_OUTPUT_DIR` configuration recommended for file serving
+- WebSocket for real-time progress (currently using SSE for analysis, polling for generation)
+
+## Documentation
+
+- `doc/ai-drama-studio-design.md` - Complete system design specification
+- `doc/setup-guide.md` - Environment setup instructions
+- `doc/progress.md` - Development progress tracker
+- `doc/bugfix.md` - Bug fix history
