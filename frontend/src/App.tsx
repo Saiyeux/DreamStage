@@ -12,12 +12,12 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/" element={<ScriptAnalysisPage />} />
+        <Route path="/upload" element={<ScriptUploadPage />} />
+        <Route path="/generation" element={<GenerationCenterPage />} />
+        <Route path="/config" element={<ConfigPage />} />
+        <Route path="/home" element={<Layout />}>
           <Route index element={<HomePage />} />
-          <Route path="upload" element={<ScriptUploadPage />} />
-          <Route path="analysis" element={<ScriptAnalysisPage />} />
-          <Route path="generation" element={<GenerationCenterPage />} />
-          <Route path="config" element={<ConfigPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
