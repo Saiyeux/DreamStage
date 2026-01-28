@@ -208,9 +208,66 @@ PORT=8001
 - `COMFYUI_OUTPUT_DIR` configuration recommended for file serving
 - WebSocket for real-time progress (currently using SSE for analysis, polling for generation)
 
+## Recent Improvements (as of Jan 2026)
+
+### UI Enhancements
+- **Genshin Impact-style Showcase**: Immersive full-screen character/scene viewers with glassmorphism effects
+  - `CharacterShowcase`: Full-screen character display with editable panels, keyboard navigation (← → ESC)
+  - `SceneShowcase`: Full-screen scene display with background images, character lists, dialogues
+  - See `frontend/UI_FEATURES.md` for detailed interaction guide
+- **Global UI Beautification**: Gradient backgrounds (purple→blue), glass effects, custom scrollbars, transition animations
+- **Scene List Redesign**: Card grid layout with thumbnail previews (replaced table view)
+
+### Configurable Prompt System
+- All prompts externalized to JSON files in `backend/app/config/prompts/`:
+  - Text prompts: `text/analysis_prompts.json`, `text/chunk_config.json`
+  - Image prompts: `img/character_prompts.json`, `img/scene_prompts.json`
+  - Video prompts: `video/action_prompts.json`
+- Multiple workflow configurations per type in `workflow_config.json`
+- `PromptService` class handles loading, caching, and template variable substitution
+
+### Debugging & Logging
+- Local file logging system in `backend/logs/` (app.log, debug.log)
+- Scene analysis debug output shows block-by-block processing and scene number mapping
+- Frontend scene loading debug logs for troubleshooting
+
+### Bug Fixes
+- Fixed chunked text analysis (now processes all chunks, not just first)
+- Fixed FLUX2 workflow subgraph format (400 errors resolved)
+- Fixed scene analysis JSON truncation issues (300s LLM timeout)
+- Fixed UI refresh issues after scene analysis completion
+- Regex pattern fixes for text parsing
+
+## Critical Development Notes
+
+### When Working with Analysis Features
+- **Chunking**: Scripts are split at ~8000 chars on paragraph boundaries (`text/chunk_config.json`)
+- **Scene Numbering**: Automatic renumbering occurs across chunks - debug logs show original→new mapping
+- **Partial Saves**: On chunk failure, successful data is preserved; check `chunk_error` SSE events
+- **Frontend State**: `projectStore` persists to sessionStorage; streaming analysis state survives page navigation
+
+### When Working with ComfyUI Workflows
+- Workflow JSON files in `comfyui_workflows/` use placeholder syntax: `{{variable_name}}`
+- `ComfyUIClient` substitutes placeholders before submission
+- Always test workflow JSON validity in ComfyUI UI before adding to config
+- FLUX2 requires subgraph format compliance (see commit 7a52e38 for example fix)
+
+### When Modifying Prompts
+- Edit JSON files in `backend/app/config/prompts/`, NOT hardcoded strings
+- `PromptService` caches prompts on first load - restart backend to reload
+- Use template variables like `{character_name}`, `{scene_description}` for dynamic content
+- Test prompt changes with actual LLM calls, not just syntax validation
+
+### When Working with UI Components
+- `CharacterShowcase` and `SceneShowcase` expect specific data shapes from backend
+- Frontend caches characters/scenes in Zustand store to avoid refetching
+- UI uses Tailwind 4 with custom classes: `glass-effect`, `scrollbar-hide`
+- Animation timing: 300-700ms transitions, use `isAnimating` state to prevent race conditions
+
 ## Documentation
 
 - `doc/ai-drama-studio-design.md` - Complete system design specification
 - `doc/setup-guide.md` - Environment setup instructions
 - `doc/progress.md` - Development progress tracker
-- `doc/bugfix.md` - Bug fix history
+- `doc/bugfix.md` - Bug fix history and known issues
+- `frontend/UI_FEATURES.md` - Interactive UI features and keyboard shortcuts
