@@ -1,0 +1,27 @@
+{
+  "character_portrait": {
+    "description": "角色肖像图生成提示词模板",
+    "base_template": "{{gender}}, {{age}} years old, {{hair}}, {{face}}, {{body}}, {{skin}} skin, {{clothing_style}}",
+    "quality_suffix": "high quality, detailed, professional portrait, 8k, sharp focus, studio lighting",
+    "negative_prompt": "blurry, low quality, distorted, deformed, ugly, bad anatomy, bad proportions"
+  },
+  "gender_mapping": {
+    "女": "woman",
+    "男": "man",
+    "default": "person"
+  },
+  "style_presets": {
+    "realistic": {
+      "quality_suffix": "photorealistic, hyperrealistic, 8k uhd, high resolution, professional photography",
+      "negative_prompt": "cartoon, anime, illustration, painting, drawing, art, sketch"
+    },
+    "anime": {
+      "quality_suffix": "anime style, high quality anime art, detailed anime illustration, vibrant colors",
+      "negative_prompt": "realistic, photo, 3d render, low quality, blurry"
+    },
+    "cinematic": {
+      "quality_suffix": "cinematic lighting, movie still, dramatic lighting, professional cinematography, film grain",
+      "negative_prompt": "amateur, low budget, poor lighting, overexposed, underexposed"
+    }
+  }
+}

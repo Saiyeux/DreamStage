@@ -7,6 +7,9 @@ from typing import Any
 from app.core.config import settings
 from app.schemas.common import ComfyUIStatus
 
+# 工作流目录
+WORKFLOW_DIR = settings.WORKFLOW_DIR
+
 
 class ComfyUIClient:
     """ComfyUI API 客户端"""
@@ -124,6 +127,35 @@ class ComfyUIClient:
 
             # 更新 Empty Latent Image 节点
             if class_type == "EmptyLatentImage":
+                if "width" in params:
+                    inputs["width"] = params["width"]
+                if "height" in params:
+                    inputs["height"] = params["height"]
+
+            # 更新 FLUX2 专用节点
+            if class_type == "EmptyFlux2LatentImage":
+                if "width" in params:
+                    inputs["width"] = params["width"]
+                if "height" in params:
+                    inputs["height"] = params["height"]
+
+            if class_type == "Flux2Scheduler":
+                if "steps" in params:
+                    inputs["steps"] = params["steps"]
+                if "width" in params:
+                    inputs["width"] = params["width"]
+                if "height" in params:
+                    inputs["height"] = params["height"]
+
+            if class_type == "RandomNoise":
+                if "seed" in params:
+                    inputs["noise_seed"] = params["seed"]
+
+            # 更新 FLUX2 子图节点 (text-to-image subgraph)
+            # 子图节点的 class_type 是 UUID，但有 text/width/height 输入
+            if "text" in inputs and "width" in inputs and "height" in inputs:
+                if "positive_prompt" in params:
+                    inputs["text"] = params["positive_prompt"]
                 if "width" in params:
                     inputs["width"] = params["width"]
                 if "height" in params:
@@ -298,7 +330,7 @@ class ComfyUIClient:
             seed = random.randint(0, 2**32 - 1)
 
         # 加载 workflow
-        workflow_path = Path("comfyui_workflows") / workflow_name
+        workflow_path = WORKFLOW_DIR / workflow_name
         workflow = await self.load_workflow(str(workflow_path))
 
         # 替换模板占位符
@@ -389,7 +421,7 @@ class ComfyUIClient:
             seed = random.randint(0, 2**32 - 1)
 
         # 加载 workflow
-        workflow_path = Path("comfyui_workflows") / workflow_name
+        workflow_path = WORKFLOW_DIR / workflow_name
         workflow = await self.load_workflow(str(workflow_path))
 
         # 更新 workflow 中的模板占位符

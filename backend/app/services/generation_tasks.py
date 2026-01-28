@@ -8,6 +8,7 @@ from typing import Any
 from app.db.database import async_session_maker
 from app.models import Character, Scene, CharacterImage, SceneImage, VideoClip
 from app.services.comfyui_client import comfyui_client
+from app.services.prompt_service import prompt_service
 
 
 # 配置文件路径
@@ -72,93 +73,49 @@ class GenerationTasks:
             "error": error,
         }
 
-    def _build_character_prompt(self, character: Character, image_type: str) -> str:
-        """构建角色图像 prompt"""
-        parts = []
+    def _build_character_prompt(self, character: Character, image_type: str) -> tuple[str, str]:
+        """构建角色图像 prompt，返回 (positive_prompt, negative_prompt)"""
+        # 使用 prompt_service 构建基础提示词
+        positive_prompt, negative_prompt = prompt_service.build_character_prompt(
+            gender=character.gender,
+            age=character.age,
+            hair=character.hair,
+            face=character.face,
+            body=character.body,
+            skin=character.skin,
+            clothing_style=character.clothing_style,
+        )
 
-        # 基础描述
-        if character.gender:
-            gender_en = "woman" if "女" in character.gender else "man"
-            parts.append(f"a {gender_en}")
-        if character.age:
-            parts.append(f"{character.age} years old")
-        if character.hair:
-            parts.append(character.hair)
-        if character.face:
-            parts.append(character.face)
-        if character.body:
-            parts.append(character.body)
-        if character.skin:
-            parts.append(f"{character.skin} skin")
-        if character.clothing_style:
-            parts.append(character.clothing_style)
-
-        base = ", ".join(parts) if parts else "a person"
-
-        # 从配置文件获取类型修饰
+        # 添加类型修饰（如正面、侧面等）
         type_info = self._get_image_type_info(image_type)
         modifier = type_info.get("prompt_suffix", "portrait")
-        quality = "high quality, detailed, professional portrait, 8k, sharp focus, studio lighting"
+        positive_prompt = f"{positive_prompt}, {modifier}"
 
-        return f"{base}, {modifier}, {quality}"
+        return positive_prompt, negative_prompt
 
-    def _build_scene_prompt(self, scene: Scene) -> str:
-        """构建场景图 prompt"""
-        parts = []
+    def _build_scene_prompt(self, scene: Scene) -> tuple[str, str]:
+        """构建场景图 prompt，返回 (positive_prompt, negative_prompt)"""
+        return prompt_service.build_scene_prompt(
+            location=scene.location,
+            time_of_day=scene.time_of_day,
+            atmosphere=scene.atmosphere,
+            environment_desc=scene.environment_desc,
+            characters_in_scene=scene.characters_data,
+        )
 
-        if scene.location:
-            parts.append(scene.location)
-        if scene.time_of_day:
-            parts.append(scene.time_of_day)
-        if scene.atmosphere:
-            parts.append(scene.atmosphere)
-        if scene.environment_desc:
-            parts.append(scene.environment_desc)
-
-        # 添加角色信息
-        if scene.characters_data:
-            for char in scene.characters_data:
-                char_desc = []
-                if char.get("character_name"):
-                    char_desc.append(char["character_name"])
-                if char.get("position"):
-                    char_desc.append(f"at {char['position']}")
-                if char.get("action"):
-                    char_desc.append(char["action"])
-                if char.get("expression"):
-                    char_desc.append(char["expression"])
-                if char_desc:
-                    parts.append(", ".join(char_desc))
-
-        base = ", ".join(parts) if parts else "a scene"
-        quality = "cinematic, high quality, detailed environment, professional cinematography, 9:16 aspect ratio"
-
-        return f"{base}, {quality}"
-
-    def _build_action_prompt(self, scene: Scene) -> str:
-        """构建视频动作 prompt"""
-        parts = []
-
-        # 角色动作
+    def _build_action_prompt(self, scene: Scene) -> tuple[str, str]:
+        """构建视频动作 prompt，返回 (positive_prompt, negative_prompt)"""
+        # 提取角色动作列表
+        character_actions = []
         if scene.characters_data:
             for char in scene.characters_data:
                 if char.get("action"):
-                    parts.append(char["action"])
+                    character_actions.append(char["action"])
 
-        # 镜头运动
-        if scene.camera_movement:
-            camera_map = {
-                "固定": "static camera",
-                "推进": "camera push in, zoom in slowly",
-                "拉远": "camera pull out, zoom out slowly",
-                "平移": "camera pan, horizontal movement",
-            }
-            parts.append(camera_map.get(scene.camera_movement, scene.camera_movement))
-
-        if not parts:
-            parts.append("subtle movement, gentle motion")
-
-        return ", ".join(parts) + ", smooth motion, cinematic"
+        return prompt_service.build_action_prompt(
+            character_actions=character_actions if character_actions else None,
+            camera_movement=scene.camera_movement,
+        )
 
     async def generate_character_images(
         self,
@@ -172,28 +129,35 @@ class GenerationTasks:
         try:
             total = len(image_types)
             generated_images = []
-            negative_prompt = "blurry, low quality, distorted, deformed"
 
             async with async_session_maker() as db:
                 for i, image_type in enumerate(image_types):
                     progress = int((i / total) * 100)
-                    type_label = self.IMAGE_TYPE_LABELS.get(image_type, image_type)
+                    type_info = self._get_image_type_info(image_type)
+                    type_label = type_info.get("label", image_type)
                     self.update_task_status(
                         task_id, "running", progress, f"生成 {character.name} {type_label}..."
                     )
 
-                    # 构建 prompt
-                    prompt = self._build_character_prompt(character, image_type)
+                    # 构建 prompt（使用配置文件中的模板）
+                    prompt, negative_prompt = self._build_character_prompt(character, image_type)
                     output_filename = f"character_{character.id}_{image_type}"
 
+                    # 获取工作流配置
+                    workflow_config = prompt_service.get_default_workflow("character")
+                    if not workflow_config:
+                        raise ValueError("未找到角色图工作流配置")
+
+                    workflow_params = workflow_config.get("params", {})
+
                     try:
-                        # 调用 ComfyUI 生成
+                        # 调用 ComfyUI 生成（使用配置的工作流）
                         image_path = await comfyui_client.generate_image(
-                            workflow_name="character_portrait_flux2.json",
+                            workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
                             positive_prompt=prompt,
                             negative_prompt=negative_prompt,
-                            width=768,
-                            height=1024,
+                            width=workflow_params.get("width", 768),
+                            height=workflow_params.get("height", 1024),
                             output_filename=output_filename,
                             project_id=character.project_id,
                         )
@@ -261,7 +225,13 @@ class GenerationTasks:
             total_chars = len(characters)
             total_images = total_chars * len(types_to_generate)
             completed = 0
-            negative_prompt = "blurry, low quality, distorted, deformed"
+
+            # 获取工作流配置
+            workflow_config = prompt_service.get_default_workflow("character")
+            if not workflow_config:
+                raise ValueError("未找到角色图工作流配置")
+
+            workflow_params = workflow_config.get("params", {})
 
             async with async_session_maker() as db:
                 for i, character in enumerate(characters):
@@ -274,17 +244,17 @@ class GenerationTasks:
                             f"{character.name} - {type_label}"
                         )
 
-                        # 构建 prompt
-                        prompt = self._build_character_prompt(character, image_type)
+                        # 构建 prompt（使用配置文件中的模板）
+                        prompt, negative_prompt = self._build_character_prompt(character, image_type)
                         output_filename = f"char_{character.id[:8]}_{image_type}"
 
                         try:
                             image_path = await comfyui_client.generate_image(
-                                workflow_name="character_portrait_flux2.json",
+                                workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
                                 positive_prompt=prompt,
                                 negative_prompt=negative_prompt,
-                                width=768,
-                                height=1024,
+                                width=workflow_params.get("width", 768),
+                                height=workflow_params.get("height", 1024),
                                 output_filename=output_filename,
                                 project_id=project_id,
                             )
@@ -327,17 +297,24 @@ class GenerationTasks:
         self.update_task_status(task_id, "running", 0, f"生成场景 #{scene.scene_number}...")
 
         try:
-            prompt = self._build_scene_prompt(scene)
-            negative_prompt = "blurry, low quality, distorted, ugly"
+            # 构建提示词（使用配置文件中的模板）
+            prompt, negative_prompt = self._build_scene_prompt(scene)
             output_filename = f"scene_{scene.project_id[:8]}_{scene.scene_number}"
+
+            # 获取工作流配置
+            workflow_config = prompt_service.get_default_workflow("scene")
+            if not workflow_config:
+                raise ValueError("未找到场景图工作流配置")
+
+            workflow_params = workflow_config.get("params", {})
 
             # 调用 ComfyUI (scene workflow 使用 IPAdapter 保持角色一致性)
             image_path = await comfyui_client.generate_image(
-                workflow_name="scene_generation_flux2.json",
+                workflow_name=workflow_config.get("workflow_file", "scene_generation_flux2.json"),
                 positive_prompt=prompt,
                 negative_prompt=negative_prompt,
-                width=768,
-                height=1344,
+                width=workflow_params.get("width", 768),
+                height=workflow_params.get("height", 1344),
                 output_filename=output_filename,
                 project_id=scene.project_id,
                 reference_image=reference_image,
@@ -376,7 +353,13 @@ class GenerationTasks:
         try:
             total = len(scenes)
             generated = 0
-            negative_prompt = "blurry, low quality, distorted, ugly"
+
+            # 获取工作流配置
+            workflow_config = prompt_service.get_default_workflow("scene")
+            if not workflow_config:
+                raise ValueError("未找到场景图工作流配置")
+
+            workflow_params = workflow_config.get("params", {})
 
             async with async_session_maker() as db:
                 for i, scene in enumerate(scenes):
@@ -385,16 +368,17 @@ class GenerationTasks:
                         task_id, "running", progress, f"场景 #{scene.scene_number}"
                     )
 
-                    prompt = self._build_scene_prompt(scene)
+                    # 构建提示词（使用配置文件中的模板）
+                    prompt, negative_prompt = self._build_scene_prompt(scene)
                     output_filename = f"scene_{project_id[:8]}_{scene.scene_number}"
 
                     try:
                         image_path = await comfyui_client.generate_image(
-                            workflow_name="scene_generation_flux2.json",
+                            workflow_name=workflow_config.get("workflow_file", "scene_generation_flux2.json"),
                             positive_prompt=prompt,
                             negative_prompt=negative_prompt,
-                            width=768,
-                            height=1344,
+                            width=workflow_params.get("width", 768),
+                            height=workflow_params.get("height", 1344),
                             output_filename=output_filename,
                             project_id=project_id,
                         )
@@ -441,25 +425,32 @@ class GenerationTasks:
             if not input_image:
                 input_image = f"scene_{scene.project_id[:8]}_{scene.scene_number}.png"
 
-            action_prompt = self._build_action_prompt(scene)
-            negative_prompt = "blurry, low quality, distorted, jittery, unstable"
+            # 获取工作流配置
+            workflow_config = prompt_service.get_default_workflow("video")
+            if not workflow_config:
+                raise ValueError("未找到视频工作流配置")
+
+            workflow_params = workflow_config.get("params", {})
+            video_length = workflow_params.get("video_length", 97)
+            frame_rate = workflow_params.get("frame_rate", 24)
+
+            # 构建提示词（使用配置文件中的模板）
+            action_prompt, negative_prompt = self._build_action_prompt(scene)
             output_filename = f"video_{scene.project_id[:8]}_{scene.scene_number}"
-            video_length = 97  # ~4秒 @24fps
-            frame_rate = 24
 
             self.update_task_status(task_id, "running", 10, "准备视频生成...")
 
             # 调用 ComfyUI 生成视频
             video_path = await comfyui_client.generate_video(
-                workflow_name="video_generation_ltx2.json",
+                workflow_name=workflow_config.get("workflow_file", "video_generation_ltx2.json"),
                 input_image=input_image,
                 action_prompt=action_prompt,
                 negative_prompt=negative_prompt,
-                width=768,
-                height=1344,
+                width=workflow_params.get("width", 768),
+                height=workflow_params.get("height", 1344),
                 video_length=video_length,
-                steps=30,
-                cfg=3.0,
+                steps=workflow_params.get("steps", 30),
+                cfg=workflow_params.get("cfg", 3.0),
                 frame_rate=frame_rate,
                 output_filename=output_filename,
                 project_id=scene.project_id,
@@ -471,9 +462,9 @@ class GenerationTasks:
                     id=str(uuid.uuid4()),
                     scene_id=scene.id,
                     video_path=video_path,
-                    duration=video_length / frame_rate,  # ~4秒
+                    duration=video_length / frame_rate,
                     fps=frame_rate,
-                    resolution="768x1344",
+                    resolution=f"{workflow_params.get('width', 768)}x{workflow_params.get('height', 1344)}",
                     prompt_used=action_prompt,
                     is_approved=False,
                 )
@@ -501,9 +492,15 @@ class GenerationTasks:
         try:
             total = len(scenes)
             generated = 0
-            negative_prompt = "blurry, low quality, distorted, jittery, unstable"
-            video_length = 97
-            frame_rate = 24
+
+            # 获取工作流配置
+            workflow_config = prompt_service.get_default_workflow("video")
+            if not workflow_config:
+                raise ValueError("未找到视频工作流配置")
+
+            workflow_params = workflow_config.get("params", {})
+            video_length = workflow_params.get("video_length", 97)
+            frame_rate = workflow_params.get("frame_rate", 24)
 
             async with async_session_maker() as db:
                 for i, scene in enumerate(scenes):
@@ -514,20 +511,21 @@ class GenerationTasks:
 
                     # 输入图像为之前生成的场景图
                     input_image = f"scene_{project_id[:8]}_{scene.scene_number}.png"
-                    action_prompt = self._build_action_prompt(scene)
+                    # 构建提示词（使用配置文件中的模板）
+                    action_prompt, negative_prompt = self._build_action_prompt(scene)
                     output_filename = f"video_{project_id[:8]}_{scene.scene_number}"
 
                     try:
                         video_path = await comfyui_client.generate_video(
-                            workflow_name="video_generation_ltx2.json",
+                            workflow_name=workflow_config.get("workflow_file", "video_generation_ltx2.json"),
                             input_image=input_image,
                             action_prompt=action_prompt,
                             negative_prompt=negative_prompt,
-                            width=768,
-                            height=1344,
+                            width=workflow_params.get("width", 768),
+                            height=workflow_params.get("height", 1344),
                             video_length=video_length,
-                            steps=30,
-                            cfg=3.0,
+                            steps=workflow_params.get("steps", 30),
+                            cfg=workflow_params.get("cfg", 3.0),
                             frame_rate=frame_rate,
                             output_filename=output_filename,
                             project_id=project_id,
@@ -540,7 +538,7 @@ class GenerationTasks:
                             video_path=video_path,
                             duration=video_length / frame_rate,
                             fps=frame_rate,
-                            resolution="768x1344",
+                            resolution=f"{workflow_params.get('width', 768)}x{workflow_params.get('height', 1344)}",
                             prompt_used=action_prompt,
                             is_approved=False,
                         )

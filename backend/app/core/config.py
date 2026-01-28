@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     DATA_DIR: Path = Path("./data")
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/database.sqlite"
 
+    # 工作流目录（相对于项目根目录）
+    WORKFLOW_DIR: Path = Path(__file__).parent.parent.parent.parent / "comfyui_workflows"
+
     # 服务配置
     HOST: str = "0.0.0.0"
     PORT: int = 8001

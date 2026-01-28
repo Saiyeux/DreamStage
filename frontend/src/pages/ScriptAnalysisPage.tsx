@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
-import { projectsApi, analysisApi } from '@/api'
+import { projectsApi, analysisApi, generationApi, configApi } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
 import { analysisService } from '@/services/analysisService'
 import { CharacterShowcase } from '@/components/CharacterShowcase'
@@ -410,15 +410,51 @@ export function ScriptAnalysisPage() {
           characters={characters}
           initialIndex={selectedCharacterIndex}
           onClose={() => setSelectedCharacterIndex(null)}
-          onGenerate={(characterId) => {
+          onGenerate={async (characterId) => {
             console.log('生成角色图:', characterId)
-            // TODO: 调用生成API
-            alert('生成角色图功能即将实现！\n角色ID: ' + characterId)
+            try {
+              // 获取默认图片类型配置
+              const templates = await configApi.getCharacterImageTemplates()
+              const imageTypes = templates.default_types.map(t => t.id)
+
+              // 调用生成 API
+              const response = await generationApi.generateCharacterImages(
+                projectId!,
+                characterId,
+                imageTypes
+              )
+
+              // 关闭弹窗，提示用户
+              setSelectedCharacterIndex(null)
+              alert(`角色图生成任务已启动！\n任务ID: ${response.task_id}\n\n请前往"生成中心"查看进度。`)
+
+              // 跳转到生成中心
+              navigate(`/generation?project=${projectId}`)
+            } catch (err) {
+              console.error('生成角色图失败:', err)
+              alert('生成角色图失败，请检查 ComfyUI 服务是否正常。')
+            }
           }}
-          onUpdate={(characterId, updates) => {
+          onUpdate={async (characterId, updates) => {
             console.log('更新角色信息:', characterId, updates)
-            // TODO: 调用更新API
-            alert('保存成功！\n(实际保存功能即将实现)')
+            try {
+              // 调用更新 API
+              const updatedCharacter = await analysisApi.updateCharacter(
+                projectId!,
+                characterId,
+                updates
+              )
+
+              // 更新本地状态
+              setCharacters(characters.map(c =>
+                c.id === characterId ? updatedCharacter : c
+              ))
+
+              alert('保存成功！')
+            } catch (err) {
+              console.error('更新角色失败:', err)
+              alert('保存失败，请重试。')
+            }
           }}
         />
       )}

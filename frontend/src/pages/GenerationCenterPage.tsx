@@ -452,6 +452,8 @@ function CharacterLibraryTab({
             selectedTypes={getCharacterEffectiveTypes(character.id)}
             onSaveCharacterTypes={(types) => saveCharacterCustomTypes(character.id, types)}
             status={character.images && character.images.length > 0 ? 'completed' : generating ? 'generating' : 'pending'}
+            projectId={projectId}
+            onRefresh={onRefresh}
           />
         ))}
       </div>
@@ -665,11 +667,15 @@ function CharacterGenerationCard({
   selectedTypes,
   onSaveCharacterTypes,
   status,
+  projectId,
+  onRefresh,
 }: {
   character: Character
   selectedTypes: ImageType[]
   onSaveCharacterTypes?: (types: ImageType[]) => void
   status: 'pending' | 'generating' | 'completed'
+  projectId: string
+  onRefresh?: () => void
 }) {
   const statusLabel = {
     pending: '⬜ 待生成',
@@ -680,6 +686,56 @@ function CharacterGenerationCard({
   const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
   const images = character.images || []
   const imageCount = images.length
+
+  // 单个角色生成状态
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generatingTypeId, setGeneratingTypeId] = useState<string | null>(null)
+  const [genProgress, setGenProgress] = useState(0)
+  const pollingRef = useRef<number | null>(null)
+
+  // 清理轮询
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [])
+
+  // 生成单张图片
+  const generateSingleImage = async (typeId: string) => {
+    setIsGenerating(true)
+    setGeneratingTypeId(typeId)
+    setGenProgress(0)
+
+    try {
+      const response = await generationApi.generateCharacterImages(projectId, character.id, [typeId])
+      const taskId = response.task_id
+
+      // 轮询任务状态
+      pollingRef.current = window.setInterval(async () => {
+        try {
+          const taskStatus = await generationApi.getTaskStatus(taskId)
+          setGenProgress(taskStatus.progress)
+
+          if (taskStatus.status === 'completed' || taskStatus.status === 'failed') {
+            setIsGenerating(false)
+            setGeneratingTypeId(null)
+            if (pollingRef.current) clearInterval(pollingRef.current)
+            if (taskStatus.status === 'completed' && onRefresh) {
+              onRefresh()
+            }
+          }
+        } catch (err) {
+          console.error('Poll status failed:', err)
+        }
+      }, 1000)
+    } catch (err) {
+      setIsGenerating(false)
+      setGeneratingTypeId(null)
+      console.error('Generate failed:', err)
+    }
+  }
 
   // 根据类型查找图片
   const getImageByType = (typeId: string) => {
@@ -763,31 +819,63 @@ function CharacterGenerationCard({
       <div className="flex gap-2 flex-wrap">
         {selectedTypes.map((type) => {
           const img = getImageByType(type.id)
+          const isThisGenerating = isGenerating && generatingTypeId === type.id
           return (
             <div
               key={type.id}
-              className={`w-16 h-20 rounded-lg flex items-center justify-center text-xs overflow-hidden ${
-                img
-                  ? 'bg-gray-100'
-                  : status === 'generating'
-                  ? 'bg-blue-100 text-blue-500'
-                  : 'bg-gray-100 text-gray-400'
-              }`}
-              title={type.label}
+              className="relative group"
             >
-              {img ? (
-                <img
-                  src={fileUrl.image(img.imagePath)}
-                  alt={`${character.name} ${type.label}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                  }}
-                />
-              ) : status === 'generating' ? (
-                '⏳'
-              ) : (
-                type.label
+              <div
+                className={`w-16 h-20 rounded-lg flex items-center justify-center text-xs overflow-hidden ${
+                  img
+                    ? 'bg-gray-100'
+                    : isThisGenerating
+                    ? 'bg-blue-100 text-blue-500'
+                    : status === 'generating'
+                    ? 'bg-blue-50 text-blue-400'
+                    : 'bg-gray-100 text-gray-400'
+                }`}
+                title={type.label}
+              >
+                {img ? (
+                  <img
+                    src={fileUrl.image(img.imagePath)}
+                    alt={`${character.name} ${type.label}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                ) : isThisGenerating ? (
+                  <div className="text-center">
+                    <span className="animate-spin inline-block">⏳</span>
+                    <div className="text-[10px] mt-1">{genProgress}%</div>
+                  </div>
+                ) : status === 'generating' ? (
+                  '⏳'
+                ) : (
+                  type.label
+                )}
+              </div>
+              {/* 生成按钮 - 悬停时显示 */}
+              {!img && !isGenerating && status !== 'generating' && (
+                <button
+                  onClick={() => generateSingleImage(type.id)}
+                  className="absolute inset-0 bg-purple-600/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-medium"
+                  title={`生成${type.label}`}
+                >
+                  生成
+                </button>
+              )}
+              {/* 重新生成按钮 - 已有图片时悬停显示 */}
+              {img && !isGenerating && status !== 'generating' && (
+                <button
+                  onClick={() => generateSingleImage(type.id)}
+                  className="absolute inset-0 bg-purple-600/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-medium"
+                  title={`重新生成${type.label}`}
+                >
+                  重新生成
+                </button>
               )}
             </div>
           )

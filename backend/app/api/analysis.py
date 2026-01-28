@@ -19,6 +19,7 @@ from app.schemas import (
     SceneUpdate,
 )
 from app.services.llm_client import llm_client
+from app.services.prompt_service import prompt_service
 from app.api.config import get_llm_chunk_size
 
 router = APIRouter()
@@ -81,13 +82,22 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
     # 发送开始事件
     yield f"data: {json.dumps({'type': 'start', 'analysis_type': analysis_type})}\n\n"
 
-    # 分割剧本为多个块
-    chunk_size = get_llm_chunk_size()
-    script_chunks = split_script_into_chunks(project.script_text, chunk_size)
+    # 分割剧本为多个块（优先使用章节分块，回退到字符数分块）
+    chunk_config = prompt_service.get_chunk_config()
+    chunk_mode = chunk_config.get("chunk_mode", "chapter")
+
+    if chunk_mode == "chapter":
+        script_chunks = prompt_service.split_script_by_chapters(project.script_text)
+        logger.info(f"项目 {project_id} - 使用章节分块模式")
+    else:
+        chunk_size = get_llm_chunk_size()
+        script_chunks = split_script_into_chunks(project.script_text, chunk_size)
+        logger.info(f"项目 {project_id} - 使用字符数分块模式，分块大小: {chunk_size}")
+
     total_chunks = len(script_chunks)
 
     # 调试：记录分块信息
-    logger.info(f"项目 {project_id} - 剧本长度: {len(project.script_text)} 字符，分块大小: {chunk_size}，总块数: {total_chunks}")
+    logger.info(f"项目 {project_id} - 剧本长度: {len(project.script_text)} 字符，总块数: {total_chunks}")
     for i, chunk in enumerate(script_chunks, 1):
         logger.debug(f"块 {i}/{total_chunks} 长度: {len(chunk)} 字符，前80字符: {chunk[:80].replace(chr(10), ' ')}")
 
@@ -111,97 +121,26 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
             # 通知当前处理的块
             yield f"data: {json.dumps({'type': 'chunk_start', 'chunk': chunk_idx, 'total': total_chunks})}\n\n"
 
-            # 根据类型选择 prompt
+            # 根据类型选择 prompt（使用配置文件中的提示词模板）
             if analysis_type == "summary":
-                prompt = f"""你是一位专业的剧本分析师。请阅读以下剧本内容，生成一段简洁的剧情简介。
-
-## 剧本内容
-{script_chunk}
-
-## 输出要求
-请以JSON格式输出：
-```json
-{{
-  "summary": "100-200字的剧情简介，包含主要人物和核心冲突",
-  "main_conflict": "主要冲突点（一句话）",
-  "tone": "故事基调（如：甜宠、虐恋、悬疑、喜剧等）",
-  "estimated_duration_minutes": 预估时长（分钟，数字）
-}}
-```"""
+                prompt = prompt_service.get_summary_prompt(script_chunk)
             elif analysis_type == "characters":
                 existing_names = [c.get("name", "") for c in all_characters]
-                existing_hint = ""
-                if existing_names:
-                    existing_hint = f"\n\n## 已识别的角色（请勿重复）\n{', '.join(existing_names)}"
-                prompt = f"""你是一位专业的剧本分析师和角色设计师。请从以下剧本片段中提取所有角色的详细信息。
-
-## 剧本内容（第{chunk_idx}部分，共{total_chunks}部分）
-{script_chunk}{existing_hint}
-
-## 输出要求
-请以JSON格式输出本片段中出现的所有角色（不要重复已识别的角色）：
-```json
-{{
-  "characters": [
-    {{
-      "name": "角色姓名",
-      "gender": "男/女",
-      "age": "具体年龄或年龄段",
-      "role_type": "主角/配角/龙套",
-      "appearance": {{
-        "hair": "发型和发色描述",
-        "face": "脸型和五官特征",
-        "body": "身材特征",
-        "skin": "肤色"
-      }},
-      "personality": "性格特点",
-      "clothing_style": "服装风格"
-    }}
-  ]
-}}
-```
-如果本片段没有新角色，返回空数组。"""
+                prompt = prompt_service.get_characters_prompt(
+                    script_text=script_chunk,
+                    chunk_index=chunk_idx,
+                    total_chunks=total_chunks,
+                    existing_names=existing_names if existing_names else None,
+                )
             elif analysis_type == "scenes":
                 scene_start_num = len(all_scenes) + 1
-                prompt = f"""你是一位专业的分镜设计师。请根据以下剧本片段和角色信息，设计详细的分镜方案。
-
-## 剧本内容（第{chunk_idx}部分，共{total_chunks}部分）
-{script_chunk}
-
-## 角色列表
-{characters_json}
-
-## 输出要求
-请以JSON格式输出本片段的所有场景（场景序号从{scene_start_num}开始）：
-```json
-{{
-  "scenes": [
-    {{
-      "scene_number": {scene_start_num},
-      "location": "场景地点",
-      "time_of_day": "时间（白天/黄昏/夜晚等）",
-      "atmosphere": "氛围描述",
-      "environment": {{
-        "description": "环境详细描述"
-      }},
-      "characters": [
-        {{
-          "character_name": "角色名",
-          "position": "位置",
-          "action": "动作",
-          "expression": "表情"
-        }}
-      ],
-      "dialogue": "对白内容",
-      "camera": {{
-        "shot_type": "镜头类型（近景/中景/远景等）",
-        "movement": "镜头运动（固定/推/拉/摇等）"
-      }},
-      "duration_seconds": 预估时长秒数
-    }}
-  ]
-}}
-```"""
+                prompt = prompt_service.get_scenes_prompt(
+                    script_text=script_chunk,
+                    chunk_index=chunk_idx,
+                    total_chunks=total_chunks,
+                    characters_json=characters_json,
+                    scene_start_num=scene_start_num,
+                )
             else:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Unknown analysis type'})}\n\n"
                 return
