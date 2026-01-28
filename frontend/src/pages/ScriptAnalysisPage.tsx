@@ -390,12 +390,25 @@ function CharactersContent({
   const [isEditing, setIsEditing] = useState(false)
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const selectedCharacter = characters[selectedIndex]
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index)
     setIsEditing(false)
     setEditedCharacter({})
+  }
+
+  const handleScrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' })
+    }
+  }
+
+  const handleScrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' })
+    }
   }
 
   const handleEdit = () => {
@@ -651,35 +664,58 @@ function CharactersContent({
               <div className="mb-2 text-xs text-gray-600">
                 角色列表 ({characters.length} 项) - 点击切换
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {characters.map((character, index) => {
-                  const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
-                  const bgColor = character.gender?.includes('女') ? 'from-pink-400 to-rose-400' : character.gender?.includes('男') ? 'from-blue-400 to-indigo-400' : 'from-gray-400 to-gray-500'
-                  const isSelected = index === selectedIndex
-                  return (
-                    <div
-                      key={character.id}
-                      onClick={() => handleSelect(index)}
-                      className={`flex-shrink-0 w-20 cursor-pointer transition-all duration-300 ${
-                        isSelected ? 'scale-110 origin-bottom' : 'opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <div className={`relative bg-white rounded-xl p-2 border-2 ${
-                        isSelected ? 'border-purple-500 shadow-lg' : 'border-gray-200'
-                      }`}>
-                        <div className={`w-full aspect-square bg-gradient-to-br ${bgColor} rounded-lg flex items-center justify-center text-3xl shadow-md`}>
-                          {avatar}
+              <div className="flex items-center gap-2">
+                {/* 左箭头按钮 */}
+                <button
+                  onClick={handleScrollLeft}
+                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                >
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* 角色列表 */}
+                <div ref={scrollContainerRef} className="flex-1 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {characters.map((character, index) => {
+                    const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
+                    const bgColor = character.gender?.includes('女') ? 'from-pink-400 to-rose-400' : character.gender?.includes('男') ? 'from-blue-400 to-indigo-400' : 'from-gray-400 to-gray-500'
+                    const isSelected = index === selectedIndex
+                    return (
+                      <div
+                        key={character.id}
+                        onClick={() => handleSelect(index)}
+                        className={`flex-shrink-0 w-20 cursor-pointer transition-all duration-300 ${
+                          isSelected ? 'scale-110 origin-bottom' : 'opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className={`relative bg-white rounded-xl p-2 border-2 ${
+                          isSelected ? 'border-purple-500 shadow-lg' : 'border-gray-200'
+                        }`}>
+                          <div className={`w-full aspect-square bg-gradient-to-br ${bgColor} rounded-lg flex items-center justify-center text-3xl shadow-md`}>
+                            {avatar}
+                          </div>
+                          <p className="text-xs font-bold text-gray-800 mt-1 text-center truncate">
+                            {character.name}
+                          </p>
                         </div>
-                        <p className="text-xs font-bold text-gray-800 mt-1 text-center truncate">
-                          {character.name}
-                        </p>
+                        {isSelected && (
+                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full" />
+                        )}
                       </div>
-                      {isSelected && (
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full" />
-                      )}
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
+
+                {/* 右箭头按钮 */}
+                <button
+                  onClick={handleScrollRight}
+                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                >
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
             </div>
           </>
@@ -699,10 +735,23 @@ function ScenesContent({
 }) {
   const navigate = useNavigate()
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const selectedScene = scenes[selectedIndex]
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index)
+  }
+
+  const handleScrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' })
+    }
+  }
+
+  const handleScrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' })
+    }
   }
 
   return (
@@ -877,48 +926,71 @@ function ScenesContent({
               <div className="mb-2 text-xs text-gray-600">
                 场景列表 ({scenes.length} 项) - 点击切换
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {scenes.map((scene, index) => {
-                  const isSelected = index === selectedIndex
-                  return (
-                    <div
-                      key={scene.id}
-                      onClick={() => handleSelect(index)}
-                      className={`flex-shrink-0 w-32 cursor-pointer transition-all duration-300 ${
-                        isSelected ? 'scale-105 origin-bottom' : 'opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <div className={`relative bg-white rounded-xl overflow-hidden border-2 ${
-                        isSelected ? 'border-purple-500 shadow-lg' : 'border-gray-200'
-                      }`}>
-                        <div className="relative h-20 bg-gradient-to-br from-slate-700 to-slate-900">
-                          {scene.sceneImage?.imagePath ? (
-                            <img
-                              src={fileUrl.image(scene.sceneImage.imagePath)}
-                              alt={`场景 ${scene.sceneNumber}`}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white/20 text-3xl">
-                              🎬
+              <div className="flex items-center gap-2">
+                {/* 左箭头按钮 */}
+                <button
+                  onClick={handleScrollLeft}
+                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                >
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* 场景列表 */}
+                <div ref={scrollContainerRef} className="flex-1 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {scenes.map((scene, index) => {
+                    const isSelected = index === selectedIndex
+                    return (
+                      <div
+                        key={scene.id}
+                        onClick={() => handleSelect(index)}
+                        className={`flex-shrink-0 w-32 cursor-pointer transition-all duration-300 ${
+                          isSelected ? 'scale-105 origin-bottom' : 'opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className={`relative bg-white rounded-xl overflow-hidden border-2 ${
+                          isSelected ? 'border-purple-500 shadow-lg' : 'border-gray-200'
+                        }`}>
+                          <div className="relative h-20 bg-gradient-to-br from-slate-700 to-slate-900">
+                            {scene.sceneImage?.imagePath ? (
+                              <img
+                                src={fileUrl.image(scene.sceneImage.imagePath)}
+                                alt={`场景 ${scene.sceneNumber}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-white/20 text-3xl">
+                                🎬
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                            <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                              <span className="text-white font-bold text-xs">#{scene.sceneNumber}</span>
                             </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                          <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded-full">
-                            <span className="text-white font-bold text-xs">#{scene.sceneNumber}</span>
+                          </div>
+                          <div className="p-2 bg-white">
+                            <p className="text-xs font-bold text-gray-800 truncate">{scene.location}</p>
+                            <p className="text-xs text-gray-500 truncate">{scene.timeOfDay}</p>
                           </div>
                         </div>
-                        <div className="p-2 bg-white">
-                          <p className="text-xs font-bold text-gray-800 truncate">{scene.location}</p>
-                          <p className="text-xs text-gray-500 truncate">{scene.timeOfDay}</p>
-                        </div>
+                        {isSelected && (
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full" />
+                        )}
                       </div>
-                      {isSelected && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full" />
-                      )}
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
+
+                {/* 右箭头按钮 */}
+                <button
+                  onClick={handleScrollRight}
+                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                >
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
             </div>
           </>
