@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
-import { projectsApi, analysisApi, charactersApi } from '@/api'
+import { projectsApi, analysisApi, charactersApi, generationApi } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
 import { analysisService } from '@/services/analysisService'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
@@ -10,7 +10,6 @@ import { fileUrl } from '@/api/client'
 type Tab = 'characters' | 'scenes'
 
 export function ScriptAnalysisPage() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const urlProjectId = searchParams.get('project')
 
@@ -32,18 +31,15 @@ export function ScriptAnalysisPage() {
   const [activeTab, setActiveTab] = useState<Tab>('characters')
   const [loading, setLoading] = useState(false)
 
-  // 从 store 获取终端状态和当前分析类型
   const { terminalOutput, isStreaming, terminalExpanded, currentAnalyzing } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
 
-  // 自动滚动终端
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight
     }
   }, [terminalOutput])
 
-  // 页面加载时检查分析服务状态
   useEffect(() => {
     if (analysisService.isAnalyzing()) {
       const analysisType = analysisService.getCurrentAnalysisType()
@@ -60,7 +56,6 @@ export function ScriptAnalysisPage() {
     }
   }, [projectId])
 
-  // 加载项目和数据
   useEffect(() => {
     if (!projectId) return
 
@@ -86,7 +81,6 @@ export function ScriptAnalysisPage() {
     loadData()
   }, [projectId])
 
-  // 刷新项目状态
   const refreshProjectStatus = async () => {
     if (!projectId) return
     try {
@@ -97,7 +91,6 @@ export function ScriptAnalysisPage() {
     }
   }
 
-  // 创建分析回调函数
   const createAnalysisCallbacks = useCallback((analysisType: 'characters' | 'scenes') => ({
     onStart: () => {
       appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM 开始响应...`)
@@ -159,7 +152,6 @@ export function ScriptAnalysisPage() {
     }
   }), [projectId, appendTerminalOutput, updateLastTerminalLine, setAnalysisState, setCharacters, setScenes, refreshProjectStatus])
 
-  // 停止流式分析
   const stopStream = async () => {
     analysisService.stop()
     appendTerminalOutput('')
@@ -171,7 +163,6 @@ export function ScriptAnalysisPage() {
     await refreshProjectStatus()
   }
 
-  // 流式分析
   const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
     if (!projectId) return
     if (isStreaming || analysisService.isAnalyzing()) return
@@ -195,7 +186,6 @@ export function ScriptAnalysisPage() {
     analysisService.start(projectId, analysisType, callbacks)
   }
 
-  // 项目切换处理
   const handleProjectChange = (newProjectId: string) => {
     if (newProjectId && newProjectId !== projectId) {
       setSearchParams({ project: newProjectId })
@@ -205,22 +195,20 @@ export function ScriptAnalysisPage() {
   // 无项目时的空状态
   if (!projectId) {
     return (
-      <div className="flex h-screen">
+      <div className="flex h-screen bg-[#FBFBFC]">
         <ProjectSidebar
           currentProject={null}
           onProjectChange={handleProjectChange}
         />
-        <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
-          <div className="glass-effect rounded-2xl p-12 shadow-xl text-center max-w-md">
-            <div className="text-6xl mb-4">📝</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">请先上传剧本</h2>
-            <p className="text-gray-500 mb-6">上传剧本后，系统将自动分析角色和分镜</p>
-            <button
-              onClick={() => navigate('/upload')}
-              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              上传剧本
-            </button>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-sm">
+            <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h2 className="text-base font-medium text-[#1D1D1F] mb-1">请先上传剧本</h2>
+            <p className="text-sm text-[#6B6F76]">上传剧本后，系统将自动分析角色和分镜</p>
           </div>
         </div>
       </div>
@@ -229,15 +217,15 @@ export function ScriptAnalysisPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen">
+      <div className="flex h-screen bg-[#FBFBFC]">
         <ProjectSidebar
           currentProject={currentProject}
           onProjectChange={handleProjectChange}
         />
-        <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
-          <div className="glass-effect rounded-2xl p-12 shadow-xl text-center">
-            <div className="text-4xl mb-4 animate-pulse">⏳</div>
-            <p className="text-gray-500">加载中...</p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-[#6B6F76]">
+            <span className="w-4 h-4 border-2 border-[#E4E5E7] border-t-[#5E6AD2] rounded-full animate-spin" />
+            <span className="text-sm">加载中...</span>
           </div>
         </div>
       </div>
@@ -245,7 +233,7 @@ export function ScriptAnalysisPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#FBFBFC]">
       {/* 左侧边栏 */}
       <ProjectSidebar
         currentProject={currentProject}
@@ -259,41 +247,47 @@ export function ScriptAnalysisPage() {
       {/* 右侧主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶部标题栏 */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="bg-white border-b border-[#E4E5E7] px-6 py-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-800">
-              项目: {currentProject?.name || '未命名'}
+            <h1 className="text-sm font-medium text-[#1D1D1F]">
+              {currentProject?.name || '未命名项目'}
             </h1>
             {isStreaming && (
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium animate-pulse">
-                🔄 分析中...
+              <span className="tag primary animate-pulse-subtle">
+                分析中
               </span>
             )}
           </div>
         </div>
 
         {/* Tab切换 */}
-        <div className="bg-gray-50 border-b border-gray-200 px-6 py-2">
-          <div className="flex gap-2">
+        <div className="bg-white border-b border-[#E4E5E7] px-6">
+          <div className="flex gap-6">
             <button
               onClick={() => setActiveTab('characters')}
-              className={`px-6 py-2 text-sm font-semibold rounded-t-lg transition-colors ${
+              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'characters'
-                  ? 'bg-white text-purple-600 border-t-2 border-purple-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'text-[#5E6AD2] border-[#5E6AD2]'
+                  : 'text-[#6B6F76] border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               角色库
+              {characters.length > 0 && (
+                <span className="ml-1.5 text-xs text-[#9CA0A8]">{characters.length}</span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('scenes')}
-              className={`px-6 py-2 text-sm font-semibold rounded-t-lg transition-colors ${
+              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'scenes'
-                  ? 'bg-white text-purple-600 border-t-2 border-purple-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'text-[#5E6AD2] border-[#5E6AD2]'
+                  : 'text-[#6B6F76] border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               场景库
+              {scenes.length > 0 && (
+                <span className="ml-1.5 text-xs text-[#9CA0A8]">{scenes.length}</span>
+              )}
             </button>
           </div>
         </div>
@@ -314,50 +308,49 @@ export function ScriptAnalysisPage() {
         </div>
 
         {/* 底部终端 */}
-        <div className="border-t border-gray-200 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-          <div className="flex items-center justify-between px-5 py-2 bg-gradient-to-r from-gray-800 to-gray-700 border-b border-gray-600">
-            <div
-              className="flex items-center gap-3 flex-1 cursor-pointer group"
-              onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
-            >
-              <span className="text-green-400 font-mono text-sm">$</span>
-              <span className="text-gray-200 text-xs font-mono font-semibold">LLM / ComfyUI Output</span>
+        <div className="border-t border-[#E4E5E7] bg-[#1D1D1F]">
+          <div
+            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-white/5"
+            onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[#5E6AD2] text-xs font-mono">$</span>
+              <span className="text-[#9CA0A8] text-xs font-medium">Output</span>
               {isStreaming && (
-                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded-full animate-pulse border border-yellow-500/30">
-                  streaming...
+                <span className="flex items-center gap-1 text-xs text-[#5E6AD2]">
+                  <span className="w-1.5 h-1.5 bg-[#5E6AD2] rounded-full animate-pulse" />
+                  streaming
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
               {isStreaming && (
                 <button
-                  onClick={stopStream}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-medium transition-all"
-                  title="停止当前分析"
+                  onClick={(e) => { e.stopPropagation(); stopStream(); }}
+                  className="px-2 py-1 bg-[#EF4444] text-white text-xs rounded font-medium hover:bg-[#DC2626]"
                 >
-                  ⏹ 停止
+                  停止
                 </button>
               )}
-              <button
-                onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
-                className="text-gray-300 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-700 transition-all"
+              <svg
+                className={`w-4 h-4 text-[#6B6F76] transition-transform ${terminalExpanded ? '' : 'rotate-180'}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                {terminalExpanded ? '▼' : '▲'}
-              </button>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
           </div>
 
           {terminalExpanded && (
             <div
               ref={terminalRef}
-              className="p-4 font-mono text-xs text-green-400 overflow-y-auto bg-black/20"
-              style={{
-                maxHeight: '200px',
-                textShadow: '0 0 5px rgba(74, 222, 128, 0.5)',
-              }}
+              className="px-4 py-3 font-mono text-xs text-[#9CA0A8] overflow-y-auto bg-[#161618]"
+              style={{ maxHeight: '160px' }}
             >
               {terminalOutput.length === 0 ? (
-                <p className="text-gray-500 italic">$ 等待分析任务...</p>
+                <p className="text-[#6B6F76]">等待任务...</p>
               ) : (
                 terminalOutput.map((line, i) => (
                   <div key={i} className="whitespace-pre-wrap break-all leading-relaxed">
@@ -366,13 +359,12 @@ export function ScriptAnalysisPage() {
                 ))
               )}
               {isStreaming && (
-                <span className="inline-block w-1.5 h-3 bg-green-400 animate-pulse ml-1" />
+                <span className="inline-block w-1.5 h-3 bg-[#5E6AD2] animate-pulse ml-0.5" />
               )}
             </div>
           )}
         </div>
       </div>
-
     </div>
   )
 }
@@ -385,13 +377,19 @@ function CharactersContent({
   characters: Character[]
   projectId: string
 }) {
-  const navigate = useNavigate()
+  const { setCharacters } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
   const [isSaving, setIsSaving] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const selectedCharacter = characters[selectedIndex]
+
+  // 生成相关状态
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateProgress, setGenerateProgress] = useState(0)
+  const [generateMessage, setGenerateMessage] = useState('')
+  const pollingRef = useRef<number | null>(null)
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index)
@@ -401,13 +399,13 @@ function CharactersContent({
 
   const handleScrollLeft = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' })
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' })
     }
   }
 
   const handleScrollRight = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' })
+      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' })
     }
   }
 
@@ -445,7 +443,6 @@ function CharactersContent({
 
       alert('保存成功！')
       setIsEditing(false)
-      // 刷新页面以更新数据
       window.location.reload()
     } catch (err) {
       console.error('Save character failed:', err)
@@ -459,260 +456,308 @@ function CharactersContent({
     setEditedCharacter(prev => ({ ...prev, [field]: value }))
   }
 
+  // 清理轮询
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [])
+
+  // 生成角色图
+  const handleGenerate = async () => {
+    if (!selectedCharacter?.id || isGenerating) return
+
+    setIsGenerating(true)
+    setGenerateProgress(0)
+    setGenerateMessage('正在启动生成任务...')
+
+    try {
+      // 调用生成 API，生成 front 类型的图片
+      const response = await generationApi.generateCharacterImages(
+        projectId,
+        selectedCharacter.id,
+        ['front']
+      )
+
+      const taskId = response.task_id
+      setGenerateMessage('生成中...')
+
+      // 轮询任务状态
+      pollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await generationApi.getTaskStatus(taskId)
+          setGenerateProgress(status.progress)
+          setGenerateMessage(status.message || '生成中...')
+
+          if (status.status === 'completed') {
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current)
+              pollingRef.current = null
+            }
+            setIsGenerating(false)
+            setGenerateMessage('生成完成！')
+
+            // 刷新角色数据
+            const updatedCharacters = await analysisApi.getCharacters(projectId)
+            setCharacters(updatedCharacters)
+
+            setTimeout(() => {
+              setGenerateMessage('')
+              setGenerateProgress(0)
+            }, 2000)
+          } else if (status.status === 'failed') {
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current)
+              pollingRef.current = null
+            }
+            setIsGenerating(false)
+            setGenerateMessage(`生成失败: ${status.error || '未知错误'}`)
+          }
+        } catch (err) {
+          console.error('Poll status failed:', err)
+        }
+      }, 1000)
+    } catch (err) {
+      console.error('Generate failed:', err)
+      setIsGenerating(false)
+      setGenerateMessage('启动生成任务失败')
+    }
+  }
+
   return (
     <div className="flex flex-1 overflow-hidden">
-      {/* 左侧 Info 面板 - 显示选中角色详情 */}
-      <div className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+      {/* 左侧详情面板 */}
+      <div className="w-72 bg-white border-r border-[#E4E5E7] overflow-y-auto">
         {characters.length === 0 ? (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-gray-800">Info</h3>
+          <div className="p-4">
+            <h3 className="text-sm font-medium text-[#1D1D1F] mb-3">详情</h3>
+            <div className="text-sm text-[#6B6F76]">
+              <p>暂无角色数据</p>
+              <p className="text-xs mt-1 text-[#9CA0A8]">请先分析角色</p>
             </div>
-            <div className="space-y-3 text-sm">
-              <div>
-                <label className="text-gray-600 block mb-1 text-xs">角色数量</label>
-                <p className="font-semibold text-gray-800">0 个</p>
-              </div>
-              <div>
-                <label className="text-gray-600 block mb-1 text-xs">状态</label>
-                <p className="font-semibold text-gray-500">待分析</p>
-              </div>
-            </div>
-          </>
+          </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-gray-800">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-[#1D1D1F]">
                 {isEditing ? (
                   <input
                     type="text"
                     value={editedCharacter.name || ''}
                     onChange={(e) => updateField('name', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="w-full px-2 py-1 border border-[#E4E5E7] rounded text-sm focus:outline-none focus:border-[#5E6AD2]"
                   />
                 ) : (
-                  selectedCharacter.name
+                  selectedCharacter?.name
                 )}
               </h3>
               {!isEditing && (
                 <button
                   onClick={handleEdit}
-                  className="text-blue-500 text-xs font-medium hover:text-blue-600"
+                  className="text-xs text-[#5E6AD2] hover:text-[#4F5BC7] font-medium"
                 >
                   编辑
                 </button>
               )}
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="text-gray-500 block mb-1">角色类型</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editedCharacter.roleType || ''}
-                    onChange={(e) => updateField('roleType', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded"
-                  />
-                ) : (
-                  <p className="font-semibold text-gray-800">{selectedCharacter.roleType}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">性别</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editedCharacter.gender || ''}
-                    onChange={(e) => updateField('gender', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded"
-                  />
-                ) : (
-                  <p className="font-semibold text-gray-800">{selectedCharacter.gender || '未知'}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">年龄</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editedCharacter.age || ''}
-                    onChange={(e) => updateField('age', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded"
-                  />
-                ) : (
-                  <p className="font-semibold text-gray-800">{selectedCharacter.age || '未知'}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">外貌特征</label>
-                {isEditing ? (
-                  <textarea
-                    value={editedCharacter.appearance || ''}
-                    onChange={(e) => updateField('appearance', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded resize-none"
-                    rows={3}
-                  />
-                ) : (
-                  <p className="text-gray-700 leading-relaxed">{selectedCharacter.appearance || '暂无描述'}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">性格特点</label>
-                {isEditing ? (
-                  <textarea
-                    value={editedCharacter.personality || ''}
-                    onChange={(e) => updateField('personality', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded resize-none"
-                    rows={3}
-                  />
-                ) : (
-                  <p className="text-gray-700 leading-relaxed">{selectedCharacter.personality || '暂无描述'}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">服装风格</label>
-                {isEditing ? (
-                  <textarea
-                    value={editedCharacter.clothing || ''}
-                    onChange={(e) => updateField('clothing', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded resize-none"
-                    rows={3}
-                  />
-                ) : (
-                  <p className="text-gray-700 leading-relaxed">{selectedCharacter.clothing || '暂无描述'}</p>
-                )}
-              </div>
+            <div className="space-y-4 text-sm">
+              <Field
+                label="类型"
+                value={selectedCharacter?.roleType}
+                isEditing={isEditing}
+                editValue={editedCharacter.roleType}
+                onChange={(v) => updateField('roleType', v)}
+              />
+              <Field
+                label="性别"
+                value={selectedCharacter?.gender}
+                isEditing={isEditing}
+                editValue={editedCharacter.gender}
+                onChange={(v) => updateField('gender', v)}
+              />
+              <Field
+                label="年龄"
+                value={selectedCharacter?.age}
+                isEditing={isEditing}
+                editValue={editedCharacter.age}
+                onChange={(v) => updateField('age', v)}
+              />
+              <Field
+                label="外貌"
+                value={selectedCharacter?.appearance}
+                isEditing={isEditing}
+                editValue={editedCharacter.appearance}
+                onChange={(v) => updateField('appearance', v)}
+                multiline
+              />
+              <Field
+                label="性格"
+                value={selectedCharacter?.personality}
+                isEditing={isEditing}
+                editValue={editedCharacter.personality}
+                onChange={(v) => updateField('personality', v)}
+                multiline
+              />
+              <Field
+                label="服装"
+                value={selectedCharacter?.clothing}
+                isEditing={isEditing}
+                editValue={editedCharacter.clothing}
+                onChange={(v) => updateField('clothing', v)}
+                multiline
+              />
             </div>
 
             {isEditing ? (
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-6">
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="flex-1 py-2 bg-[#5E6AD2] text-white rounded-md text-xs font-medium hover:bg-[#4F5BC7] disabled:opacity-50"
                 >
                   {isSaving ? '保存中...' : '保存'}
                 </button>
                 <button
                   onClick={handleCancel}
                   disabled={isSaving}
-                  className="flex-1 py-2 bg-gray-400 text-white rounded-lg text-sm font-semibold hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="flex-1 py-2 bg-[#F7F8F9] text-[#6B6F76] rounded-md text-xs font-medium hover:bg-[#E4E5E7] disabled:opacity-50"
                 >
                   取消
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => navigate(`/generation?project=${projectId}`)}
-                className="w-full mt-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-sm font-semibold hover:from-purple-600 hover:to-indigo-600 shadow-md transition-all"
-              >
-                生成角色图
-              </button>
+              <div className="mt-6 space-y-2">
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="w-full py-2 bg-[#5E6AD2] text-white rounded-md text-xs font-medium hover:bg-[#4F5BC7] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      生成中...
+                    </span>
+                  ) : '生成角色图'}
+                </button>
+
+                {/* 进度条 */}
+                {(isGenerating || generateMessage) && (
+                  <div className="space-y-1">
+                    <div className="h-1.5 bg-[#E4E5E7] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#5E6AD2] transition-all duration-300"
+                        style={{ width: `${generateProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-[#6B6F76]">{generateMessage}</p>
+                  </div>
+                )}
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* 右侧 Generated Contents - 只显示已生成的图片 */}
-      <div className="flex-1 bg-gray-50 overflow-hidden flex flex-col">
+      {/* 右侧内容区 */}
+      <div className="flex-1 bg-[#FBFBFC] overflow-hidden flex flex-col">
         {characters.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-5xl mb-3">👤</div>
-              <p>暂无角色数据</p>
-              <p className="text-sm mt-2">请使用左侧边栏的"分析角色"按钮</p>
+              <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <p className="text-sm text-[#6B6F76]">暂无角色数据</p>
+              <p className="text-xs text-[#9CA0A8] mt-1">使用左侧"分析角色"按钮开始</p>
             </div>
           </div>
         ) : (
           <>
-            {/* 上方：已生成的图片展示 */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6">
-                <h3 className="text-lg font-bold text-gray-700 mb-4">Generated Contents</h3>
-
-                {selectedCharacter.characterImages && selectedCharacter.characterImages.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {selectedCharacter.characterImages.map((img) => (
-                      <div key={img.id} className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
-                        <img
-                          src={fileUrl.image(img.imagePath)}
-                          alt={`${selectedCharacter.name} - ${img.imageType}`}
-                          className="w-full aspect-square object-cover"
-                        />
-                        <div className="p-3">
-                          <p className="text-sm font-semibold text-gray-700">{img.imageType}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(img.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
+            {/* 生成的图片 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <h3 className="text-sm font-medium text-[#1D1D1F] mb-4">生成内容</h3>
+              {selectedCharacter?.characterImages && selectedCharacter.characterImages.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedCharacter.characterImages.map((img) => (
+                    <div key={img.id} className="card overflow-hidden">
+                      <img
+                        src={fileUrl.image(img.imagePath)}
+                        alt={`${selectedCharacter.name} - ${img.imageType}`}
+                        className="w-full aspect-square object-cover"
+                      />
+                      <div className="p-3">
+                        <p className="text-sm font-medium text-[#1D1D1F]">{img.imageType}</p>
+                        <p className="text-xs text-[#9CA0A8] mt-0.5">
+                          {new Date(img.createdAt).toLocaleDateString()}
+                        </p>
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
                   </div>
-                ) : (
-                  <div className="text-center py-16 text-gray-400">
-                    <div className="text-5xl mb-3">🖼️</div>
-                    <p>暂无生成图片</p>
-                    <p className="text-sm mt-2">点击左侧"生成角色图"按钮开始生成</p>
-                  </div>
-                )}
-              </div>
+                  <p className="text-sm text-[#6B6F76]">暂无生成图片</p>
+                  <p className="text-xs text-[#9CA0A8] mt-1">点击"生成角色图"开始</p>
+                </div>
+              )}
             </div>
 
-            {/* 下方：横向滚动选择器 - 修复遮挡问题 */}
-            <div className="bg-white border-t border-gray-200 p-4 pt-6">
-              <div className="mb-2 text-xs text-gray-600">
-                角色列表 ({characters.length} 项) - 点击切换
-              </div>
+            {/* 角色选择器 */}
+            <div className="bg-white border-t border-[#E4E5E7] p-4">
               <div className="flex items-center gap-2">
-                {/* 左箭头按钮 */}
                 <button
                   onClick={handleScrollLeft}
-                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                  className="flex-shrink-0 w-8 h-8 bg-white border border-[#E4E5E7] rounded-md flex items-center justify-center hover:border-[#5E6AD2] hover:text-[#5E6AD2]"
                 >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
 
-                {/* 角色列表 */}
-                <div ref={scrollContainerRef} className="flex-1 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                <div ref={scrollContainerRef} className="flex-1 flex gap-2 overflow-x-auto scrollbar-hide py-1">
                   {characters.map((character, index) => {
-                    const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
-                    const bgColor = character.gender?.includes('女') ? 'from-pink-400 to-rose-400' : character.gender?.includes('男') ? 'from-blue-400 to-indigo-400' : 'from-gray-400 to-gray-500'
                     const isSelected = index === selectedIndex
+                    const isFemale = character.gender?.includes('女')
+                    const isMale = character.gender?.includes('男')
+
+                    // 根据性别设置颜色
+                    const getColors = () => {
+                      if (isSelected) {
+                        if (isFemale) return 'bg-[#E11D48] text-white'
+                        if (isMale) return 'bg-[#2563EB] text-white'
+                        return 'bg-[#5E6AD2] text-white'
+                      }
+                      if (isFemale) return 'bg-[#FFF1F2] text-[#BE123C] hover:bg-[#FFE4E6]'
+                      if (isMale) return 'bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE]'
+                      return 'bg-[#F7F8F9] text-[#6B6F76] hover:bg-[#E4E5E7]'
+                    }
+
                     return (
-                      <div
+                      <button
                         key={character.id}
                         onClick={() => handleSelect(index)}
-                        className={`flex-shrink-0 w-20 cursor-pointer transition-all duration-300 ${
-                          isSelected ? 'scale-110 origin-bottom' : 'opacity-60 hover:opacity-100'
-                        }`}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${getColors()}`}
                       >
-                        <div className={`relative bg-white rounded-xl p-2 border-2 ${
-                          isSelected ? 'border-purple-500 shadow-lg' : 'border-gray-200'
-                        }`}>
-                          <div className={`w-full aspect-square bg-gradient-to-br ${bgColor} rounded-lg flex items-center justify-center text-3xl shadow-md`}>
-                            {avatar}
-                          </div>
-                          <p className="text-xs font-bold text-gray-800 mt-1 text-center truncate">
-                            {character.name}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full" />
-                        )}
-                      </div>
+                        {character.name}
+                      </button>
                     )
                   })}
                 </div>
 
-                {/* 右箭头按钮 */}
                 <button
                   onClick={handleScrollRight}
-                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                  className="flex-shrink-0 w-8 h-8 bg-white border border-[#E4E5E7] rounded-md flex items-center justify-center hover:border-[#5E6AD2] hover:text-[#5E6AD2]"
                 >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -744,91 +789,67 @@ function ScenesContent({
 
   const handleScrollLeft = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' })
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' })
     }
   }
 
   const handleScrollRight = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' })
+      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' })
     }
   }
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      {/* 左侧 Info 面板 - 显示选中场景详情 */}
-      <div className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+      {/* 左侧详情面板 */}
+      <div className="w-72 bg-white border-r border-[#E4E5E7] overflow-y-auto">
         {scenes.length === 0 ? (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-gray-800">Info</h3>
+          <div className="p-4">
+            <h3 className="text-sm font-medium text-[#1D1D1F] mb-3">详情</h3>
+            <div className="text-sm text-[#6B6F76]">
+              <p>暂无场景数据</p>
+              <p className="text-xs mt-1 text-[#9CA0A8]">请先分析场景</p>
             </div>
-            <div className="space-y-3 text-sm">
-              <div>
-                <label className="text-gray-600 block mb-1 text-xs">场景数量</label>
-                <p className="font-semibold text-gray-800">0 个</p>
-              </div>
-              <div>
-                <label className="text-gray-600 block mb-1 text-xs">状态</label>
-                <p className="font-semibold text-gray-500">待分析</p>
-              </div>
-            </div>
-          </>
+          </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-gray-800">场景 #{selectedScene.sceneNumber}</h3>
-              <button className="text-blue-500 text-xs font-medium hover:text-blue-600">
-                编辑
-              </button>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-[#1D1D1F]">
+                场景 #{selectedScene?.sceneNumber}
+              </h3>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="text-gray-500 block mb-1">地点</label>
-                <p className="font-semibold text-gray-800">{selectedScene.location}</p>
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">时间</label>
-                <p className="font-semibold text-gray-800">{selectedScene.timeOfDay}</p>
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">时长</label>
-                <p className="font-semibold text-gray-800">{selectedScene.durationSeconds}秒</p>
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">环境描述</label>
-                <p className="text-gray-700 leading-relaxed">{selectedScene.environment || '暂无描述'}</p>
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">镜头设置</label>
-                <p className="text-gray-700 leading-relaxed">{selectedScene.cameraAngle || '暂无描述'}</p>
-              </div>
-              <div>
-                <label className="text-gray-500 block mb-1">出场角色</label>
-                <div className="flex flex-wrap gap-1">
-                  {selectedScene.characters && selectedScene.characters.length > 0 ? (
-                    selectedScene.characters.map((char) => (
+            <div className="space-y-4 text-sm">
+              <Field label="地点" value={selectedScene?.location} />
+              <Field label="时间" value={selectedScene?.timeOfDay} />
+              <Field label="时长" value={selectedScene?.durationSeconds ? `${selectedScene.durationSeconds}秒` : undefined} />
+              <Field label="环境" value={selectedScene?.environment} multiline />
+              <Field label="镜头" value={selectedScene?.cameraAngle} />
+
+              {selectedScene?.characters && selectedScene.characters.length > 0 && (
+                <div>
+                  <label className="text-xs text-[#6B6F76] block mb-1.5">出场角色</label>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedScene.characters.map((char) => (
                       <span
                         key={char.characterId}
-                        className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full"
+                        className="tag primary"
                       >
                         {char.characterName}
                       </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400">无</span>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              </div>
-              {selectedScene.dialogues && selectedScene.dialogues.length > 0 && (
+              )}
+
+              {selectedScene?.dialogues && selectedScene.dialogues.length > 0 && (
                 <div>
-                  <label className="text-gray-500 block mb-1">对白</label>
-                  <div className="space-y-1 bg-gray-50 rounded p-2 max-h-32 overflow-y-auto">
+                  <label className="text-xs text-[#6B6F76] block mb-1.5">对白</label>
+                  <div className="bg-[#F7F8F9] rounded-md p-2.5 max-h-32 overflow-y-auto space-y-1.5">
                     {selectedScene.dialogues.map((dialogue, idx) => (
                       <div key={idx} className="text-xs">
-                        <span className="font-semibold text-purple-700">{dialogue.characterName}:</span>
-                        <span className="text-gray-700 ml-1">{dialogue.content}</span>
+                        <span className="font-medium text-[#5E6AD2]">{dialogue.characterName}:</span>
+                        <span className="text-[#1D1D1F] ml-1">{dialogue.content}</span>
                       </div>
                     ))}
                   </div>
@@ -836,158 +857,130 @@ function ScenesContent({
               )}
             </div>
 
-            <div className="space-y-2 mt-4">
+            <div className="space-y-2 mt-6">
               <button
                 onClick={() => navigate(`/generation?project=${projectId}`)}
-                className="w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-sm font-semibold hover:from-purple-600 hover:to-indigo-600 shadow-md transition-all"
+                className="w-full py-2 bg-[#5E6AD2] text-white rounded-md text-xs font-medium hover:bg-[#4F5BC7]"
               >
                 生成场景图
               </button>
               <button
                 onClick={() => navigate(`/generation?project=${projectId}`)}
-                className="w-full py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg text-sm font-semibold hover:from-green-600 hover:to-emerald-600 shadow-md transition-all"
+                className="w-full py-2 bg-white text-[#1D1D1F] border border-[#E4E5E7] rounded-md text-xs font-medium hover:border-[#5E6AD2] hover:text-[#5E6AD2]"
               >
                 生成视频
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
 
-      {/* 右侧 Generated Contents - 只显示已生成的图片/视频 */}
-      <div className="flex-1 bg-gray-50 overflow-hidden flex flex-col">
+      {/* 右侧内容区 */}
+      <div className="flex-1 bg-[#FBFBFC] overflow-hidden flex flex-col">
         {scenes.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-5xl mb-3">🎬</div>
-              <p>暂无场景数据</p>
-              <p className="text-sm mt-2">请使用左侧边栏的"分析场景"按钮</p>
+              <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="text-sm text-[#6B6F76]">暂无场景数据</p>
+              <p className="text-xs text-[#9CA0A8] mt-1">使用左侧"分析场景"按钮开始</p>
             </div>
           </div>
         ) : (
           <>
-            {/* 上方：已生成的图片/视频展示 */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6">
-                <h3 className="text-lg font-bold text-gray-700 mb-4">Generated Contents</h3>
-
-                {(selectedScene.sceneImage || selectedScene.videoClips?.length > 0) ? (
-                  <div className="space-y-4">
-                    {/* 场景图 */}
-                    {selectedScene.sceneImage && (
-                      <div className="bg-white rounded-xl overflow-hidden shadow-lg">
-                        <img
-                          src={fileUrl.image(selectedScene.sceneImage.imagePath)}
-                          alt={`场景 ${selectedScene.sceneNumber}`}
-                          className="w-full aspect-video object-cover"
-                        />
-                        <div className="p-3">
-                          <p className="text-sm font-semibold text-gray-700">场景图</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(selectedScene.sceneImage.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
+            {/* 生成的内容 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <h3 className="text-sm font-medium text-[#1D1D1F] mb-4">生成内容</h3>
+              {(selectedScene?.sceneImage || (selectedScene?.videoClips && selectedScene.videoClips.length > 0)) ? (
+                <div className="space-y-4">
+                  {selectedScene.sceneImage && (
+                    <div className="card overflow-hidden">
+                      <img
+                        src={fileUrl.image(selectedScene.sceneImage.imagePath)}
+                        alt={`场景 ${selectedScene.sceneNumber}`}
+                        className="w-full aspect-video object-cover"
+                      />
+                      <div className="p-3">
+                        <p className="text-sm font-medium text-[#1D1D1F]">场景图</p>
+                        <p className="text-xs text-[#9CA0A8] mt-0.5">
+                          {new Date(selectedScene.sceneImage.createdAt).toLocaleDateString()}
+                        </p>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* 视频片段 */}
-                    {selectedScene.videoClips && selectedScene.videoClips.length > 0 && (
-                      <div className="grid grid-cols-2 gap-4">
-                        {selectedScene.videoClips.map((video) => (
-                          <div key={video.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                            <video
-                              src={fileUrl.video(video.videoPath)}
-                              controls
-                              className="w-full aspect-video object-cover bg-black"
-                            />
-                            <div className="p-3">
-                              <p className="text-sm font-semibold text-gray-700">视频片段</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {new Date(video.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
+                  {selectedScene.videoClips && selectedScene.videoClips.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedScene.videoClips.map((video) => (
+                        <div key={video.id} className="card overflow-hidden">
+                          <video
+                            src={fileUrl.video(video.videoPath)}
+                            controls
+                            className="w-full aspect-video object-cover bg-black"
+                          />
+                          <div className="p-3">
+                            <p className="text-sm font-medium text-[#1D1D1F]">视频片段</p>
+                            <p className="text-xs text-[#9CA0A8] mt-0.5">
+                              {new Date(video.createdAt).toLocaleDateString()}
+                            </p>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
                   </div>
-                ) : (
-                  <div className="text-center py-16 text-gray-400">
-                    <div className="text-5xl mb-3">🎬</div>
-                    <p>暂无生成内容</p>
-                    <p className="text-sm mt-2">点击左侧按钮开始生成场景图或视频</p>
-                  </div>
-                )}
-              </div>
+                  <p className="text-sm text-[#6B6F76]">暂无生成内容</p>
+                  <p className="text-xs text-[#9CA0A8] mt-1">点击左侧按钮开始生成</p>
+                </div>
+              )}
             </div>
 
-            {/* 下方：横向滚动选择器 - 修复遮挡问题 */}
-            <div className="bg-white border-t border-gray-200 p-4 pt-6">
-              <div className="mb-2 text-xs text-gray-600">
-                场景列表 ({scenes.length} 项) - 点击切换
-              </div>
+            {/* 场景选择器 */}
+            <div className="bg-white border-t border-[#E4E5E7] p-4">
               <div className="flex items-center gap-2">
-                {/* 左箭头按钮 */}
                 <button
                   onClick={handleScrollLeft}
-                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                  className="flex-shrink-0 w-8 h-8 bg-white border border-[#E4E5E7] rounded-md flex items-center justify-center hover:border-[#5E6AD2] hover:text-[#5E6AD2]"
                 >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
 
-                {/* 场景列表 */}
-                <div ref={scrollContainerRef} className="flex-1 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                <div ref={scrollContainerRef} className="flex-1 flex gap-2 overflow-x-auto scrollbar-hide py-1">
                   {scenes.map((scene, index) => {
                     const isSelected = index === selectedIndex
                     return (
-                      <div
+                      <button
                         key={scene.id}
                         onClick={() => handleSelect(index)}
-                        className={`flex-shrink-0 w-32 cursor-pointer transition-all duration-300 ${
-                          isSelected ? 'scale-105 origin-bottom' : 'opacity-60 hover:opacity-100'
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                          isSelected
+                            ? 'bg-[#5E6AD2] text-white'
+                            : 'bg-[#F7F8F9] text-[#6B6F76] hover:bg-[#E4E5E7] hover:text-[#1D1D1F]'
                         }`}
                       >
-                        <div className={`relative bg-white rounded-xl overflow-hidden border-2 ${
-                          isSelected ? 'border-purple-500 shadow-lg' : 'border-gray-200'
-                        }`}>
-                          <div className="relative h-20 bg-gradient-to-br from-slate-700 to-slate-900">
-                            {scene.sceneImage?.imagePath ? (
-                              <img
-                                src={fileUrl.image(scene.sceneImage.imagePath)}
-                                alt={`场景 ${scene.sceneNumber}`}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-white/20 text-3xl">
-                                🎬
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                            <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded-full">
-                              <span className="text-white font-bold text-xs">#{scene.sceneNumber}</span>
-                            </div>
-                          </div>
-                          <div className="p-2 bg-white">
-                            <p className="text-xs font-bold text-gray-800 truncate">{scene.location}</p>
-                            <p className="text-xs text-gray-500 truncate">{scene.timeOfDay}</p>
-                          </div>
-                        </div>
-                        {isSelected && (
-                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full" />
-                        )}
-                      </div>
+                        #{scene.sceneNumber} {scene.location}
+                      </button>
                     )
                   })}
                 </div>
 
-                {/* 右箭头按钮 */}
                 <button
                   onClick={handleScrollRight}
-                  className="flex-shrink-0 w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-purple-500 hover:bg-purple-50 transition-all shadow-sm"
+                  className="flex-shrink-0 w-8 h-8 bg-white border border-[#E4E5E7] rounded-md flex items-center justify-center hover:border-[#5E6AD2] hover:text-[#5E6AD2]"
                 >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -996,6 +989,48 @@ function ScenesContent({
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+// 字段组件
+function Field({
+  label,
+  value,
+  isEditing,
+  editValue,
+  onChange,
+  multiline
+}: {
+  label: string
+  value?: string
+  isEditing?: boolean
+  editValue?: string
+  onChange?: (v: string) => void
+  multiline?: boolean
+}) {
+  return (
+    <div>
+      <label className="text-xs text-[#6B6F76] block mb-1">{label}</label>
+      {isEditing && onChange ? (
+        multiline ? (
+          <textarea
+            value={editValue || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-2 py-1.5 border border-[#E4E5E7] rounded-md text-sm resize-none focus:outline-none focus:border-[#5E6AD2]"
+            rows={3}
+          />
+        ) : (
+          <input
+            type="text"
+            value={editValue || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-2 py-1.5 border border-[#E4E5E7] rounded-md text-sm focus:outline-none focus:border-[#5E6AD2]"
+          />
+        )
+      ) : (
+        <p className="text-sm text-[#1D1D1F] leading-relaxed">{value || '—'}</p>
+      )}
     </div>
   )
 }
