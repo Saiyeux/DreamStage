@@ -1,0 +1,120 @@
+{
+  "3": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "空Latent图像（SD3）"
+    }
+  },
+  "4": {
+    "inputs": {
+      "shift": 4,
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "采样算法（AuraFlow）"
+    }
+  },
+  "5": {
+    "inputs": {
+      "ckpt_name": "NetaYumev35_pretrained_all_in_one.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Checkpoint加载器（简易）"
+    }
+  },
+  "10": {
+    "inputs": {
+      "text": "anime style, portrait of an 18-year-old fierce and intelligent girl, long dark hair, piercing aurora-blue eyes, determined yet vulnerable expression, lips slightly parted, skin with faint silver glow, holding a silver chalice. Front-facing, centered, from chest up, studio lighting, plain white background, sharp focus, highly detailed face, 8k, transparent background",
+      "clip": [
+        "5",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "11": {
+    "inputs": {
+      "text": "You are an assistant designed to generate low-quality images based on textual prompts <Prompt Start> blurry, worst quality, low quality, jpeg artifacts, signature, watermark, username, error, deformed hands, bad anatomy, extra limbs, poorly drawn hands, poorly drawn face, mutation, deformed, extra eyes, extra arms, extra legs, malformed limbs, fused fingers, too many fingers, long neck, cross-eyed, bad proportions, missing arms, missing legs, extra digit, fewer digits, cropped",
+      "clip": [
+        "5",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "12": {
+    "inputs": {
+      "seed": 337305503634066,
+      "steps": 30,
+      "cfg": 4,
+      "sampler_name": "res_multistep",
+      "scheduler": "linear_quadratic",
+      "denoise": 1,
+      "model": [
+        "4",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "K采样器"
+    }
+  },
+  "14": {
+    "inputs": {
+      "samples": [
+        "12",
+        0
+      ],
+      "vae": [
+        "5",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "15": {
+    "inputs": {
+      "filename_prefix": "Anime",
+      "images": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存图像"
+    }
+  }
+}
