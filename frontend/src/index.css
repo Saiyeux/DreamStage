@@ -183,7 +183,7 @@ input:focus, select:focus, textarea:focus {
   color: var(--color-text);
 }
 
-/* 隐藏滚动条 */
+/* 滚动条样式 - 默认隐藏 but show on hover for better UX */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -192,6 +192,31 @@ input:focus, select:focus, textarea:focus {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* For elements that need visible scrollbars on demand */
+.scrollbar-default {
+  -ms-overflow-style: auto;
+  scrollbar-width: auto;
+}
+
+.scrollbar-default::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-default::-webkit-scrollbar-track {
+  background: #F3F4F6;
+  border-radius: 4px;
+}
+
+.scrollbar-default::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 4px;
+}
+
+.scrollbar-default::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
 }
 
 /* 状态指示器 */

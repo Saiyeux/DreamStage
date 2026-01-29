@@ -724,8 +724,8 @@ function CharactersContent({
               )}
             </div>
 
-            {/* 角色选择器 - 卡片式 */}
-            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4">
+            {/* 角色选择器 - 卡片式 - 添加最小高度确保可见 */}
+            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px]">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium text-[#1D1D1F]">角色列表</h4>
                 <div className="flex gap-1">
@@ -748,7 +748,7 @@ function CharactersContent({
                 </div>
               </div>
 
-              <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-hide py-1 items-stretch">
+              <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-default py-1 items-stretch">
                 {characters.map((character, index) => {
                   const isSelected = index === selectedIndex
                   const isFemale = character.gender?.includes('女')
@@ -980,8 +980,8 @@ function ScenesContent({
               )}
             </div>
 
-            {/* 场景选择器 - 卡片式 */}
-            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4">
+            {/* 场景选择器 - 卡片式 - 添加最小高度确保可见 */}
+            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px]">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium text-[#1D1D1F]">场景列表</h4>
                 <div className="flex gap-1">
@@ -1004,7 +1004,7 @@ function ScenesContent({
                 </div>
               </div>
 
-              <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-hide py-1 items-stretch">
+              <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-default py-1 items-stretch">
                 {scenes.map((scene, index) => {
                   const isSelected = index === selectedIndex
 

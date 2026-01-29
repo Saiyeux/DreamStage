@@ -120,9 +120,9 @@ export function ProjectSidebar({
   }
 
   return (
-    <div className="w-60 bg-white border-r border-[#E4E5E7] flex flex-col h-screen">
+    <div className="w-60 bg-white border-r border-[#E4E5E7] flex flex-col h-screen overflow-y-auto">
       {/* Logo / 标题 - 带图标 */}
-      <div className="px-4 py-4 border-b border-[#E4E5E7]">
+      <div className="px-4 py-4 border-b border-[#E4E5E7] flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-[#F97316] to-[#FB923C] rounded-xl flex items-center justify-center shadow-sm">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +137,7 @@ export function ProjectSidebar({
       </div>
 
       {/* 项目选择 - 卡片式 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7]">
+      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
         <label className="text-xs font-medium text-[#6B6F76] mb-2 block flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -170,7 +170,7 @@ export function ProjectSidebar({
       </div>
 
       {/* 剧情简介 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7]">
+      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-medium text-[#6B6F76] flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,7 +210,7 @@ export function ProjectSidebar({
       </div>
 
       {/* 服务状态 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7]">
+      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
         <label className="text-xs font-medium text-[#6B6F76] mb-2 block flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
@@ -240,7 +240,7 @@ export function ProjectSidebar({
       </div>
 
       {/* 操作区 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7]">
+      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
         <input
           ref={fileInputRef}
           type="file"
