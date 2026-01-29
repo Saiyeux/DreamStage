@@ -265,9 +265,9 @@ export function ScriptAnalysisPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('characters')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                 activeTab === 'characters'
-                  ? 'bg-[#F97316] text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white shadow-sm'
                   : 'bg-[#F7F8F9] text-[#6B6F76] hover:bg-[#FFEDD5] hover:text-[#EA580C]'
               }`}
             >
@@ -280,9 +280,9 @@ export function ScriptAnalysisPage() {
             </button>
             <button
               onClick={() => setActiveTab('scenes')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                 activeTab === 'scenes'
-                  ? 'bg-[#F97316] text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white shadow-sm'
                   : 'bg-[#F7F8F9] text-[#6B6F76] hover:bg-[#FFEDD5] hover:text-[#EA580C]'
               }`}
             >
@@ -331,7 +331,7 @@ export function ScriptAnalysisPage() {
               {isStreaming && (
                 <button
                   onClick={(e) => { e.stopPropagation(); stopStream(); }}
-                  className="px-2 py-1 bg-[#EF4444] text-white text-xs rounded font-medium hover:bg-[#DC2626]"
+                  className="px-2 py-1 bg-[#EF4444] text-white text-xs rounded font-medium hover:bg-[#DC2626] transition-colors duration-200"
                 >
                   停止
                 </button>
@@ -561,7 +561,7 @@ function CharactersContent({
               {!isEditing && (
                 <button
                   onClick={handleEdit}
-                  className="text-xs text-[#F97316] hover:text-[#EA580C] font-medium"
+                  className="text-xs text-[#F97316] hover:text-[#EA580C] font-medium transition-colors duration-200"
                 >
                   编辑
                 </button>
@@ -621,14 +621,14 @@ function CharactersContent({
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex-1 py-2.5 bg-[#F97316] text-white rounded-lg text-sm font-medium hover:bg-[#EA580C] disabled:opacity-50 shadow-sm"
+                  className="flex-1 py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] disabled:opacity-50 shadow-sm transition-all duration-200"
                 >
                   {isSaving ? '保存中...' : '保存修改'}
                 </button>
                 <button
                   onClick={handleCancel}
                   disabled={isSaving}
-                  className="flex-1 py-2.5 bg-[#F7F8F9] text-[#6B6F76] rounded-lg text-sm font-medium hover:bg-[#E4E5E7] disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-[#F7F8F9] text-[#6B6F76] rounded-lg text-sm font-medium hover:bg-[#E4E5E7] disabled:opacity-50 transition-all duration-200"
                 >
                   取消
                 </button>
@@ -638,7 +638,7 @@ function CharactersContent({
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="w-full py-2.5 bg-[#F97316] text-white rounded-lg text-sm font-medium hover:bg-[#EA580C] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
                 >
                   {isGenerating ? (
                     <>
@@ -696,7 +696,7 @@ function CharactersContent({
               {selectedCharacter?.characterImages && selectedCharacter.characterImages.length > 0 ? (
                 <div className="grid grid-cols-2 gap-4">
                   {selectedCharacter.characterImages.map((img) => (
-                    <div key={img.id} className="card overflow-hidden">
+                    <div key={img.id} className="card overflow-hidden rounded-xl transition-all duration-200">
                       <img
                         src={fileUrl.image(img.imagePath)}
                         alt={`${selectedCharacter.name} - ${img.imageType}`}
@@ -713,7 +713,7 @@ function CharactersContent({
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-xl flex items-center justify-center mx-auto mb-3">
                     <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -725,7 +725,7 @@ function CharactersContent({
             </div>
 
             {/* 角色选择器 - 卡片式 - 添加最小高度确保可见 */}
-            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px]">
+            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px] rounded-b-xl">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium text-[#1D1D1F]">角色列表</h4>
                 <div className="flex gap-1">
@@ -772,7 +772,7 @@ function CharactersContent({
                     <button
                       key={character.id}
                       onClick={() => handleSelect(index)}
-                      className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                      className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
                       style={{
                         background: getBgColor(),
                         color: getTextColor(),
@@ -887,7 +887,7 @@ function ScenesContent({
               <div className="pt-4 border-t border-[#E4E5E7] space-y-2">
                 <button
                   onClick={() => navigate(`/generation?project=${projectId}`)}
-                  className="w-full py-2.5 bg-[#F97316] text-white rounded-lg text-sm font-medium hover:bg-[#EA580C] shadow-sm flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -896,7 +896,7 @@ function ScenesContent({
                 </button>
                 <button
                   onClick={() => navigate(`/generation?project=${projectId}`)}
-                  className="w-full py-2.5 bg-white text-[#1D1D1F] border border-[#E4E5E7] rounded-lg text-sm font-medium hover:border-[#F97316] hover:text-[#F97316] flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-white text-[#1D1D1F] border border-[#E4E5E7] rounded-lg text-sm font-medium hover:border-[#F97316] hover:text-[#F97316] flex items-center justify-center gap-2 transition-all duration-200"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -932,7 +932,7 @@ function ScenesContent({
               {(selectedScene?.sceneImage || (selectedScene?.videoClips && selectedScene.videoClips.length > 0)) ? (
                 <div className="space-y-4">
                   {selectedScene.sceneImage && (
-                    <div className="card overflow-hidden">
+                    <div className="card overflow-hidden rounded-xl transition-all duration-200">
                       <img
                         src={fileUrl.image(selectedScene.sceneImage.imagePath)}
                         alt={`场景 ${selectedScene.sceneNumber}`}
@@ -950,11 +950,11 @@ function ScenesContent({
                   {selectedScene.videoClips && selectedScene.videoClips.length > 0 && (
                     <div className="grid grid-cols-2 gap-4">
                       {selectedScene.videoClips.map((video) => (
-                        <div key={video.id} className="card overflow-hidden">
+                        <div key={video.id} className="card overflow-hidden rounded-xl transition-all duration-200">
                           <video
                             src={fileUrl.video(video.videoPath)}
                             controls
-                            className="w-full aspect-video object-cover bg-black"
+                            className="w-full aspect-video object-cover bg-black rounded-t-xl"
                           />
                           <div className="p-3">
                             <p className="text-sm font-medium text-[#1D1D1F]">视频片段</p>
@@ -969,7 +969,7 @@ function ScenesContent({
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-xl flex items-center justify-center mx-auto mb-3">
                     <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
@@ -981,7 +981,7 @@ function ScenesContent({
             </div>
 
             {/* 场景选择器 - 卡片式 - 添加最小高度确保可见 */}
-            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px]">
+            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px] rounded-b-xl">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium text-[#1D1D1F]">场景列表</h4>
                 <div className="flex gap-1">
@@ -1012,9 +1012,9 @@ function ScenesContent({
                     <button
                       key={scene.id}
                       onClick={() => handleSelect(index)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                         isSelected
-                          ? 'bg-[#F97316] text-white'
+                          ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white shadow-sm'
                           : 'bg-[#FFF7ED] text-[#EA580C] hover:bg-[#FFEDD5]'
                       }`}
                     >

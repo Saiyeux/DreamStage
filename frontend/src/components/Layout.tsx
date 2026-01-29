@@ -37,7 +37,7 @@ export function Layout() {
                 </span>
                 <button
                   onClick={reset}
-                  className="text-xs text-gray-400 hover:text-red-500 hover:rotate-90 transition-transform duration-300"
+                  className="text-xs text-gray-400 hover:text-red-500 hover:rotate-90 transition-all duration-300"
                   title="关闭项目"
                 >
                   ✕
