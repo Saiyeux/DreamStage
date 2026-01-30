@@ -5,10 +5,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from app.core.logging_config import get_logger
 from app.db.database import async_session_maker
 from app.models import Character, Scene, CharacterImage, SceneImage, VideoClip
 from app.services.comfyui_client import comfyui_client
 from app.services.prompt_service import prompt_service
+
+logger = get_logger(__name__)
 
 
 # 配置文件路径
@@ -124,6 +127,7 @@ class GenerationTasks:
         image_types: list[str],
     ):
         """生成角色图像"""
+        logger.info(f"[任务开始] task_id={task_id}, character={character.name}, types={image_types}")
         self.update_task_status(task_id, "running", 0, "准备生成...")
 
         try:
@@ -138,6 +142,7 @@ class GenerationTasks:
                     self.update_task_status(
                         task_id, "running", progress, f"生成 {character.name} {type_label}..."
                     )
+                    logger.info(f"[生成图片] task_id={task_id}, type={image_type}, progress={progress}%")
 
                     # 构建 prompt（使用配置文件中的模板）
                     prompt, negative_prompt = self._build_character_prompt(character, image_type)
@@ -146,12 +151,15 @@ class GenerationTasks:
                     # 获取工作流配置
                     workflow_config = prompt_service.get_default_workflow("character")
                     if not workflow_config:
-                        raise ValueError("未找到角色图工作流配置")
+                        error_msg = "未找到角色图工作流配置"
+                        logger.error(f"[配置错误] task_id={task_id}, error={error_msg}")
+                        raise ValueError(error_msg)
 
                     workflow_params = workflow_config.get("params", {})
 
                     try:
                         # 调用 ComfyUI 生成（使用配置的工作流）
+                        logger.debug(f"[调用ComfyUI] task_id={task_id}, workflow={workflow_config.get('workflow_file')}")
                         image_path = await comfyui_client.generate_image(
                             workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
                             positive_prompt=prompt,
@@ -161,6 +169,8 @@ class GenerationTasks:
                             output_filename=output_filename,
                             project_id=character.project_id,
                         )
+
+                        logger.info(f"[图片生成成功] task_id={task_id}, type={image_type}, path={image_path}")
 
                         # 保存到数据库
                         char_image = CharacterImage(
@@ -182,16 +192,26 @@ class GenerationTasks:
                         })
                     except Exception as e:
                         # 单张图片失败不中断整个任务
-                        print(f"Generate {image_type} failed: {e}")
+                        logger.error(f"[图片生成失败] task_id={task_id}, type={image_type}, error={str(e)}", exc_info=True)
                         continue
 
-            self.update_task_status(
-                task_id, "completed", 100,
-                f"完成 {len(generated_images)}/{total} 张",
-                result=generated_images
-            )
+            if generated_images:
+                logger.info(f"[任务完成] task_id={task_id}, success={len(generated_images)}/{total}")
+                self.update_task_status(
+                    task_id, "completed", 100,
+                    f"完成 {len(generated_images)}/{total} 张",
+                    result=generated_images
+                )
+            else:
+                logger.error(f"[任务失败] task_id={task_id}, 未生成任何图片")
+                self.update_task_status(
+                    task_id, "failed", 0, 
+                    "生图失败或超时，详见后台日志",
+                    error="No images were generated (possible timeout or ComfyUI error)"
+                )
 
         except Exception as e:
+            logger.error(f"[任务异常] task_id={task_id}, error={str(e)}", exc_info=True)
             self.update_task_status(task_id, "failed", 0, "", error=str(e))
 
     async def generate_character_library(
@@ -209,6 +229,7 @@ class GenerationTasks:
             characters: 角色列表
             image_types: 要生成的图片类型列表，为None时使用默认配置
         """
+        logger.info(f"[批量任务开始] task_id={task_id}, project={project_id}, characters={len(characters)}, types={image_types}")
         self.update_task_status(task_id, "running", 0, "开始生成角色库...")
 
         try:
@@ -216,27 +237,34 @@ class GenerationTasks:
             if image_types is None:
                 config = self._load_image_type_config()
                 types_to_generate = [t["id"] for t in config.get("default_types", [])]
+                logger.info(f"[使用默认类型] task_id={task_id}, types={types_to_generate}")
             else:
                 types_to_generate = image_types
 
             if not types_to_generate:
                 types_to_generate = ["front", "side", "back"]  # 最终回退
+                logger.warning(f"[使用回退类型] task_id={task_id}, types={types_to_generate}")
 
             total_chars = len(characters)
             total_images = total_chars * len(types_to_generate)
-            completed = 0
+            completed_attempts = 0
+            success_count = 0
+            logger.info(f"[任务规模] task_id={task_id}, total_images={total_images}")
 
             # 获取工作流配置
             workflow_config = prompt_service.get_default_workflow("character")
             if not workflow_config:
-                raise ValueError("未找到角色图工作流配置")
+                error_msg = "未找到角色图工作流配置"
+                logger.error(f"[配置错误] task_id={task_id}, error={error_msg}")
+                raise ValueError(error_msg)
 
             workflow_params = workflow_config.get("params", {})
 
             async with async_session_maker() as db:
                 for i, character in enumerate(characters):
+                    logger.info(f"[处理角色] task_id={task_id}, character={character.name} ({i+1}/{total_chars})")
                     for j, image_type in enumerate(types_to_generate):
-                        progress = int((completed / total_images) * 100)
+                        progress = int((completed_attempts / total_images) * 100)
                         type_info = self._get_image_type_info(image_type)
                         type_label = type_info.get("label", image_type)
                         self.update_task_status(
@@ -249,6 +277,7 @@ class GenerationTasks:
                         output_filename = f"char_{character.id[:8]}_{image_type}"
 
                         try:
+                            logger.debug(f"[生成图片] task_id={task_id}, character={character.name}, type={image_type}")
                             image_path = await comfyui_client.generate_image(
                                 workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
                                 positive_prompt=prompt,
@@ -258,6 +287,8 @@ class GenerationTasks:
                                 output_filename=output_filename,
                                 project_id=project_id,
                             )
+
+                            logger.info(f"[图片成功] task_id={task_id}, character={character.name}, type={image_type}, path={image_path}")
 
                             # 保存到数据库
                             char_image = CharacterImage(
@@ -271,14 +302,25 @@ class GenerationTasks:
                             )
                             db.add(char_image)
                             await db.commit()
+                            success_count += 1
                         except Exception as e:
-                            print(f"Generate {character.name} {image_type} failed: {e}")
+                            logger.error(f"[图片失败] task_id={task_id}, character={character.name}, type={image_type}, error={str(e)}", exc_info=True)
 
-                        completed += 1
+                        completed_attempts += 1
 
-            self.update_task_status(task_id, "completed", 100, "角色库生成完成")
+            if success_count > 0:
+                logger.info(f"[批量任务完成] task_id={task_id}, success={success_count}/{total_images}")
+                self.update_task_status(task_id, "completed", 100, f"生图完成: {success_count}/{total_images}")
+            else:
+                logger.error(f"[批量任务失败] task_id={task_id}, 未生成任何图片")
+                self.update_task_status(
+                    task_id, "failed", 0, 
+                    "生图全部失败或超时，详见后台日志",
+                    error="All images failed to generate"
+                )
 
         except Exception as e:
+            logger.error(f"[批量任务失败] task_id={task_id}, error={str(e)}", exc_info=True)
             self.update_task_status(task_id, "failed", 0, "", error=str(e))
 
     async def generate_scene_image(

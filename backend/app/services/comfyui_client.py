@@ -1,11 +1,14 @@
 import json
 import uuid
 import httpx
+import logging
 from pathlib import Path
 from typing import Any
 
 from app.core.config import settings
 from app.schemas.common import ComfyUIStatus
+
+logger = logging.getLogger(__name__)
 
 # 工作流目录
 WORKFLOW_DIR = settings.WORKFLOW_DIR
@@ -34,7 +37,7 @@ class ComfyUIClient:
         models: dict[str, list[str]] = {}
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
                 response = await client.get(f"{self.base_url}/object_info")
                 if response.status_code != 200:
                     return models
@@ -65,7 +68,7 @@ class ComfyUIClient:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
                 response = await client.get(f"{self.base_url}/system_stats")
                 if response.status_code == 200:
                     status.connected = True
@@ -113,9 +116,22 @@ class ComfyUIClient:
 
             # 更新 CLIP Text Encode 节点
             if class_type in ["CLIPTextEncode", "CLIPTextEncodeFlux"]:
-                if "positive_prompt" in params and "positive" in node_id.lower():
+                # 尝试根据 node_id 或标题识别
+                is_positive = "positive" in node_id.lower() or "positive" in node.get("_meta", {}).get("title", "").lower()
+                is_negative = "negative" in node_id.lower() or "negative" in node.get("_meta", {}).get("title", "").lower()
+                
+                # 如果都没有，尝试根据 text 内容判断 (如果有占位符)
+                text_content = inputs.get("text", "")
+                if not is_positive and not is_negative:
+                    if "{{positive_prompt}}" in text_content:
+                        is_positive = True
+                if not is_negative and not is_positive:
+                    if "{{negative_prompt}}" in text_content:
+                        is_negative = True
+
+                if is_positive and "positive_prompt" in params:
                     inputs["text"] = params["positive_prompt"]
-                if "negative_prompt" in params and "negative" in node_id.lower():
+                elif is_negative and "negative_prompt" in params:
                     inputs["text"] = params["negative_prompt"]
 
             # 更新 KSampler 节点
@@ -124,16 +140,16 @@ class ComfyUIClient:
                     inputs["seed"] = params["seed"]
                 if "steps" in params:
                     inputs["steps"] = params["steps"]
+                if "cfg" in params:
+                    inputs["cfg"] = params["cfg"]
+
+            # 更新 Model Sampling 节点 (AuraFlow 等)
+            if class_type == "ModelSamplingAuraFlow":
+                # AuraFlow 有时通过 shift 参数调整，目前保留默认
+                pass
 
             # 更新 Empty Latent Image 节点
-            if class_type == "EmptyLatentImage":
-                if "width" in params:
-                    inputs["width"] = params["width"]
-                if "height" in params:
-                    inputs["height"] = params["height"]
-
-            # 更新 FLUX2 专用节点
-            if class_type == "EmptyFlux2LatentImage":
+            if class_type in ["EmptyLatentImage", "EmptySD3LatentImage", "EmptyFlux2LatentImage"]:
                 if "width" in params:
                     inputs["width"] = params["width"]
                 if "height" in params:
@@ -202,7 +218,8 @@ class ComfyUIClient:
 
     async def queue_prompt(self, workflow: dict[str, Any]) -> str:
         """提交 workflow 到 ComfyUI 队列"""
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # 显式禁用代理，避免 Clash 等系统代理干扰 localhost 请求
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
             response = await client.post(
                 f"{self.base_url}/prompt",
                 json={
@@ -210,21 +227,39 @@ class ComfyUIClient:
                     "client_id": self.client_id,
                 },
             )
+            
+            if response.status_code != 200:
+                error_msg = response.text
+                try:
+                    if response.content.strip():
+                        error_data = response.json()
+                        error_msg = json.dumps(error_data, indent=2)
+                except Exception:
+                    pass
+                logger.error(f"ComfyUI API Error ( {response.status_code} ): {error_msg}")
+            
             response.raise_for_status()
             data = response.json()
             return data.get("prompt_id", "")
 
     async def get_history(self, prompt_id: str) -> dict[str, Any]:
-        """获取任务历史/状态"""
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        """获取任务历史"""
+        async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.get(f"{self.base_url}/history/{prompt_id}")
+            response.raise_for_status()
+            return response.json()
+
+    async def get_system_stats(self) -> dict[str, Any]:
+        """获取系统状态"""
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.get(f"{self.base_url}/system_stats")
             response.raise_for_status()
             return response.json()
 
     async def interrupt(self) -> bool:
         """中断当前正在执行的任务"""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
                 response = await client.post(f"{self.base_url}/interrupt")
                 return response.status_code == 200
         except Exception:
@@ -233,7 +268,7 @@ class ComfyUIClient:
     async def delete_from_queue(self, prompt_id: str) -> bool:
         """从队列中删除指定任务"""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
                 response = await client.post(
                     f"{self.base_url}/queue",
                     json={"delete": [prompt_id]},
@@ -245,7 +280,7 @@ class ComfyUIClient:
     async def clear_queue(self) -> bool:
         """清空所有队列任务"""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
                 response = await client.post(
                     f"{self.base_url}/queue",
                     json={"clear": True},
@@ -291,21 +326,27 @@ class ComfyUIClient:
     async def wait_for_completion(
         self,
         prompt_id: str,
-        timeout: float = 300.0,
+        timeout: float = 1200.0,
         poll_interval: float = 2.0,
     ) -> dict[str, Any]:
         """等待任务完成"""
         import asyncio
 
         elapsed = 0.0
+        logger.info(f"[等待完成] prompt_id={prompt_id}, timeout={timeout}s")
         while elapsed < timeout:
-            history = await self.get_history(prompt_id)
-            if prompt_id in history:
-                return history[prompt_id]
+            try:
+                history = await self.get_history(prompt_id)
+                if prompt_id in history:
+                    logger.info(f"[任务完成详情] prompt_id={prompt_id}, elapsed={elapsed}s")
+                    return history[prompt_id]
+            except Exception as e:
+                logger.warning(f"[获取历史失败] prompt_id={prompt_id}, error={str(e)}")
 
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
 
+        logger.error(f"[任务超时] prompt_id={prompt_id}, timeout={timeout}s")
         raise TimeoutError(f"Task {prompt_id} did not complete within {timeout}s")
 
     async def generate_image(

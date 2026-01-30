@@ -28,6 +28,12 @@ export function GenerationCenterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Global generation state that persists across tab switches
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+  const [taskProgress, setTaskProgress] = useState(0)
+  const [taskMessage, setTaskMessage] = useState('')
+  const pollingRef = useRef<number | null>(null)
+
   const loadData = useCallback(async () => {
     if (!projectId) return
 
@@ -56,6 +62,15 @@ export function GenerationCenterPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [])
 
   if (!projectId) {
     return (
@@ -120,8 +135,8 @@ export function GenerationCenterPage() {
           <button
             onClick={() => setActiveTab('characters')}
             className={`flex-1 min-w-[120px] px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'characters'
-                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
-                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+              ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+              : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
           >
             <span className="text-lg">📸</span> Character Library
@@ -129,8 +144,8 @@ export function GenerationCenterPage() {
           <button
             onClick={() => setActiveTab('scenes')}
             className={`flex-1 min-w-[120px] px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'scenes'
-                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
-                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+              ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+              : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
           >
             <span className="text-lg">🖼️</span> Scene Images
@@ -138,8 +153,8 @@ export function GenerationCenterPage() {
           <button
             onClick={() => setActiveTab('videos')}
             className={`flex-1 min-w-[120px] px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'videos'
-                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
-                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+              ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+              : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
           >
             <span className="text-lg">🎬</span> Video Generation
@@ -153,6 +168,13 @@ export function GenerationCenterPage() {
               characters={characters}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
               onRefresh={loadData}
+              activeTaskId={activeTaskId}
+              setActiveTaskId={setActiveTaskId}
+              taskProgress={taskProgress}
+              setTaskProgress={setTaskProgress}
+              taskMessage={taskMessage}
+              setTaskMessage={setTaskMessage}
+              pollingRef={pollingRef}
             />
           )}
           {activeTab === 'scenes' && (
@@ -184,17 +206,27 @@ function CharacterLibraryTab({
   characters,
   onNavigateAnalysis,
   onRefresh,
+  activeTaskId,
+  setActiveTaskId,
+  taskProgress,
+  setTaskProgress,
+  taskMessage,
+  setTaskMessage,
+  pollingRef,
 }: {
   projectId: string
   characters: Character[]
   onNavigateAnalysis: () => void
   onRefresh: () => void
+  activeTaskId: string | null
+  setActiveTaskId: (id: string | null) => void
+  taskProgress: number
+  setTaskProgress: (progress: number) => void
+  taskMessage: string
+  setTaskMessage: (message: string) => void
+  pollingRef: React.MutableRefObject<number | null>
 }) {
-  const [generating, setGenerating] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [statusMessage, setStatusMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const pollingRef = useRef<number | null>(null)
 
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
   const [selectedTypes, setSelectedTypes] = useState<ImageType[]>([])
@@ -206,14 +238,6 @@ function CharacterLibraryTab({
       setTemplates(data)
       setSelectedTypes(data.default_types)
     }).catch(console.error)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current)
-      }
-    }
   }, [])
 
   const addType = (type: ImageType) => {
@@ -258,28 +282,29 @@ function CharacterLibraryTab({
   }
 
   const startGeneration = async () => {
-    setGenerating(true)
-    setProgress(0)
     setError(null)
-    setStatusMessage('Starting generation task...')
+    setTaskProgress(0)
+    setTaskMessage('Starting generation task...')
 
     try {
       const imageTypes = selectedTypes.map(t => t.id)
       const response = await generationApi.generateCharacterLibrary(projectId, imageTypes)
       const taskId = response.task_id
+      setActiveTaskId(taskId)
 
       pollingRef.current = window.setInterval(async () => {
         try {
           const status = await generationApi.getTaskStatus(taskId)
-          setProgress(status.progress)
-          setStatusMessage(status.message)
+          setTaskProgress(status.progress)
+          setTaskMessage(status.message)
 
           if (status.status === 'completed') {
-            setGenerating(false)
+            setActiveTaskId(null)
+            setTaskMessage('Generation completed!')
             if (pollingRef.current) clearInterval(pollingRef.current)
             onRefresh()
           } else if (status.status === 'failed') {
-            setGenerating(false)
+            setActiveTaskId(null)
             setError(status.error || 'Generation failed')
             if (pollingRef.current) clearInterval(pollingRef.current)
           }
@@ -288,7 +313,7 @@ function CharacterLibraryTab({
         }
       }, 1000)
     } catch (err) {
-      setGenerating(false)
+      setActiveTaskId(null)
       setError('Failed to start generation. Check backend service.')
       console.error('Start generation failed:', err)
     }
@@ -358,10 +383,10 @@ function CharacterLibraryTab({
       {/* Control Bar */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur py-4 border-b border-slate-100 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {generating ? (
+          {activeTaskId ? (
             <div className="flex items-center gap-3 bg-primary-50 px-4 py-2 rounded-lg border border-primary-100">
               <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm font-medium text-primary-700">{statusMessage} <span className="opacity-75">({progress}%)</span></span>
+              <span className="text-sm font-medium text-primary-700">{taskMessage} <span className="opacity-75">({taskProgress}%)</span></span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg text-sm">
@@ -371,10 +396,10 @@ function CharacterLibraryTab({
         </div>
         <button
           onClick={startGeneration}
-          disabled={generating || selectedTypes.length === 0}
+          disabled={!!activeTaskId || selectedTypes.length === 0}
           className="btn btn-primary px-8 shadow-lg shadow-primary-500/20"
         >
-          {generating ? 'Generating...' : '▶ Start Generation'}
+          {activeTaskId ? 'Generating...' : '▶ Start Generation'}
         </button>
       </div>
 
@@ -385,11 +410,11 @@ function CharacterLibraryTab({
         </div>
       )}
 
-      {generating && (
+      {activeTaskId && (
         <div className="h-1.5 bg-slate-100 rounded-full mb-8 overflow-hidden">
           <div
             className="h-full bg-primary-500 rounded-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${taskProgress}%` }}
           />
         </div>
       )}
@@ -402,7 +427,7 @@ function CharacterLibraryTab({
             character={character}
             selectedTypes={getCharacterEffectiveTypes(character.id)}
             onSaveCharacterTypes={(types) => saveCharacterCustomTypes(character.id, types)}
-            status={character.images && character.images.length > 0 ? 'completed' : generating ? 'generating' : 'pending'}
+            status={character.images && character.images.length > 0 ? 'completed' : activeTaskId ? 'generating' : 'pending'}
             projectId={projectId}
             onRefresh={onRefresh}
           />
@@ -509,8 +534,8 @@ function TemplateSelectionModal({
                 <label
                   key={name}
                   className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${selectedTemplates.includes(name)
-                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
-                      : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                    : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                 >
                   <input
@@ -544,8 +569,8 @@ function TemplateSelectionModal({
                   <label
                     key={type.id}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${isSelected
-                        ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                       }`}
                   >
                     <input
@@ -725,10 +750,10 @@ function CharacterGenerationCard({
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${status === 'completed'
-              ? 'bg-green-50 text-green-700 border-green-100'
-              : status === 'generating'
-                ? 'bg-primary-50 text-primary-700 border-primary-100 animate-pulse'
-                : 'bg-slate-50 text-slate-500 border-slate-100'
+            ? 'bg-green-50 text-green-700 border-green-100'
+            : status === 'generating'
+              ? 'bg-primary-50 text-primary-700 border-primary-100 animate-pulse'
+              : 'bg-slate-50 text-slate-500 border-slate-100'
             }`}>
             {statusLabel[status]}
           </span>
@@ -753,12 +778,12 @@ function CharacterGenerationCard({
             >
               <div
                 className={`w-20 h-24 rounded-lg flex items-center justify-center text-xs overflow-hidden border transition-all ${img
-                    ? 'border-slate-200 bg-slate-50'
-                    : isThisGenerating
-                      ? 'border-primary-300 bg-primary-50 text-primary-600'
-                      : status === 'generating'
-                        ? 'border-primary-200 bg-primary-50/50 text-primary-400'
-                        : 'border-slate-100 bg-slate-50 text-slate-300'
+                  ? 'border-slate-200 bg-slate-50'
+                  : isThisGenerating
+                    ? 'border-primary-300 bg-primary-50 text-primary-600'
+                    : status === 'generating'
+                      ? 'border-primary-200 bg-primary-50/50 text-primary-400'
+                      : 'border-slate-100 bg-slate-50 text-slate-300'
                   }`}
                 title={type.label}
               >

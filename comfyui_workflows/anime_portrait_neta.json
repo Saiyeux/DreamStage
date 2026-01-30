@@ -1,0 +1,120 @@
+{
+    "3": {
+        "inputs": {
+            "width": 1024,
+            "height": 1024,
+            "batch_size": 1
+        },
+        "class_type": "EmptySD3LatentImage",
+        "_meta": {
+            "title": "Empty Latent"
+        }
+    },
+    "4": {
+        "inputs": {
+            "shift": 4,
+            "model": [
+                "5",
+                0
+            ]
+        },
+        "class_type": "ModelSamplingAuraFlow",
+        "_meta": {
+            "title": "AuraFlow Sampling"
+        }
+    },
+    "5": {
+        "inputs": {
+            "ckpt_name": "NetaYumev35_pretrained_all_in_one.safetensors"
+        },
+        "class_type": "CheckpointLoaderSimple",
+        "_meta": {
+            "title": "Checkpoint Loader"
+        }
+    },
+    "10": {
+        "inputs": {
+            "text": "{{positive_prompt}}",
+            "clip": [
+                "5",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "Positive Prompt"
+        }
+    },
+    "11": {
+        "inputs": {
+            "text": "{{negative_prompt}}",
+            "clip": [
+                "5",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "Negative Prompt"
+        }
+    },
+    "12": {
+        "inputs": {
+            "seed": 0,
+            "steps": 20,
+            "cfg": 4,
+            "sampler_name": "res_multistep",
+            "scheduler": "linear_quadratic",
+            "denoise": 1,
+            "model": [
+                "4",
+                0
+            ],
+            "positive": [
+                "10",
+                0
+            ],
+            "negative": [
+                "11",
+                0
+            ],
+            "latent_image": [
+                "3",
+                0
+            ]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+            "title": "KSampler"
+        }
+    },
+    "14": {
+        "inputs": {
+            "samples": [
+                "12",
+                0
+            ],
+            "vae": [
+                "5",
+                2
+            ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+            "title": "VAE Decode"
+        }
+    },
+    "15": {
+        "inputs": {
+            "filename_prefix": "{{output_filename}}",
+            "images": [
+                "14",
+                0
+            ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+            "title": "Save Image"
+        }
+    }
+}
