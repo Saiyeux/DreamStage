@@ -88,7 +88,7 @@ class ComfyUIClient:
         if not path.exists():
             raise FileNotFoundError(f"Workflow not found: {workflow_path}")
 
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
 
     async def update_workflow_params(
         self,

@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
@@ -55,11 +56,44 @@ class AnalysisResponse(CamelModel):
 class GenerateCharacterImagesRequest(CamelModel):
     character_id: str
     image_types: list[str]
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
 
 
 class GenerateCharacterLibraryRequest(CamelModel):
     image_types: list[str] | None = None  # 可选，默认使用后端配置
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
 
 
 class GenerateSceneRequest(CamelModel):
     scene_id: str
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class GenerateSceneImageRequest(CamelModel):
+    scene_id: str
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class GenerateSceneVideoRequest(CamelModel):
+    scene_id: str
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class GenerateAllSceneImagesRequest(CamelModel):
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class GenerateAllVideosRequest(CamelModel):
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class GenerateBulkRequest(CamelModel):
+    workflow_id: str | None = None
+    params: dict[str, Any] | None = None

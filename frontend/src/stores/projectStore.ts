@@ -19,6 +19,20 @@ interface ProjectState {
     currentAnalyzing: 'characters' | 'scenes' | null
   }
 
+  // 工作流选择
+  selectedWorkflows: {
+    character: string | null
+    scene: string | null
+    video: string | null
+  }
+
+  // 工作流参数
+  workflowParams: {
+    character: Record<string, any>
+    scene: Record<string, any>
+    video: Record<string, any>
+  }
+
   // Actions
   setCurrentProject: (project: Project | null) => void
   setCharacters: (characters: Character[]) => void
@@ -29,6 +43,8 @@ interface ProjectState {
   setAnalysisState: (state: Partial<ProjectState['analysisState']>) => void
   appendTerminalOutput: (line: string) => void
   updateLastTerminalLine: (content: string) => void
+  setSelectedWorkflow: (type: 'character' | 'scene' | 'video', id: string | null) => void
+  setWorkflowParams: (type: 'character' | 'scene' | 'video', params: Record<string, any>) => void
   reset: () => void
 }
 
@@ -97,12 +113,43 @@ export const useProjectStore = create<ProjectState>()(
           }
         }),
 
+      selectedWorkflows: {
+        character: null,
+        scene: null,
+        video: null,
+      },
+      workflowParams: {
+        character: {},
+        scene: {},
+        video: {},
+      },
+
+      setSelectedWorkflow: (type, id) =>
+        set((state) => ({
+          selectedWorkflows: { ...state.selectedWorkflows, [type]: id },
+        })),
+
+      setWorkflowParams: (type, params) =>
+        set((state) => ({
+          workflowParams: { ...state.workflowParams, [type]: params },
+        })),
+
       reset: () =>
         set({
           currentProject: null,
           characters: [],
           scenes: [],
           analysisState: { ...initialAnalysisState },
+          selectedWorkflows: {
+            character: null,
+            scene: null,
+            video: null,
+          },
+          workflowParams: {
+            character: {},
+            scene: {},
+            video: {},
+          },
         }),
     }),
     {
@@ -114,6 +161,9 @@ export const useProjectStore = create<ProjectState>()(
         characters: state.characters,
         scenes: state.scenes,
         analysisState: state.analysisState,
+        analysisState: state.analysisState,
+        selectedWorkflows: state.selectedWorkflows,
+        workflowParams: state.workflowParams,
       }),
     }
   )

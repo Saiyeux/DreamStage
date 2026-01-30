@@ -42,6 +42,7 @@ export interface CharacterImage {
   negativePrompt: string
   seed: number
   isSelected: boolean
+  isLoading?: boolean
 }
 
 // 场景

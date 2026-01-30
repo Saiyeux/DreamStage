@@ -214,7 +214,20 @@ class LLMClient:
   "estimated_duration_minutes": 预估时长（分钟，数字）
 }}
 ```"""
-        return await self.chat_json(prompt)
+        try:
+            result = await self.chat_json(prompt)
+            if isinstance(result, dict):
+                return result
+            elif isinstance(result, list) and len(result) > 0:
+                first = result[0]
+                if isinstance(first, dict):
+                    return first
+                return {"summary": str(first)}
+            elif isinstance(result, str):
+                return {"summary": result}
+            return {"summary": ""}
+        except Exception:
+            return {"summary": ""}
 
     async def analyze_characters(self, script_text: str, chunk_size: int = 8000) -> dict[str, Any]:
         """分析角色信息 - 支持多块文本处理"""
@@ -260,7 +273,13 @@ class LLMClient:
 
             try:
                 result = await self.chat_json(prompt)
-                new_chars = result.get("characters", [])
+                if isinstance(result, list):
+                    new_chars = result
+                elif isinstance(result, dict):
+                    new_chars = result.get("characters", [])
+                else:
+                    new_chars = []
+                
                 all_characters = self._merge_characters(all_characters, new_chars)
             except Exception:
                 continue
@@ -320,7 +339,13 @@ class LLMClient:
 
             try:
                 result = await self.chat_json(prompt)
-                new_scenes = result.get("scenes", [])
+                if isinstance(result, list):
+                    new_scenes = result
+                elif isinstance(result, dict):
+                    new_scenes = result.get("scenes", [])
+                else:
+                    new_scenes = []
+                    
                 all_scenes.extend(new_scenes)
             except Exception:
                 continue

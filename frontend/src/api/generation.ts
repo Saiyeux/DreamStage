@@ -20,44 +20,60 @@ export const generationApi = {
   getTaskStatus: (taskId: string) =>
     api.get<TaskStatus>(`/projects/tasks/${taskId}/status`),
 
+  // 停止任务
+  stopTask: (taskId: string) =>
+    api.post<{ message: string }>(`/projects/tasks/${taskId}/stop`),
+
   // 获取项目中的活跃任务
   getActiveTasks: (projectId: string) =>
     api.get<Record<string, TaskStatus>>(`/projects/${projectId}/tasks/active`),
 
-  // 生成单个角色图像
   generateCharacterImages: (
     projectId: string,
     characterId: string,
     imageTypes: string[],
+    workflowId?: string,
+    params?: Record<string, any>,
   ) =>
     api.post<TaskResponse>(`/projects/${projectId}/generate/character-images`, {
       character_id: characterId,
       image_types: imageTypes,
+      workflow_id: workflowId,
+      params,
     }),
 
   // 批量生成角色库
-  generateCharacterLibrary: (projectId: string, imageTypes?: string[]) =>
+  generateCharacterLibrary: (projectId: string, imageTypes?: string[], workflowId?: string, params?: Record<string, any>) =>
     api.post<TaskResponse>(`/projects/${projectId}/generate/character-library`, {
       image_types: imageTypes,
+      workflow_id: workflowId,
+      params,
     }),
 
   // 生成单个场景图
-  generateSceneImage: (projectId: string, sceneId: string) =>
+  generateSceneImage: (projectId: string, sceneId: string, workflowId?: string, params?: Record<string, any>) =>
     api.post<TaskResponse>(`/projects/${projectId}/generate/scene-image`, {
       scene_id: sceneId,
+      workflow_id: workflowId,
+      params,
     }),
 
-  // 批量生成场景图
-  generateAllSceneImages: (projectId: string) =>
-    api.post<TaskResponse>(`/projects/${projectId}/generate/all-scene-images`),
+  generateAllSceneImages: (projectId: string, workflowId?: string, params?: Record<string, any>) =>
+    api.post<TaskResponse>(`/projects/${projectId}/generate/all-scene-images`, {
+      workflow_id: workflowId,
+      params,
+    }),
 
-  // 生成单个场景视频
-  generateSceneVideo: (projectId: string, sceneId: string) =>
+  generateSceneVideo: (projectId: string, sceneId: string, workflowId?: string, params?: Record<string, any>) =>
     api.post<TaskResponse>(`/projects/${projectId}/generate/scene-video`, {
       scene_id: sceneId,
+      workflow_id: workflowId,
+      params,
     }),
 
-  // 批量生成视频
-  generateAllVideos: (projectId: string) =>
-    api.post<TaskResponse>(`/projects/${projectId}/generate/all-videos`),
+  generateAllVideos: (projectId: string, workflowId?: string, params?: Record<string, any>) =>
+    api.post<TaskResponse>(`/projects/${projectId}/generate/all-videos`, {
+      workflow_id: workflowId,
+      params,
+    }),
 }

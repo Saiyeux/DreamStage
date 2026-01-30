@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_db
 from app.core.logging_config import get_logger
 from app.models import Project, ProjectStatus, Character, Scene
-from app.schemas import TaskResponse, GenerateCharacterImagesRequest, GenerateCharacterLibraryRequest, GenerateSceneRequest
+from app.schemas import TaskResponse, GenerateCharacterImagesRequest, GenerateCharacterLibraryRequest, GenerateSceneRequest, GenerateBulkRequest
 from app.services.comfyui_client import comfyui_client
 from app.services.generation_tasks import generation_tasks
 
@@ -48,6 +48,8 @@ async def generate_character_images(
         task_id=task_id,
         character=character,
         image_types=request.image_types,
+        workflow_id=request.workflow_id,
+        params=request.params,
     )
 
     return TaskResponse(task_id=task_id, message="Character image generation started")
@@ -82,6 +84,8 @@ async def generate_character_library(
         project_id=project_id,
         characters=list(characters),
         image_types=request.image_types,
+        workflow_id=request.workflow_id,
+        params=request.params,
     )
 
     # 更新项目状态
@@ -121,6 +125,8 @@ async def generate_scene_image(
         generation_tasks.generate_scene_image,
         task_id=task_id,
         scene=scene,
+        workflow_id=request.workflow_id,
+        params=request.params,
     )
 
     return TaskResponse(task_id=task_id, message="Scene image generation started")
@@ -129,6 +135,7 @@ async def generate_scene_image(
 @router.post("/{project_id}/generate/all-scene-images", response_model=TaskResponse)
 async def generate_all_scene_images(
     project_id: str,
+    request: GenerateBulkRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
@@ -150,6 +157,8 @@ async def generate_all_scene_images(
         task_id=task_id,
         project_id=project_id,
         scenes=list(scenes),
+        workflow_id=request.workflow_id,
+        params=request.params,
     )
 
     return TaskResponse(task_id=task_id, message="Scene images generation started")
@@ -184,6 +193,8 @@ async def generate_scene_video(
         generation_tasks.generate_scene_video,
         task_id=task_id,
         scene=scene,
+        workflow_id=request.workflow_id,
+        params=request.params,
     )
 
     return TaskResponse(task_id=task_id, message="Scene video generation started")
@@ -192,6 +203,7 @@ async def generate_scene_video(
 @router.post("/{project_id}/generate/all-videos", response_model=TaskResponse)
 async def generate_all_videos(
     project_id: str,
+    request: GenerateBulkRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
@@ -217,6 +229,8 @@ async def generate_all_videos(
         task_id=task_id,
         project_id=project_id,
         scenes=scenes_with_images,
+        workflow_id=request.workflow_id,
+        params=request.params,
     )
 
     return TaskResponse(task_id=task_id, message="Video generation started")
@@ -235,3 +249,12 @@ async def get_task_status(task_id: str):
 async def get_active_tasks(project_id: str):
     """获取项目中的活跃任务"""
     return generation_tasks.get_active_tasks_for_project(project_id)
+
+
+@router.post("/tasks/{task_id}/stop")
+async def stop_task(task_id: str):
+    """停止任务"""
+    success = await generation_tasks.stop_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found or could not be stopped")
+    return {"message": "Task stopped"}

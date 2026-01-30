@@ -163,28 +163,57 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     json_str = json_match.group(1)
                     logger.debug(f"块 {chunk_idx}/{total_chunks} - 从markdown代码块中提取JSON")
                 else:
-                    # 尝试直接查找 JSON 对象
-                    json_match = re.search(r'(\{[\s\S]*\})', full_response)
+                    # 尝试直接查找 JSON 对象 或 数组
+                    json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', full_response)
                     json_str = json_match.group(1) if json_match else full_response
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} - 直接提取JSON对象，是否找到: {json_match is not None}")
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} - 直接提取JSON对象/数组，是否找到: {json_match is not None}")
 
                 logger.debug(f"块 {chunk_idx}/{total_chunks} - 提取的JSON字符串前300字符: {json_str[:300]}")
                 parsed_data = json.loads(json_str)
-                logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，顶级keys: {list(parsed_data.keys())}")
+                
+                # 兼容性处理：提取结果数据
+                new_chars = []
+                new_scenes = []
+                
+                if isinstance(parsed_data, dict):
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，顶级keys: {list(parsed_data.keys())}")
+                    new_chars = parsed_data.get("characters", [])
+                    new_scenes = parsed_data.get("scenes", [])
+                    # 如果分析类型是summary，直接使用整个字典
+                    if analysis_type == "summary":
+                        summary_data = parsed_data
+                elif isinstance(parsed_data, list):
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，返回为列表")
+                    if analysis_type == "characters":
+                        new_chars = parsed_data
+                    elif analysis_type == "scenes":
+                        new_scenes = parsed_data
+                    elif analysis_type == "summary":
+                        # 处理摘要为列表的情况
+                        if len(parsed_data) > 0:
+                            if isinstance(parsed_data[0], dict):
+                                summary_data = parsed_data[0]
+                            else:
+                                summary_data = {"summary": str(parsed_data[0])}
+                elif isinstance(parsed_data, str):
+                    logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，返回为字符串")
+                    if analysis_type == "summary":
+                        summary_data = {"summary": parsed_data}
+                else:
+                    logger.warning(f"块 {chunk_idx}/{total_chunks} - JSON解析成功但格式不符合预期: {type(parsed_data)}")
 
                 if analysis_type == "characters":
-                    new_chars = parsed_data.get("characters", [])
                     all_characters = merge_characters(all_characters, new_chars)
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_chars), 'total_found': len(all_characters)})}\n\n"
                 elif analysis_type == "scenes":
-                    new_scenes = parsed_data.get("scenes", [])
                     # 调试：输出每个块返回的场景信息
                     scene_numbers = [s.get("scene_number", "?") for s in new_scenes]
                     logger.debug(f"块 {chunk_idx}/{total_chunks} 返回 {len(new_scenes)} 个场景，编号: {scene_numbers}")
                     all_scenes.extend(new_scenes)
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n"
                 elif analysis_type == "summary":
-                    summary_data = parsed_data
+                    if not summary_data and isinstance(parsed_data, dict):
+                         summary_data = parsed_data
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx})}\n\n"
                     break  # 摘要只需要第一块
 
@@ -341,8 +370,19 @@ async def analyze_summary(project_id: str, db: AsyncSession = Depends(get_db)):
     # 调用 LLM 生成简介
     summary_data = await llm_client.analyze_summary(project.script_text)
 
+    # 结果修正
+    if isinstance(summary_data, str):
+        summary_text = summary_data
+    elif isinstance(summary_data, dict):
+        summary_text = summary_data.get("summary", "")
+    elif isinstance(summary_data, list) and len(summary_data) > 0:
+        first = summary_data[0]
+        summary_text = first.get("summary", str(first)) if isinstance(first, dict) else str(first)
+    else:
+        summary_text = ""
+
     # 更新项目
-    project.summary = summary_data.get("summary", "")
+    project.summary = summary_text
     await db.commit()
 
     return AnalysisResponse(

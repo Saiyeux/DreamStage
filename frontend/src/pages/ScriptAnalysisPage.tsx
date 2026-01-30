@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { Character, Scene } from '@/types'
+import type { Character, Scene, CharacterImage } from '@/types'
 import { projectsApi, analysisApi, charactersApi, generationApi, configApi } from '@/api'
 import type { ImageType, CharacterImageTemplates } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
@@ -25,12 +25,15 @@ export function ScriptAnalysisPage() {
     setAnalysisState,
     appendTerminalOutput,
     updateLastTerminalLine,
+    selectedWorkflows,
+    workflowParams
   } = useProjectStore()
 
   const projectId = urlProjectId || currentProject?.id
 
   const [activeTab, setActiveTab] = useState<Tab>('characters')
   const [loading, setLoading] = useState(false)
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
 
   const { terminalOutput, isStreaming, terminalExpanded, currentAnalyzing } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
@@ -381,7 +384,7 @@ function CharactersContent({
   characters: Character[]
   projectId: string
 }) {
-  const { setCharacters } = useProjectStore()
+  const { setCharacters, selectedWorkflows, workflowParams } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
@@ -390,8 +393,12 @@ function CharactersContent({
 
   // Generation state
   const [generatingCharId, setGeneratingCharId] = useState<string | null>(null)
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
   const [generateMessage, setGenerateMessage] = useState('')
   const pollingRef = useRef<number | null>(null)
+
+  // Lightbox state
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
   // Settings state
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
@@ -515,33 +522,45 @@ function CharactersContent({
     if (pollingRef.current) clearInterval(pollingRef.current)
 
     setGeneratingCharId(targetId)
+    setCurrentTaskId(taskId)
     setGenerateMessage('Syncing task status...')
 
     pollingRef.current = window.setInterval(async () => {
       try {
         const status = await generationApi.getTaskStatus(taskId)
-        setGenerateMessage(status.message || 'Generating...')
 
-        if (status.status === 'completed') {
-          if (pollingRef.current) clearInterval(pollingRef.current)
-          pollingRef.current = null
-          setGenerateMessage('Done!')
+        if (status.status === 'completed' || status.status === 'failed') {
+          // Clear interval immediately
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+          }
 
-          const updatedCharacters = await analysisApi.getCharacters(projectId)
-          setCharacters(updatedCharacters)
+          if (status.status === 'completed') {
+            setGenerateMessage('Done!')
 
-          setTimeout(() => {
-            setGeneratingCharId(null)
-            setGenerateMessage('')
-          }, 2000)
-        } else if (status.status === 'failed') {
-          if (pollingRef.current) clearInterval(pollingRef.current)
-          pollingRef.current = null
-          setGenerateMessage(`Failed: ${status.error || 'Unknown error'}`)
-          setTimeout(() => {
-            setGeneratingCharId(null)
-            setGenerateMessage('')
-          }, 5000)
+            try {
+              const updatedCharacters = await analysisApi.getCharacters(projectId)
+              setCharacters(updatedCharacters)
+            } catch (err) {
+              console.error('Failed to reload characters:', err)
+            }
+
+            setTimeout(() => {
+              setGeneratingCharId(null)
+              setCurrentTaskId(null)
+              setGenerateMessage('')
+            }, 2000)
+          } else {
+            setGenerateMessage(`Failed: ${status.error || 'Unknown error'}`)
+            setTimeout(() => {
+              setGeneratingCharId(null)
+              setCurrentTaskId(null)
+              setGenerateMessage('')
+            }, 5000)
+          }
+        } else {
+          setGenerateMessage(status.message || 'Generating...')
         }
       } catch (err) {
         console.error('Poll status failed:', err)
@@ -561,6 +580,18 @@ function CharactersContent({
     }).catch(err => console.error('Failed to recover active tasks:', err))
   }, [projectId, startPolling])
 
+  const handleStop = async () => {
+    if (!currentTaskId) return
+    try {
+      await generationApi.stopTask(currentTaskId)
+      if (pollingRef.current) clearInterval(pollingRef.current)
+      pollingRef.current = null
+      setGenerateMessage('Stopping...')
+    } catch (err) {
+      console.error('Stop failed:', err)
+    }
+  }
+
   const handleGenerate = async () => {
     if (!selectedCharacter?.id || generatingCharId) return
 
@@ -570,16 +601,60 @@ function CharactersContent({
       return
     }
 
+
     try {
       const response = await generationApi.generateCharacterImages(
         projectId,
         selectedCharacter.id,
-        selectedTypes
+        selectedTypes,
+        selectedWorkflows.character || undefined,
+        workflowParams.character || undefined
       )
+
+      // Optimistic UI: Add ONE placeholder for the combined generation
+      const combinedTypeLabel = selectedTypes.length > 0
+        ? selectedTypes.map(t => t.replace('id_', '')).join(', ')
+        : 'Generated'
+
+      const newImage: CharacterImage = {
+        id: `temp_${Date.now()}`,
+        characterId: selectedCharacter.id,
+        imageType: combinedTypeLabel,
+        imagePath: '',
+        promptUsed: '',
+        negativePrompt: '',
+        seed: 0,
+        isSelected: false,
+        isLoading: true
+      }
+
+      const updatedCharacters = characters.map(c => {
+        if (c.id === selectedCharacter.id) {
+          return {
+            ...c,
+            images: [...(c.images || []), newImage]
+          }
+        }
+        return c
+      })
+      setCharacters(updatedCharacters)
+
       startPolling(response.task_id, selectedCharacter.id)
     } catch (err) {
       console.error('Generate failed:', err)
       setGeneratingCharId(null)
+      // Remove placeholders if failed immediately
+      // Remove placeholders if failed immediately
+      const revertedCharacters = characters.map(c => {
+        if (c.id === selectedCharacter.id) {
+          return {
+            ...c,
+            images: (c.images || []).filter(img => !img.isLoading)
+          }
+        }
+        return c
+      })
+      setCharacters(revertedCharacters)
       setGenerateMessage('Failed to start task')
     }
   }
@@ -587,7 +662,7 @@ function CharactersContent({
   const updateSelection = (category: 'view' | 'expression' | 'action', typeId: string) => {
     setSelections(prev => ({
       ...prev,
-      [category]: typeId
+      [category]: prev[category] === typeId ? undefined : typeId
     }))
   }
 
@@ -697,11 +772,19 @@ function CharactersContent({
 
             {/* Simple Status Message (Scoped to active character) */}
             {generatingCharId === selectedCharacter.id && generateMessage && (
-              <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg shadow-sm animate-fade-in flex items-center gap-3">
-                <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full flex-shrink-0" />
-                <span className="text-sm font-medium text-primary-700">
-                  {generateMessage}
-                </span>
+              <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg shadow-sm animate-fade-in flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full flex-shrink-0" />
+                  <span className="text-sm font-medium text-primary-700">
+                    {generateMessage}
+                  </span>
+                </div>
+                <button
+                  onClick={handleStop}
+                  className="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
+                >
+                  🛑 Stop
+                </button>
               </div>
             )}
 
@@ -859,63 +942,79 @@ function CharactersContent({
                         {selectedCharacter.images.map((img, index) => (
                           <div
                             key={img.id}
-                            className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[3/4] shadow-sm hover:shadow-md transition-all cursor-pointer"
-                            onClick={() => handleDownload(fileUrl.image(img.imagePath), `char_${selectedCharacter.name}_${img.imageType}_${img.id.slice(0, 4)}.png`)}
+                            className={`relative group rounded-xl overflow-hidden border border-slate-200 aspect-[3/4] shadow-sm hover:shadow-md transition-all ${img.isLoading ? 'cursor-wait bg-slate-50' : 'cursor-pointer'}`}
+                            onClick={() => !img.isLoading && setLightboxImage(fileUrl.image(img.imagePath))}
                           >
-                            <img
-                              src={fileUrl.image(img.imagePath)}
-                              alt={img.imageType}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
+                            {img.isLoading ? (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-500">
+                                <span className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mb-2" />
+                                <span className="text-xs font-medium animate-pulse">Generating...</span>
+                                <span className="text-[10px] text-slate-400 mt-1">{img.imageType}</span>
+                              </div>
+                            ) : (
+                              <img
+                                src={fileUrl.image(img.imagePath)}
+                                alt={img.imageType}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            )}
 
                             {/* Hover info box - shows to the left or right depending on grid position */}
-                            <div className={`absolute top-0 w-64 p-3 bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] hidden lg:block
-                              ${(index + 1) % 3 === 0 ? 'right-full mr-3' : 'left-full ml-3'}`}>
-                              <div className="text-[10px] font-bold text-primary-600 mb-1.5 uppercase tracking-widest border-b border-slate-100 pb-1">Prompt Details</div>
-                              <div className="space-y-2">
-                                <div className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                                  {img.promptUsed || 'No prompt information available.'}
-                                </div>
-                                {img.seed && (
-                                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Seed:</span>
-                                    <span className="text-[10px] text-slate-500 font-mono">{img.seed}</span>
+                            {!img.isLoading && (
+                              <div className={`absolute top-0 w-64 p-3 bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] hidden lg:block
+                                ${(index + 1) % 3 === 0 ? 'right-full mr-3' : 'left-full ml-3'}`}>
+                                <div className="text-[10px] font-bold text-primary-600 mb-1.5 uppercase tracking-widest border-b border-slate-100 pb-1">Prompt Details</div>
+                                <div className="space-y-2">
+                                  <div className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                                    {img.promptUsed || 'No prompt information available.'}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Overlay with single download button */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[10px] text-white/90 font-medium capitalize truncate pl-1">{img.imageType}</span>
-                                <div className="flex gap-1">
-                                  {isManagingGallery ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleDeleteImage(img.id)
-                                      }}
-                                      className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
-                                      title="Delete Image"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
-                                  ) : (
-                                    <button
-                                      className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors"
-                                      title="Download Image"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                      </svg>
-                                    </button>
+                                  {img.seed && (
+                                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50">
+                                      <span className="text-[10px] text-slate-400 font-bold uppercase">Seed:</span>
+                                      <span className="text-[10px] text-slate-500 font-mono">{img.seed}</span>
+                                    </div>
                                   )}
                                 </div>
                               </div>
-                            </div>
+                            )}
+
+                            {/* Overlay with single download button */}
+                            {!img.isLoading && (
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] text-white/90 font-medium capitalize truncate pl-1">{img.imageType}</span>
+                                  <div className="flex gap-1">
+                                    {isManagingGallery ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteImage(img.id)
+                                        }}
+                                        className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
+                                        title="Delete Image"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDownload(fileUrl.image(img.imagePath), `char_${selectedCharacter.name}_${img.imageType}_${img.id.slice(0, 4)}.png`)
+                                        }}
+                                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors"
+                                        title="Download Image"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -937,6 +1036,14 @@ function CharactersContent({
           </div>
         )}
       </div>
+
+      {/* Lightbox Overlay */}
+      {lightboxImage && (
+        <Lightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </div>
   )
 }
@@ -984,6 +1091,37 @@ function Field({
     </div>
   )
 }
+
+function Lightbox({
+  imageUrl,
+  onClose
+}: {
+  imageUrl: string
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <img
+        src={imageUrl}
+        alt="Full view"
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking image
+      />
+    </div>
+  )
+}
+
 
 function ScenesContent({
   scenes,
@@ -1139,8 +1277,9 @@ function ScenesContent({
   const handleGenerateImage = async () => {
     if (!selectedScene?.id || generatingSceneId) return
 
+    const { selectedWorkflows } = useProjectStore()
     try {
-      const response = await generationApi.generateSceneImage(projectId, selectedScene.id)
+      const response = await generationApi.generateSceneImage(projectId, selectedScene.id, selectedWorkflows.scene || undefined)
       startPolling(response.task_id, selectedScene.id)
     } catch (err) {
       console.error('Generate image failed:', err)
@@ -1152,8 +1291,9 @@ function ScenesContent({
   const handleGenerateVideo = async () => {
     if (!selectedScene?.id || !selectedScene.sceneImage || generatingSceneId) return
 
+    const { selectedWorkflows } = useProjectStore()
     try {
-      const response = await generationApi.generateSceneVideo(projectId, selectedScene.id)
+      const response = await generationApi.generateSceneVideo(projectId, selectedScene.id, selectedWorkflows.video || undefined)
       startPolling(response.task_id, selectedScene.id)
     } catch (err) {
       console.error('Generate video failed:', err)

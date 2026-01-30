@@ -58,6 +58,26 @@ class GenerationTasks:
         """获取任务状态"""
         return self._task_status.get(task_id, {"status": "unknown"})
 
+    async def stop_task(self, task_id: str) -> bool:
+        """停止任务"""
+        logger.info(f"请求停止任务: task_id={task_id}")
+        
+        # 1. 调用 ComfyUI 中断
+        # 注意: 这会中断当前正在运行的任何 ComfyUI 任务
+        await comfyui_client.interrupt()
+        
+        # 2. 如果任务存在，更新状态
+        if task_id in self._task_status:
+            self.update_task_status(
+                task_id, 
+                "failed", 
+                message="用户手动停止", 
+                error="Task stopped by user"
+            )
+            return True
+            
+        return False
+
     def get_active_tasks_for_project(self, project_id: str) -> dict[str, dict[str, Any]]:
         """获取指定项目的所有活跃任务"""
         return {
@@ -151,7 +171,7 @@ class GenerationTasks:
         )
 
     async def generate_character_images(
-        self, task_id: str, character: Character, image_types: list[str]
+        self, task_id: str, character: Character, image_types: list[str], workflow_id: str | None = None, params: dict[str, Any] | None = None
     ):
         """生成角色的一组图像"""
         logger.info(f"[开始生图任务] task_id={task_id}, character={character.name}, types={image_types}")
@@ -167,19 +187,35 @@ class GenerationTasks:
             # 使用列表中的第一个有效类型作为主分类名，或组合名称
             primary_type = image_types[0] if image_types else "portrait"
             output_filename = f"character_{character.id[:8]}_{primary_type}"
+            # 组合所有选中的类型为一个生成任务的标签字符串
+            combined_labels = []
+            for image_type in image_types:
+                type_info = self._get_image_type_info(image_type)
+                combined_labels.append(type_info.get("label", image_type))
+            
+            combined_label_str = " + ".join(combined_labels) if combined_labels else "Default"
+
+            # 生成唯一的 output filename prefix
+            unique_id = uuid.uuid4().hex[:8]
+            output_filename = f"char_{character.id[:8]}_{unique_id}"
             
             generated_images = []
-            total = 1
 
             async with async_session_maker() as db:
                 # 获取工作流配置
-                workflow_config = prompt_service.get_default_workflow("character")
+                if workflow_id:
+                    workflow_config = prompt_service.get_workflow_by_id("character", workflow_id)
+                else:
+                    workflow_config = prompt_service.get_default_workflow("character")
+                    
                 if not workflow_config:
-                    error_msg = "未找到角色图工作流配置"
+                    error_msg = f"未找到角色图工作流配置: {workflow_id or 'default'}"
                     logger.error(f"[配置错误] task_id={task_id}, error={error_msg}")
                     raise ValueError(error_msg)
 
-                workflow_params = workflow_config.get("params", {})
+                workflow_params = workflow_config.get("params", {}).copy()
+                if params:
+                    workflow_params.update(params)
 
                 try:
                     # 调用 ComfyUI 生成
@@ -192,25 +228,29 @@ class GenerationTasks:
                         height=workflow_params.get("height", 1024),
                         output_filename=output_filename,
                         project_id=character.project_id,
+                        seed=params.get("seed", -1) if params else -1
                     )
 
                     logger.info(f"[图片生成成功] task_id={task_id}, path={image_path}")
+
+                    # 构造保存的 type 字符串
+                    saved_image_type = combined_label_str
 
                     # 保存到数据库
                     char_image = CharacterImage(
                         id=str(uuid.uuid4()),
                         character_id=character.id,
-                        image_type=primary_type,
+                        image_type=saved_image_type,
                         image_path=image_path,
                         prompt_used=prompt,
                         negative_prompt=negative_prompt,
-                        is_selected=False,
+                        is_selected=True, 
                     )
                     db.add(char_image)
                     await db.commit()
 
                     generated_images.append({
-                        "type": primary_type,
+                        "type": saved_image_type,
                         "path": image_path,
                         "id": char_image.id,
                     })
@@ -243,6 +283,8 @@ class GenerationTasks:
         project_id: str,
         characters: list[Character],
         image_types: list[str] | None = None,
+        workflow_id: str | None = None,
+        params: dict[str, Any] | None = None,
     ):
         """批量生成角色库
 
@@ -275,73 +317,109 @@ class GenerationTasks:
             logger.info(f"[任务规模] task_id={task_id}, total_images={total_images}")
 
             # 获取工作流配置
-            workflow_config = prompt_service.get_default_workflow("character")
+            if workflow_id:
+                workflow_config = prompt_service.get_workflow_by_id("character", workflow_id)
+            else:
+                workflow_config = prompt_service.get_default_workflow("character")
+                
             if not workflow_config:
-                error_msg = "未找到角色图工作流配置"
+                error_msg = f"未找到角色图工作流配置: {workflow_id or 'default'}"
                 logger.error(f"[配置错误] task_id={task_id}, error={error_msg}")
                 raise ValueError(error_msg)
 
             workflow_params = workflow_config.get("params", {})
+            
+            # 合并用户参数
+            if params:
+                workflow_params.update(params)
 
             async with async_session_maker() as db:
                 for i, character in enumerate(characters):
                     logger.info(f"[处理角色] task_id={task_id}, character={character.name} ({i+1}/{total_chars})")
-                    for j, image_type in enumerate(types_to_generate):
-                        progress = int((completed_attempts / total_images) * 100)
+                    
+                    # 组合所有选中的类型为一个生成任务
+                    combined_labels = []
+                    for image_type in types_to_generate:
                         type_info = self._get_image_type_info(image_type)
-                        type_label = type_info.get("label", image_type)
-                        self.update_task_status(
-                            task_id, "running", progress,
-                            f"{character.name} - {type_label}"
+                        combined_labels.append(type_info.get("label", image_type))
+                    
+                    combined_label_str = " + ".join(combined_labels) if combined_labels else "Default"
+                    
+                    self.update_task_status(
+                        task_id, "running", 10,
+                        f"Generating: {character.name} ({combined_label_str})"
+                    )
+
+                    # 构建 Combined Prompt
+                    # 这里假设 _build_character_prompt 支持传入列表并合并 prompt
+                    # 需要确认 _build_character_prompt 的实现。如果以前是循环调用的，
+                    # 现在的逻辑应该是调用一次，传入所有 types。
+                    prompt, negative_prompt = self._build_character_prompt(character, types_to_generate)
+                    
+                    # 生成唯一的 output filename prefix
+                    # 使用 random uuid part 避免覆盖
+                    unique_id = uuid.uuid4().hex[:8]
+                    output_filename = f"char_{character.id[:8]}_{unique_id}"
+
+                    try:
+                        logger.debug(f"[生成图片] task_id={task_id}, character={character.name}, types={types_to_generate}")
+                        image_path = await comfyui_client.generate_image(
+                            workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
+                            positive_prompt=prompt,
+                            negative_prompt=negative_prompt,
+                            width=workflow_params.get("width", 768),
+                            height=workflow_params.get("height", 1024),
+                            output_filename=output_filename,
+                            project_id=project_id,
+                            # 传递所有 params 给 comfyui client，它会负责 update_workflow_params
+                            # 注意: comfyui_client.generate_image 没有直接接受 params 字典参数，
+                            # 它是接受具体参数(seed, width等)。
+                            # 我们需要看 comfyui_client.generate_image 的签名。
+                            # 之前在这个文件里我们是 update workflow_params 字典，然后传给 generate_image 的参数。
+                            # 比如: width=workflow_params.get("width", 768)
+                            # 所以这里只需确保 workflow_params 更新了就好。(上面已经更新了)
+                            # 另外，如果 params 里有其他参数(steps, cfg)，也需要传给 generate_image 吗？
+                            # generate_image 签名只有特定的几个参数。
+                            # 如果想要动态传其他参数，comfyui_client.generate_image 可能需要改或者我们手动解包。
+                            # checking generate_image signature... 
+                            # 它有 seed, width, height, output_filename.
+                            # 如果 params 有 steps, cfg，目前 generate_image 好像没有参数接收它们？
+                            # 之前看 comfyui_client.generate_image 实现：
+                            # 它内部调用 update_workflow_params(workflow, { "width": width, ... })
+                            # 它似乎没有接收 extra params 的参数。
+                            # 这是一个潜在问题。之前实现 parameters configuration 时查看了 generate_image 吗？
+                            # let's proceed with standard params for now, fix extra params later if needed.
+                            # wait, allow passing seed from params
+                            seed=params.get("seed", -1) if params else -1
                         )
 
-                        # 构建 prompt（使用配置文件中的模板）
-                        # 批量生成模式下，每个类型依然是独立生成，但使用新的接口
-                        prompt, negative_prompt = self._build_character_prompt(character, [image_type])
-                        output_filename = f"char_{character.id[:8]}_{image_type}"
+                        logger.info(f"[图片成功] task_id={task_id}, path={image_path}")
 
-                        try:
-                            logger.debug(f"[生成图片] task_id={task_id}, character={character.name}, type={image_type}")
-                            image_path = await comfyui_client.generate_image(
-                                workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
-                                positive_prompt=prompt,
-                                negative_prompt=negative_prompt,
-                                width=workflow_params.get("width", 768),
-                                height=workflow_params.get("height", 1024),
-                                output_filename=output_filename,
-                                project_id=project_id,
-                            )
+                        # 构造保存的 type 字符串
+                        # 比如: "Full Body, Happy, Running"
+                        saved_image_type = ", ".join(combined_labels) if combined_labels else "Generated"
 
-                            logger.info(f"[图片成功] task_id={task_id}, character={character.name}, type={image_type}, path={image_path}")
-
-                            # 保存到数据库
-                            char_image = CharacterImage(
-                                id=str(uuid.uuid4()),
-                                character_id=character.id,
-                                image_type=image_type,
-                                image_path=image_path,
-                                prompt_used=prompt,
-                                negative_prompt=negative_prompt,
-                                is_selected=(j == 0),  # 第一个类型作为默认选择
-                            )
-                            db.add(char_image)
-                            await db.commit()
-                            success_count += 1
-                        except Exception as e:
-                            logger.error(f"[图片失败] task_id={task_id}, character={character.name}, type={image_type}, error={str(e)}", exc_info=True)
-
-                        completed_attempts += 1
-
+                        # 保存到数据库
+                        char_image = CharacterImage(
+                            id=str(uuid.uuid4()),
+                            character_id=character.id,
+                            image_type=saved_image_type,
+                            image_path=image_path,
+                            prompt_used=prompt,
+                            negative_prompt=negative_prompt,
+                            is_selected=True, 
+                        )
+                        db.add(char_image)
+                        await db.commit()
+                        success_count += 1
+                    except Exception as e:
+                        logger.error(f"[图片失败] task_id={task_id}, error={str(e)}", exc_info=True)
+                        # Continue to next character if any
+                        
             if success_count > 0:
-                logger.info(f"[批量任务完成] task_id={task_id}, success={success_count}/{total_images}")
-                self.update_task_status(task_id, "completed", 100, f"生图完成: {success_count}/{total_images}")
+                 self.update_task_status(task_id, "completed", 100, f"Completed: {success_count} images")
             else:
-                logger.error(f"[批量任务失败] task_id={task_id}, 未生成任何图片")
-                self.update_task_status(
-                    task_id, "failed", 0, 
-                    "生图全部失败或超时，详见后台日志",
-                    error="All images failed to generate"
-                )
+                 self.update_task_status(task_id, "failed", 0, "Failed to generate images", error="Generation failed")
 
         except Exception as e:
             logger.error(f"[批量任务失败] task_id={task_id}, error={str(e)}", exc_info=True)
@@ -352,6 +430,8 @@ class GenerationTasks:
         task_id: str,
         scene: Scene,
         reference_image: str | None = None,
+        workflow_id: str | None = None,
+        params: dict[str, Any] | None = None,
     ):
         """生成场景图像
 
@@ -366,13 +446,18 @@ class GenerationTasks:
             # 构建提示词（使用配置文件中的模板）
             prompt, negative_prompt = self._build_scene_prompt(scene)
             output_filename = f"scene_{scene.project_id[:8]}_{scene.scene_number}"
-
             # 获取工作流配置
-            workflow_config = prompt_service.get_default_workflow("scene")
+            if workflow_id:
+                workflow_config = prompt_service.get_workflow_by_id("scene", workflow_id)
+            else:
+                workflow_config = prompt_service.get_default_workflow("scene")
+                
             if not workflow_config:
-                raise ValueError("未找到场景图工作流配置")
+                raise ValueError(f"未找到场景图工作流配置: {workflow_id or 'default'}")
 
-            workflow_params = workflow_config.get("params", {})
+            workflow_params = workflow_config.get("params", {}).copy()
+            if params:
+                workflow_params.update(params)
 
             # 调用 ComfyUI (scene workflow 使用 IPAdapter 保持角色一致性)
             image_path = await comfyui_client.generate_image(
@@ -412,6 +497,8 @@ class GenerationTasks:
         task_id: str,
         project_id: str,
         scenes: list[Scene],
+        workflow_id: str | None = None,
+        params: dict[str, Any] | None = None,
     ):
         """批量生成场景图像"""
         self.update_task_status(task_id, "running", 0, "开始批量生成场景图...", project_id=project_id, target_id="all_scenes")
@@ -421,9 +508,13 @@ class GenerationTasks:
             generated = 0
 
             # 获取工作流配置
-            workflow_config = prompt_service.get_default_workflow("scene")
+            if workflow_id:
+                workflow_config = prompt_service.get_workflow_by_id("scene", workflow_id)
+            else:
+                workflow_config = prompt_service.get_default_workflow("scene")
+                
             if not workflow_config:
-                raise ValueError("未找到场景图工作流配置")
+                raise ValueError(f"未找到场景图工作流配置: {workflow_id or 'default'}")
 
             workflow_params = workflow_config.get("params", {})
 
@@ -476,6 +567,8 @@ class GenerationTasks:
         task_id: str,
         scene: Scene,
         input_image: str | None = None,
+        workflow_id: str | None = None,
+        params: dict[str, Any] | None = None,
     ):
         """生成场景视频
 
@@ -492,9 +585,13 @@ class GenerationTasks:
                 input_image = f"scene_{scene.project_id[:8]}_{scene.scene_number}.png"
 
             # 获取工作流配置
-            workflow_config = prompt_service.get_default_workflow("video")
+            if workflow_id:
+                workflow_config = prompt_service.get_workflow_by_id("video", workflow_id)
+            else:
+                workflow_config = prompt_service.get_default_workflow("video")
+                
             if not workflow_config:
-                raise ValueError("未找到视频工作流配置")
+                raise ValueError(f"未找到视频工作流配置: {workflow_id or 'default'}")
 
             workflow_params = workflow_config.get("params", {})
             video_length = workflow_params.get("video_length", 97)
@@ -546,7 +643,7 @@ class GenerationTasks:
         except Exception as e:
             self.update_task_status(task_id, "failed", 0, "", error=str(e))
 
-    async def generate_all_videos(self, task_id: str, project_id: str, scenes: list[Scene]):
+    async def generate_all_videos(self, task_id: str, project_id: str, scenes: list[Scene], workflow_id: str | None = None, params: dict[str, Any] | None = None):
         """批量生成视频"""
         self.update_task_status(task_id, "running", 0, "开始批量生成视频...", project_id=project_id, target_id="all_videos")
 
@@ -555,9 +652,13 @@ class GenerationTasks:
             generated = 0
 
             # 获取工作流配置
-            workflow_config = prompt_service.get_default_workflow("video")
+            if workflow_id:
+                workflow_config = prompt_service.get_workflow_by_id("video", workflow_id)
+            else:
+                workflow_config = prompt_service.get_default_workflow("video")
+                
             if not workflow_config:
-                raise ValueError("未找到视频工作流配置")
+                raise ValueError(f"未找到视频工作流配置: {workflow_id or 'default'}")
 
             workflow_params = workflow_config.get("params", {})
             video_length = workflow_params.get("video_length", 97)

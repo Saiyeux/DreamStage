@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Project, ServiceStatus } from '@/types'
-import { healthApi, projectsApi, analysisApi } from '@/api'
+import { healthApi, projectsApi, analysisApi, configApi } from '@/api'
+import type { WorkflowConfig } from '@/api/config'
+import { useProjectStore } from '@/stores/projectStore'
+import { WorkflowSettingsModal } from './WorkflowSettingsModal'
 
 interface ProjectSidebarProps {
   currentProject: Project | null
@@ -24,6 +27,67 @@ export function ProjectSidebar({
   const [healthStatus, setHealthStatus] = useState<ServiceStatus | null>(null)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [workflowConfig, setWorkflowConfig] = useState<WorkflowConfig | null>(null)
+
+  // Settings modal state
+  const [showSettings, setShowSettings] = useState(false)
+  const [settingsType, setSettingsType] = useState<'character' | 'scene' | 'video' | null>(null)
+
+  const { selectedWorkflows, setSelectedWorkflow, workflowParams, setWorkflowParams } = useProjectStore()
+
+  const openSettings = (type: 'character' | 'scene' | 'video') => {
+    setSettingsType(type)
+    setShowSettings(true)
+  }
+
+  const handleSaveSettings = (params: Record<string, any>) => {
+    if (settingsType) {
+      setWorkflowParams(settingsType, params)
+    }
+  }
+
+  const getCurrentParams = (type: 'character' | 'scene' | 'video') => {
+    const userParams = workflowParams[type]
+    if (Object.keys(userParams).length > 0) return userParams
+
+    // If no user override, use default from config
+    const workflowId = selectedWorkflows[type]
+    if (workflowConfig && workflowId) {
+      const workflowsKey = `${type}_workflows` as keyof WorkflowConfig
+      // @ts-ignore - dynamic key access
+      const wf = (workflowConfig[workflowsKey] as any[]).find((w: any) => w.id === workflowId)
+      if (wf) return wf.params || {}
+    }
+    return {}
+  }
+
+  useEffect(() => {
+    loadProjects()
+    loadWorkflowConfig()
+  }, [])
+
+  const loadWorkflowConfig = async () => {
+    try {
+      const config = await configApi.getWorkflowConfig()
+      setWorkflowConfig(config)
+
+      // 设置初始默认值
+      if (!selectedWorkflows.character && config.character_workflows.length > 0) {
+        const defaultWf = config.character_workflows.find(w => w.default) || config.character_workflows[0]
+        setSelectedWorkflow('character', defaultWf.id)
+      }
+      if (!selectedWorkflows.scene && config.scene_workflows.length > 0) {
+        const defaultWf = config.scene_workflows.find(w => w.default) || config.scene_workflows[0]
+        setSelectedWorkflow('scene', defaultWf.id)
+      }
+      if (!selectedWorkflows.video && config.video_workflows.length > 0) {
+        const defaultWf = config.video_workflows.find(w => w.default) || config.video_workflows[0]
+        setSelectedWorkflow('video', defaultWf.id)
+      }
+    } catch (err) {
+      console.error('Load workflow config failed:', err)
+    }
+  }
 
   useEffect(() => {
     loadProjects()
@@ -264,6 +328,92 @@ export function ProjectSidebar({
               )}
             </button>
           </div>
+        </section>
+
+        {/* ComfyUI Settings */}
+        <section className="pt-2 border-t border-slate-100">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-4">
+            ComfyUI Workflow Settings
+          </label>
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5 ml-0.5">
+                <label className="text-[11px] font-medium text-slate-500">Character Workflow</label>
+                <button
+                  onClick={() => openSettings('character')}
+                  disabled={!selectedWorkflows.character}
+                  className="text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Configure Parameters"
+                >
+                  <span className="text-xs">⚙️</span>
+                </button>
+              </div>
+              <select
+                value={selectedWorkflows.character || ''}
+                onChange={(e) => setSelectedWorkflow('character', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all cursor-pointer"
+              >
+                {workflowConfig?.character_workflows.map(wf => (
+                  <option key={wf.id} value={wf.id}>{wf.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5 ml-0.5">
+                <label className="text-[11px] font-medium text-slate-500">Scene Workflow</label>
+                <button
+                  onClick={() => openSettings('scene')}
+                  disabled={!selectedWorkflows.scene}
+                  className="text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Configure Parameters"
+                >
+                  <span className="text-xs">⚙️</span>
+                </button>
+              </div>
+              <select
+                value={selectedWorkflows.scene || ''}
+                onChange={(e) => setSelectedWorkflow('scene', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all cursor-pointer"
+              >
+                {workflowConfig?.scene_workflows.map(wf => (
+                  <option key={wf.id} value={wf.id}>{wf.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5 ml-0.5">
+                <label className="text-[11px] font-medium text-slate-500">Video Workflow</label>
+                <button
+                  onClick={() => openSettings('video')}
+                  disabled={!selectedWorkflows.video}
+                  className="text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Configure Parameters"
+                >
+                  <span className="text-xs">⚙️</span>
+                </button>
+              </div>
+              <select
+                value={selectedWorkflows.video || ''}
+                onChange={(e) => setSelectedWorkflow('video', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all cursor-pointer"
+              >
+                {workflowConfig?.video_workflows.map(wf => (
+                  <option key={wf.id} value={wf.id}>{wf.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {settingsType && (
+            <WorkflowSettingsModal
+              visible={showSettings}
+              onClose={() => setShowSettings(false)}
+              onSave={handleSaveSettings}
+              initialParams={getCurrentParams(settingsType)}
+              title={`${settingsType.charAt(0).toUpperCase() + settingsType.slice(1)} Settings`}
+            />
+          )}
         </section>
       </div>
 

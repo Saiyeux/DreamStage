@@ -312,11 +312,13 @@ function CharacterLibraryTab({
     )
   }
 
+  const { selectedWorkflows } = useProjectStore()
+
   const startGeneration = async () => {
     setError(null)
     try {
       const imageTypes = selectedTypes.map(t => t.id)
-      const response = await generationApi.generateCharacterLibrary(projectId, imageTypes)
+      const response = await generationApi.generateCharacterLibrary(projectId, imageTypes, selectedWorkflows.character || undefined)
       startGlobalPolling(response.task_id)
     } catch (err) {
       setError('Failed to start generation. Check backend service.')
@@ -698,13 +700,20 @@ function CharacterGenerationCard({
     }
   }, [projectId, character.id, startPolling])
 
+  const { selectedWorkflows } = useProjectStore()
+
   const generateSingleImage = async (typeId: string) => {
     setIsGenerating(true)
     setGeneratingTypeId(typeId)
     setGenProgress(0)
 
     try {
-      const response = await generationApi.generateCharacterImages(projectId, character.id, [typeId])
+      const response = await generationApi.generateCharacterImages(
+        projectId,
+        character.id,
+        [typeId],
+        selectedWorkflows.character || undefined
+      )
       startPolling(response.task_id, typeId)
     } catch (err) {
       setIsGenerating(false)
@@ -998,13 +1007,15 @@ function SceneImageTab({
     )
   }
 
+  const { selectedWorkflows } = useProjectStore()
+
   const startGeneration = async () => {
     setGenerating(true)
     setProgress(0)
     setError(null)
 
     try {
-      const response = await generationApi.generateAllSceneImages(projectId)
+      const response = await generationApi.generateAllSceneImages(projectId, selectedWorkflows.scene || undefined)
       startGlobalPolling(response.task_id)
     } catch (err) {
       setGenerating(false)
@@ -1176,13 +1187,15 @@ function VideoGenerationTab({
     )
   }
 
+  const { selectedWorkflows } = useProjectStore()
+
   const startGeneration = async () => {
     setGenerating(true)
     setProgress(0)
     setError(null)
 
     try {
-      const response = await generationApi.generateAllVideos(projectId)
+      const response = await generationApi.generateAllVideos(projectId, selectedWorkflows.video || undefined)
       startGlobalPolling(response.task_id)
     } catch (err) {
       setGenerating(false)
