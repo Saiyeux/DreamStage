@@ -59,9 +59,49 @@ export function GenerationCenterPage() {
     }
   }, [projectId, urlProjectId, currentProject, setCurrentProject, setCharacters, setScenes])
 
-  useEffect(() => {
-    loadData()
+  const startGlobalPolling = useCallback((taskId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    setActiveTaskId(taskId)
+    setTaskMessage('Syncing task status...')
+    setTaskProgress(0)
+
+    pollingRef.current = window.setInterval(async () => {
+      try {
+        const status = await generationApi.getTaskStatus(taskId)
+        setTaskProgress(status.progress)
+        setTaskMessage(status.message)
+
+        if (status.status === 'completed') {
+          setActiveTaskId(null)
+          setTaskMessage('Generation completed!')
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+          loadData()
+        } else if (status.status === 'failed') {
+          setActiveTaskId(null)
+          setTaskMessage('Generation failed')
+          setError(status.error || 'Task failed')
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+      } catch (err) {
+        console.error('Poll status failed:', err)
+      }
+    }, 1000)
   }, [loadData])
+
+  useEffect(() => {
+    if (!projectId) return
+    // Recovery Effect: Check for global active tasks
+    generationApi.getActiveTasks(projectId).then(tasks => {
+      Object.entries(tasks).forEach(([taskId, status]) => {
+        // Handle global tasks (library, all_scenes, all_videos)
+        if (status.target_id === 'library' || status.target_id === 'all_scenes' || status.target_id === 'all_videos') {
+          startGlobalPolling(taskId)
+        }
+      })
+    }).catch(console.error)
+  }, [projectId, startGlobalPolling])
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -169,12 +209,9 @@ export function GenerationCenterPage() {
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
               onRefresh={loadData}
               activeTaskId={activeTaskId}
-              setActiveTaskId={setActiveTaskId}
               taskProgress={taskProgress}
-              setTaskProgress={setTaskProgress}
               taskMessage={taskMessage}
-              setTaskMessage={setTaskMessage}
-              pollingRef={pollingRef}
+              startGlobalPolling={startGlobalPolling}
             />
           )}
           {activeTab === 'scenes' && (
@@ -183,7 +220,7 @@ export function GenerationCenterPage() {
               scenes={scenes}
               hasCharacterLibrary={hasCharacterLibrary}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
-              onRefresh={loadData}
+              startGlobalPolling={startGlobalPolling}
             />
           )}
           {activeTab === 'videos' && (
@@ -192,7 +229,7 @@ export function GenerationCenterPage() {
               scenes={scenes}
               hasSceneImages={hasSceneImages}
               onNavigateAnalysis={() => navigate(`/analysis?project=${projectId}`)}
-              onRefresh={loadData}
+              startGlobalPolling={startGlobalPolling}
             />
           )}
         </div>
@@ -207,24 +244,18 @@ function CharacterLibraryTab({
   onNavigateAnalysis,
   onRefresh,
   activeTaskId,
-  setActiveTaskId,
   taskProgress,
-  setTaskProgress,
   taskMessage,
-  setTaskMessage,
-  pollingRef,
+  startGlobalPolling,
 }: {
   projectId: string
   characters: Character[]
   onNavigateAnalysis: () => void
   onRefresh: () => void
   activeTaskId: string | null
-  setActiveTaskId: (id: string | null) => void
   taskProgress: number
-  setTaskProgress: (progress: number) => void
   taskMessage: string
-  setTaskMessage: (message: string) => void
-  pollingRef: React.MutableRefObject<number | null>
+  startGlobalPolling: (taskId: string) => void
 }) {
   const [error, setError] = useState<string | null>(null)
 
@@ -283,37 +314,11 @@ function CharacterLibraryTab({
 
   const startGeneration = async () => {
     setError(null)
-    setTaskProgress(0)
-    setTaskMessage('Starting generation task...')
-
     try {
       const imageTypes = selectedTypes.map(t => t.id)
       const response = await generationApi.generateCharacterLibrary(projectId, imageTypes)
-      const taskId = response.task_id
-      setActiveTaskId(taskId)
-
-      pollingRef.current = window.setInterval(async () => {
-        try {
-          const status = await generationApi.getTaskStatus(taskId)
-          setTaskProgress(status.progress)
-          setTaskMessage(status.message)
-
-          if (status.status === 'completed') {
-            setActiveTaskId(null)
-            setTaskMessage('Generation completed!')
-            if (pollingRef.current) clearInterval(pollingRef.current)
-            onRefresh()
-          } else if (status.status === 'failed') {
-            setActiveTaskId(null)
-            setError(status.error || 'Generation failed')
-            if (pollingRef.current) clearInterval(pollingRef.current)
-          }
-        } catch (err) {
-          console.error('Poll status failed:', err)
-        }
-      }, 1000)
+      startGlobalPolling(response.task_id)
     } catch (err) {
-      setActiveTaskId(null)
       setError('Failed to start generation. Check backend service.')
       console.error('Start generation failed:', err)
     }
@@ -650,13 +655,48 @@ function CharacterGenerationCard({
   const [genProgress, setGenProgress] = useState(0)
   const pollingRef = useRef<number | null>(null)
 
+  const startPolling = useCallback((taskId: string, targetId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    setIsGenerating(true)
+    setGeneratingTypeId(targetId)
+    setGenProgress(0)
+
+    pollingRef.current = window.setInterval(async () => {
+      try {
+        const taskStatus = await generationApi.getTaskStatus(taskId)
+        setGenProgress(taskStatus.progress)
+
+        if (taskStatus.status === 'completed' || taskStatus.status === 'failed') {
+          setIsGenerating(false)
+          setGeneratingTypeId(null)
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+          if (taskStatus.status === 'completed' && onRefresh) {
+            onRefresh()
+          }
+        }
+      } catch (err) {
+        console.error('Poll card status failed:', err)
+      }
+    }, 1000)
+  }, [onRefresh])
+
   useEffect(() => {
+    // Card Level Recovery
+    generationApi.getActiveTasks(projectId).then(tasks => {
+      Object.entries(tasks).forEach(([taskId, status]) => {
+        if (status.target_id === character.id) {
+          startPolling(taskId, character.id) // individual card tasks use character.id
+        }
+      })
+    })
+
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
       }
     }
-  }, [])
+  }, [projectId, character.id, startPolling])
 
   const generateSingleImage = async (typeId: string) => {
     setIsGenerating(true)
@@ -665,25 +705,7 @@ function CharacterGenerationCard({
 
     try {
       const response = await generationApi.generateCharacterImages(projectId, character.id, [typeId])
-      const taskId = response.task_id
-
-      pollingRef.current = window.setInterval(async () => {
-        try {
-          const taskStatus = await generationApi.getTaskStatus(taskId)
-          setGenProgress(taskStatus.progress)
-
-          if (taskStatus.status === 'completed' || taskStatus.status === 'failed') {
-            setIsGenerating(false)
-            setGeneratingTypeId(null)
-            if (pollingRef.current) clearInterval(pollingRef.current)
-            if (taskStatus.status === 'completed' && onRefresh) {
-              onRefresh()
-            }
-          }
-        } catch (err) {
-          console.error('Poll status failed:', err)
-        }
-      }, 1000)
+      startPolling(response.task_id, typeId)
     } catch (err) {
       setIsGenerating(false)
       setGeneratingTypeId(null)
@@ -938,13 +960,13 @@ function SceneImageTab({
   scenes,
   hasCharacterLibrary,
   onNavigateAnalysis,
-  onRefresh,
+  startGlobalPolling,
 }: {
   projectId: string
   scenes: Scene[]
   hasCharacterLibrary: boolean
   onNavigateAnalysis: () => void
-  onRefresh: () => void
+  startGlobalPolling: (taskId: string) => void
 }) {
   const [currentScene, setCurrentScene] = useState(1)
   const [generating, setGenerating] = useState(false)
@@ -983,23 +1005,7 @@ function SceneImageTab({
 
     try {
       const response = await generationApi.generateAllSceneImages(projectId)
-      const taskId = response.task_id
-
-      pollingRef.current = window.setInterval(async () => {
-        try {
-          const status = await generationApi.getTaskStatus(taskId)
-          setProgress(status.progress)
-
-          if (status.status === 'completed' || status.status === 'failed') {
-            setGenerating(false)
-            if (status.status === 'failed') setError(status.error || 'Generation failed')
-            if (pollingRef.current) clearInterval(pollingRef.current)
-            if (status.status === 'completed') onRefresh()
-          }
-        } catch (err) {
-          console.error('Poll status failed:', err)
-        }
-      }, 1000)
+      startGlobalPolling(response.task_id)
     } catch (err) {
       setGenerating(false)
       setError('Failed to start generation task')
@@ -1071,7 +1077,7 @@ function SceneImageTab({
         {/* Scene Info Overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white opacity-0 group-hover:opacity-100 transition-opacity">
           <h3 className="text-xl font-bold">Scene {currentSceneData?.sceneNumber}: {currentSceneData?.location}</h3>
-          <p className="text-sm text-slate-300 mt-1 line-clamp-2">{currentSceneData?.visualDescription}</p>
+          <p className="text-sm text-slate-300 mt-1 line-clamp-2">{currentSceneData?.environmentDesc}</p>
         </div>
       </div>
 
@@ -1132,13 +1138,13 @@ function VideoGenerationTab({
   scenes,
   hasSceneImages,
   onNavigateAnalysis,
-  onRefresh,
+  startGlobalPolling,
 }: {
   projectId: string
   scenes: Scene[]
   hasSceneImages: boolean
   onNavigateAnalysis: () => void
-  onRefresh: () => void
+  startGlobalPolling: (taskId: string) => void
 }) {
   const [currentScene, setCurrentScene] = useState(1)
   const [generating, setGenerating] = useState(false)
@@ -1177,23 +1183,7 @@ function VideoGenerationTab({
 
     try {
       const response = await generationApi.generateAllVideos(projectId)
-      const taskId = response.task_id
-
-      pollingRef.current = window.setInterval(async () => {
-        try {
-          const status = await generationApi.getTaskStatus(taskId)
-          setProgress(status.progress)
-
-          if (status.status === 'completed' || status.status === 'failed') {
-            setGenerating(false)
-            if (status.status === 'failed') setError(status.error || 'Generation failed')
-            if (pollingRef.current) clearInterval(pollingRef.current)
-            if (status.status === 'completed') onRefresh()
-          }
-        } catch (err) {
-          console.error('Poll status failed:', err)
-        }
-      }, 1000)
+      startGlobalPolling(response.task_id)
     } catch (err) {
       setGenerating(false)
       setError('Failed to start video generation')

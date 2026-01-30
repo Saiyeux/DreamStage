@@ -229,3 +229,9 @@ async def get_task_status(task_id: str):
     """获取任务状态"""
     status = generation_tasks.get_task_status(task_id)
     return status
+
+
+@router.get("/{project_id}/tasks/active")
+async def get_active_tasks(project_id: str):
+    """获取项目中的活跃任务"""
+    return generation_tasks.get_active_tasks_for_project(project_id)

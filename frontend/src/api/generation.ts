@@ -11,12 +11,18 @@ interface TaskStatus {
   message: string
   result?: unknown
   error?: string
+  target_id?: string
+  project_id?: string
 }
 
 export const generationApi = {
   // 查询任务状态
   getTaskStatus: (taskId: string) =>
     api.get<TaskStatus>(`/projects/tasks/${taskId}/status`),
+
+  // 获取项目中的活跃任务
+  getActiveTasks: (projectId: string) =>
+    api.get<Record<string, TaskStatus>>(`/projects/${projectId}/tasks/active`),
 
   // 生成单个角色图像
   generateCharacterImages: (

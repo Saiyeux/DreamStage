@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_db
 from app.core.logging_config import get_logger
 from app.db.database import async_session_maker
-from app.models import Project, ProjectStatus, Character, Scene
+from app.models import Project, ProjectStatus, Character, CharacterImage, Scene, SceneImage, VideoClip
 from app.schemas import (
     AnalysisResponse,
     CharacterResponse,
@@ -549,3 +549,115 @@ async def update_scene(
     await db.refresh(scene)
 
     return scene
+# ============ 图像管理 ============
+
+@router.delete("/{project_id}/characters/images/{image_id}")
+async def delete_character_image(
+    project_id: str,
+    image_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除角色图像"""
+    # 验证权限并获取图片
+    result = await db.execute(
+        select(CharacterImage)
+        .join(Character)
+        .where(
+            CharacterImage.id == image_id,
+            Character.project_id == project_id
+        )
+    )
+    image = result.scalar_one_or_none()
+
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # 1. 从磁盘删除文件 (可选，建议做)
+    try:
+        from app.api.files import get_comfyui_output_dir
+        output_dir = get_comfyui_output_dir()
+        file_path = output_dir / image.image_path
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"已删除物理文件: {file_path}")
+    except Exception as e:
+        logger.error(f"删除物理文件失败: {str(e)}")
+        # 继续删除数据库记录，即使文件删除失败
+
+    # 2. 从数据库删除
+    await db.delete(image)
+    await db.commit()
+
+    return {"success": True, "message": "Image deleted"}
+
+@router.delete("/{project_id}/scenes/images/{image_id}")
+async def delete_scene_image(
+    project_id: str,
+    image_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除场景图像"""
+    result = await db.execute(
+        select(SceneImage)
+        .join(Scene)
+        .where(
+            SceneImage.id == image_id,
+            Scene.project_id == project_id
+        )
+    )
+    image = result.scalar_one_or_none()
+
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    try:
+        from app.api.files import get_comfyui_output_dir
+        output_dir = get_comfyui_output_dir()
+        file_path = output_dir / image.image_path
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"已删除物理文件: {file_path}")
+    except Exception as e:
+        logger.error(f"删除物理文件失败: {str(e)}")
+
+    await db.delete(image)
+    await db.commit()
+
+    return {"success": True, "message": "Scene image deleted"}
+
+@router.delete("/{project_id}/scenes/videos/{video_id}")
+async def delete_video_clip(
+    project_id: str,
+    video_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除场景视频"""
+    result = await db.execute(
+        select(VideoClip)
+        .join(Scene)
+        .where(
+            VideoClip.id == video_id,
+            Scene.project_id == project_id
+        )
+    )
+    video = result.scalar_one_or_none()
+
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    try:
+        from app.api.files import get_comfyui_output_dir
+        output_dir = get_comfyui_output_dir()
+        file_path = output_dir / video.video_path
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"已删除物理文件: {file_path}")
+    except Exception as e:
+        logger.error(f"删除物理文件失败: {str(e)}")
+
+    await db.delete(video)
+    await db.commit()
+
+    return {"success": True, "message": "Video clip deleted"}
+
+

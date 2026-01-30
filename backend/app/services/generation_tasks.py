@@ -58,6 +58,14 @@ class GenerationTasks:
         """获取任务状态"""
         return self._task_status.get(task_id, {"status": "unknown"})
 
+    def get_active_tasks_for_project(self, project_id: str) -> dict[str, dict[str, Any]]:
+        """获取指定项目的所有活跃任务"""
+        return {
+            tid: status
+            for tid, status in self._task_status.items()
+            if status.get("project_id") == project_id and status.get("status") in ["pending", "running"]
+        }
+
     def update_task_status(
         self,
         task_id: str,
@@ -66,19 +74,31 @@ class GenerationTasks:
         message: str = "",
         result: Any = None,
         error: str | None = None,
+        project_id: str | None = None,
+        target_id: str | None = None,
     ):
         """更新任务状态"""
+        # 保留原有的 metadata
+        old_status = self._task_status.get(task_id, {})
+        new_project_id = project_id or old_status.get("project_id")
+        new_target_id = target_id or old_status.get("target_id")
+
         self._task_status[task_id] = {
             "status": status,
             "progress": progress,
             "message": message,
             "result": result,
             "error": error,
+            "project_id": new_project_id,
+            "target_id": new_target_id,
         }
 
-    def _build_character_prompt(self, character: Character, image_type: str) -> tuple[str, str]:
-        """构建角色图像 prompt，返回 (positive_prompt, negative_prompt)"""
-        # 使用 prompt_service 构建基础提示词
+    def _build_character_prompt(self, character: Character, image_types: list[str]) -> tuple[str, str]:
+        """构建角色图像 prompt，返回 (positive_prompt, negative_prompt)
+        
+        整合角色资料（Profile）和多项生图设置（Settings/Tags）为单一提示词。
+        """
+        # 使用 prompt_service 构建基础提示词 (基于 Profile)
         positive_prompt, negative_prompt = prompt_service.build_character_prompt(
             gender=character.gender,
             age=character.age,
@@ -87,12 +107,22 @@ class GenerationTasks:
             body=character.body,
             skin=character.skin,
             clothing_style=character.clothing_style,
+            personality=character.personality,
         )
 
-        # 添加类型修饰（如正面、侧面等）
-        type_info = self._get_image_type_info(image_type)
-        modifier = type_info.get("prompt_suffix", "portrait")
-        positive_prompt = f"{positive_prompt}, {modifier}"
+        # 获取并合并所有选中的标签修饰符 (基于 Settings)
+        modifiers = []
+        for itype in image_types:
+            type_info = self._get_image_type_info(itype)
+            suffix = type_info.get("prompt_suffix")
+            if suffix:
+                modifiers.append(suffix)
+        
+        if modifiers:
+            # 将设置类的描述词加入提示词
+            positive_prompt = f"{positive_prompt}, {', '.join(modifiers)}"
+        else:
+            positive_prompt = f"{positive_prompt}, portrait"
 
         return positive_prompt, negative_prompt
 
@@ -121,85 +151,78 @@ class GenerationTasks:
         )
 
     async def generate_character_images(
-        self,
-        task_id: str,
-        character: Character,
-        image_types: list[str],
+        self, task_id: str, character: Character, image_types: list[str]
     ):
-        """生成角色图像"""
-        logger.info(f"[任务开始] task_id={task_id}, character={character.name}, types={image_types}")
-        self.update_task_status(task_id, "running", 0, "准备生成...")
+        """生成角色的一组图像"""
+        logger.info(f"[开始生图任务] task_id={task_id}, character={character.name}, types={image_types}")
+        self.update_task_status(task_id, "running", 0, "准备生成...", project_id=character.project_id, target_id=character.id)
 
         try:
-            total = len(image_types)
+            # 合并所有选中项为一个单一任务进行生成
+            self.update_task_status(task_id, "running", 10, f"正在汇总角色信息并生成...")
+            
+            # 构建合并后的 Prompt
+            prompt, negative_prompt = self._build_character_prompt(character, image_types)
+            
+            # 使用列表中的第一个有效类型作为主分类名，或组合名称
+            primary_type = image_types[0] if image_types else "portrait"
+            output_filename = f"character_{character.id[:8]}_{primary_type}"
+            
             generated_images = []
+            total = 1
 
             async with async_session_maker() as db:
-                for i, image_type in enumerate(image_types):
-                    progress = int((i / total) * 100)
-                    type_info = self._get_image_type_info(image_type)
-                    type_label = type_info.get("label", image_type)
-                    self.update_task_status(
-                        task_id, "running", progress, f"生成 {character.name} {type_label}..."
+                # 获取工作流配置
+                workflow_config = prompt_service.get_default_workflow("character")
+                if not workflow_config:
+                    error_msg = "未找到角色图工作流配置"
+                    logger.error(f"[配置错误] task_id={task_id}, error={error_msg}")
+                    raise ValueError(error_msg)
+
+                workflow_params = workflow_config.get("params", {})
+
+                try:
+                    # 调用 ComfyUI 生成
+                    logger.debug(f"[调用ComfyUI] task_id={task_id}, merged_prompt={prompt[:100]}...")
+                    image_path = await comfyui_client.generate_image(
+                        workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
+                        positive_prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        width=workflow_params.get("width", 768),
+                        height=workflow_params.get("height", 1024),
+                        output_filename=output_filename,
+                        project_id=character.project_id,
                     )
-                    logger.info(f"[生成图片] task_id={task_id}, type={image_type}, progress={progress}%")
 
-                    # 构建 prompt（使用配置文件中的模板）
-                    prompt, negative_prompt = self._build_character_prompt(character, image_type)
-                    output_filename = f"character_{character.id}_{image_type}"
+                    logger.info(f"[图片生成成功] task_id={task_id}, path={image_path}")
 
-                    # 获取工作流配置
-                    workflow_config = prompt_service.get_default_workflow("character")
-                    if not workflow_config:
-                        error_msg = "未找到角色图工作流配置"
-                        logger.error(f"[配置错误] task_id={task_id}, error={error_msg}")
-                        raise ValueError(error_msg)
+                    # 保存到数据库
+                    char_image = CharacterImage(
+                        id=str(uuid.uuid4()),
+                        character_id=character.id,
+                        image_type=primary_type,
+                        image_path=image_path,
+                        prompt_used=prompt,
+                        negative_prompt=negative_prompt,
+                        is_selected=False,
+                    )
+                    db.add(char_image)
+                    await db.commit()
 
-                    workflow_params = workflow_config.get("params", {})
-
-                    try:
-                        # 调用 ComfyUI 生成（使用配置的工作流）
-                        logger.debug(f"[调用ComfyUI] task_id={task_id}, workflow={workflow_config.get('workflow_file')}")
-                        image_path = await comfyui_client.generate_image(
-                            workflow_name=workflow_config.get("workflow_file", "character_portrait_flux2.json"),
-                            positive_prompt=prompt,
-                            negative_prompt=negative_prompt,
-                            width=workflow_params.get("width", 768),
-                            height=workflow_params.get("height", 1024),
-                            output_filename=output_filename,
-                            project_id=character.project_id,
-                        )
-
-                        logger.info(f"[图片生成成功] task_id={task_id}, type={image_type}, path={image_path}")
-
-                        # 保存到数据库
-                        char_image = CharacterImage(
-                            id=str(uuid.uuid4()),
-                            character_id=character.id,
-                            image_type=image_type,
-                            image_path=image_path,
-                            prompt_used=prompt,
-                            negative_prompt=negative_prompt,
-                            is_selected=False,
-                        )
-                        db.add(char_image)
-                        await db.commit()
-
-                        generated_images.append({
-                            "type": image_type,
-                            "path": image_path,
-                            "id": char_image.id,
-                        })
-                    except Exception as e:
-                        # 单张图片失败不中断整个任务
-                        logger.error(f"[图片生成失败] task_id={task_id}, type={image_type}, error={str(e)}", exc_info=True)
-                        continue
+                    generated_images.append({
+                        "type": primary_type,
+                        "path": image_path,
+                        "id": char_image.id,
+                    })
+                except Exception as e:
+                    logger.error(f"[生成失败] task_id={task_id}, error={str(e)}", exc_info=True)
+                    raise e
 
             if generated_images:
-                logger.info(f"[任务完成] task_id={task_id}, success={len(generated_images)}/{total}")
+                logger.info(f"[任务完成] task_id={task_id}, success=1/1")
                 self.update_task_status(
                     task_id, "completed", 100,
-                    f"完成 {len(generated_images)}/{total} 张",
+                    "图片生成完成",
                     result=generated_images
                 )
             else:
@@ -230,7 +253,7 @@ class GenerationTasks:
             image_types: 要生成的图片类型列表，为None时使用默认配置
         """
         logger.info(f"[批量任务开始] task_id={task_id}, project={project_id}, characters={len(characters)}, types={image_types}")
-        self.update_task_status(task_id, "running", 0, "开始生成角色库...")
+        self.update_task_status(task_id, "running", 0, "开始生成角色库...", project_id=project_id, target_id="library")
 
         try:
             # 获取要生成的图片类型
@@ -273,7 +296,8 @@ class GenerationTasks:
                         )
 
                         # 构建 prompt（使用配置文件中的模板）
-                        prompt, negative_prompt = self._build_character_prompt(character, image_type)
+                        # 批量生成模式下，每个类型依然是独立生成，但使用新的接口
+                        prompt, negative_prompt = self._build_character_prompt(character, [image_type])
                         output_filename = f"char_{character.id[:8]}_{image_type}"
 
                         try:
@@ -336,7 +360,7 @@ class GenerationTasks:
             scene: 场景对象
             reference_image: 参考图像 (角色图) 用于保持角色一致性
         """
-        self.update_task_status(task_id, "running", 0, f"生成场景 #{scene.scene_number}...")
+        self.update_task_status(task_id, "running", 0, f"生成场景 #{scene.scene_number}...", project_id=scene.project_id, target_id=scene.id)
 
         try:
             # 构建提示词（使用配置文件中的模板）
@@ -390,7 +414,7 @@ class GenerationTasks:
         scenes: list[Scene],
     ):
         """批量生成场景图像"""
-        self.update_task_status(task_id, "running", 0, "开始批量生成场景图...")
+        self.update_task_status(task_id, "running", 0, "开始批量生成场景图...", project_id=project_id, target_id="all_scenes")
 
         try:
             total = len(scenes)
@@ -460,7 +484,7 @@ class GenerationTasks:
             scene: 场景对象
             input_image: 输入图像文件名 (ComfyUI input 目录下)
         """
-        self.update_task_status(task_id, "running", 0, f"生成视频 #{scene.scene_number}...")
+        self.update_task_status(task_id, "running", 0, f"生成视频 #{scene.scene_number}...", project_id=scene.project_id, target_id=scene.id)
 
         try:
             # 如果没有提供输入图像，使用默认文件名
@@ -522,14 +546,9 @@ class GenerationTasks:
         except Exception as e:
             self.update_task_status(task_id, "failed", 0, "", error=str(e))
 
-    async def generate_all_videos(
-        self,
-        task_id: str,
-        project_id: str,
-        scenes: list[Scene],
-    ):
+    async def generate_all_videos(self, task_id: str, project_id: str, scenes: list[Scene]):
         """批量生成视频"""
-        self.update_task_status(task_id, "running", 0, "开始批量生成视频...")
+        self.update_task_status(task_id, "running", 0, "开始批量生成视频...", project_id=project_id, target_id="all_videos")
 
         try:
             total = len(scenes)

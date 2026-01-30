@@ -124,6 +124,7 @@ class PromptService:
         body: str | None = None,
         skin: str | None = None,
         clothing_style: str | None = None,
+        personality: str | None = None,
         style_preset: str = "default",
     ) -> tuple[str, str]:
         """
@@ -154,6 +155,8 @@ class PromptService:
             parts.append(f"{skin} skin")
         if clothing_style:
             parts.append(clothing_style)
+        if personality:
+            parts.append(f"personality: {personality}")
 
         base = ", ".join(parts) if parts else "a person"
 

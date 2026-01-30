@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
 import { projectsApi, analysisApi, charactersApi, generationApi, configApi } from '@/api'
 import type { ImageType, CharacterImageTemplates } from '@/api'
@@ -389,20 +389,57 @@ function CharactersContent({
   const selectedCharacter = characters[selectedIndex]
 
   // Generation state
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generateProgress, setGenerateProgress] = useState(0)
+  const [generatingCharId, setGeneratingCharId] = useState<string | null>(null)
   const [generateMessage, setGenerateMessage] = useState('')
   const pollingRef = useRef<number | null>(null)
 
   // Settings state
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(['front']) // Default to front view
+  const [selections, setSelections] = useState<{
+    view: string;
+    expression: string;
+    action: string;
+  }>({
+    view: 'front',
+    expression: 'neutral',
+    action: 'standing'
+  })
   const [isManagingTags, setIsManagingTags] = useState(false)
+  const [isManagingGallery, setIsManagingGallery] = useState(false)
 
   useEffect(() => {
     // Load image templates to get available types
     configApi.getCharacterImageTemplates().then(setTemplates).catch(console.error)
   }, [])
+
+  const handleDownload = async (imageUrl: string, filename: string) => {
+    try {
+      const response = await fetch(imageUrl)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Download failed:', error)
+    }
+  }
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!confirm('Permanently delete this image?')) return
+    try {
+      await analysisApi.deleteCharacterImage(projectId, imageId)
+      const updatedCharacters = await analysisApi.getCharacters(projectId)
+      setCharacters(updatedCharacters)
+    } catch (err) {
+      console.error('Delete image failed:', err)
+      alert('Failed to delete image')
+    }
+  }
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index)
@@ -420,6 +457,10 @@ function CharactersContent({
       roleType: selectedCharacter.roleType,
       personality: selectedCharacter.personality,
       clothingStyle: selectedCharacter.clothingStyle,
+      hair: selectedCharacter.hair,
+      face: selectedCharacter.face,
+      body: selectedCharacter.body,
+      skin: selectedCharacter.skin,
     })
   }
 
@@ -440,6 +481,10 @@ function CharactersContent({
         role_type: editedCharacter.roleType,
         personality: editedCharacter.personality,
         clothing_style: editedCharacter.clothingStyle,
+        hair: editedCharacter.hair,
+        face: editedCharacter.face,
+        body: editedCharacter.body,
+        skin: editedCharacter.skin,
       })
 
       alert('Successfully saved!')
@@ -466,16 +511,64 @@ function CharactersContent({
     }
   }, [])
 
+  const startPolling = useCallback((taskId: string, targetId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+
+    setGeneratingCharId(targetId)
+    setGenerateMessage('Syncing task status...')
+
+    pollingRef.current = window.setInterval(async () => {
+      try {
+        const status = await generationApi.getTaskStatus(taskId)
+        setGenerateMessage(status.message || 'Generating...')
+
+        if (status.status === 'completed') {
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+          setGenerateMessage('Done!')
+
+          const updatedCharacters = await analysisApi.getCharacters(projectId)
+          setCharacters(updatedCharacters)
+
+          setTimeout(() => {
+            setGeneratingCharId(null)
+            setGenerateMessage('')
+          }, 2000)
+        } else if (status.status === 'failed') {
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+          setGenerateMessage(`Failed: ${status.error || 'Unknown error'}`)
+          setTimeout(() => {
+            setGeneratingCharId(null)
+            setGenerateMessage('')
+          }, 5000)
+        }
+      } catch (err) {
+        console.error('Poll status failed:', err)
+      }
+    }, 1000)
+  }, [projectId, setCharacters])
+
+  useEffect(() => {
+    // Status Recovery: Check for active tasks on mount
+    generationApi.getActiveTasks(projectId).then(tasks => {
+      Object.entries(tasks).forEach(([taskId, status]) => {
+        if (status.target_id && status.target_id !== 'library' && !status.target_id.startsWith('all_')) {
+          // If it's a character task, resume polling
+          startPolling(taskId, status.target_id)
+        }
+      })
+    }).catch(err => console.error('Failed to recover active tasks:', err))
+  }, [projectId, startPolling])
+
   const handleGenerate = async () => {
-    if (!selectedCharacter?.id || isGenerating) return
+    if (!selectedCharacter?.id || generatingCharId) return
+
+    const selectedTypes = [selections.view, selections.expression, selections.action].filter(Boolean)
     if (selectedTypes.length === 0) {
-      alert('Please select at least one image type')
+      alert('Please select at least one characteristic')
       return
     }
-
-    setIsGenerating(true)
-    setGenerateProgress(0)
-    setGenerateMessage('Starting task...')
 
     try {
       const response = await generationApi.generateCharacterImages(
@@ -483,56 +576,19 @@ function CharactersContent({
         selectedCharacter.id,
         selectedTypes
       )
-
-      const taskId = response.task_id
-      setGenerateMessage('Generating...')
-
-      pollingRef.current = window.setInterval(async () => {
-        try {
-          const status = await generationApi.getTaskStatus(taskId)
-          setGenerateProgress(status.progress)
-          setGenerateMessage(status.message || 'Generating...')
-
-          if (status.status === 'completed') {
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current)
-              pollingRef.current = null
-            }
-            setIsGenerating(false)
-            setGenerateMessage('Done!')
-
-            const updatedCharacters = await analysisApi.getCharacters(projectId)
-            setCharacters(updatedCharacters)
-
-            setTimeout(() => {
-              setGenerateMessage('')
-              setGenerateProgress(0)
-            }, 2000)
-          } else if (status.status === 'failed') {
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current)
-              pollingRef.current = null
-            }
-            setIsGenerating(false)
-            setGenerateMessage(`Failed: ${status.error || 'Unknown error'}`)
-          }
-        } catch (err) {
-          console.error('Poll status failed:', err)
-        }
-      }, 1000)
+      startPolling(response.task_id, selectedCharacter.id)
     } catch (err) {
       console.error('Generate failed:', err)
-      setIsGenerating(false)
+      setGeneratingCharId(null)
       setGenerateMessage('Failed to start task')
     }
   }
 
-  const toggleType = (typeId: string) => {
-    setSelectedTypes(prev =>
-      prev.includes(typeId)
-        ? prev.filter(t => t !== typeId)
-        : [...prev, typeId]
-    )
+  const updateSelection = (category: 'view' | 'expression' | 'action', typeId: string) => {
+    setSelections(prev => ({
+      ...prev,
+      [category]: typeId
+    }))
   }
 
   return (
@@ -613,10 +669,10 @@ function CharactersContent({
                     </button>
                     <button
                       onClick={handleGenerate}
-                      disabled={isGenerating}
+                      disabled={!!generatingCharId}
                       className="btn btn-primary text-xs shadow-md shadow-primary-500/20"
                     >
-                      {isGenerating ? '⏳ Generating...' : '▶ Generate Selected'}
+                      {generatingCharId === selectedCharacter.id ? '⏳ Generating...' : '▶ Generate Selected'}
                     </button>
                   </>
                 ) : (
@@ -639,19 +695,13 @@ function CharactersContent({
               </div>
             </div>
 
-            {/* Progress Bar */}
-            {(isGenerating || generateMessage) && (
-              <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm animate-fade-in">
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="font-medium text-primary-600 flex items-center gap-2">
-                    {isGenerating && <span className="animate-spin w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full" />}
-                    {generateMessage}
-                  </span>
-                  <span className="text-slate-400">{generateProgress}%</span>
-                </div>
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${generateProgress}%` }} />
-                </div>
+            {/* Simple Status Message (Scoped to active character) */}
+            {generatingCharId === selectedCharacter.id && generateMessage && (
+              <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg shadow-sm animate-fade-in flex items-center gap-3">
+                <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full flex-shrink-0" />
+                <span className="text-sm font-medium text-primary-700">
+                  {generateMessage}
+                </span>
               </div>
             )}
 
@@ -674,11 +724,11 @@ function CharactersContent({
                     <Field label="Clothing Style" value={selectedCharacter.clothingStyle} isEditing={isEditing} editValue={editedCharacter.clothingStyle} onChange={(v) => updateField('clothingStyle', v)} multiline />
                     <div className="border-t border-slate-100 pt-4 mt-4">
                       <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Appearance Details</h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <div><span className="text-slate-400 text-xs block mb-0.5">Hair</span> {selectedCharacter.hair || 'N/A'}</div>
-                        <div><span className="text-slate-400 text-xs block mb-0.5">Face</span> {selectedCharacter.face || 'N/A'}</div>
-                        <div><span className="text-slate-400 text-xs block mb-0.5">Body</span> {selectedCharacter.body || 'N/A'}</div>
-                        <div><span className="text-slate-400 text-xs block mb-0.5">Skin</span> {selectedCharacter.skin || 'N/A'}</div>
+                      <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                        <Field label="Hair" value={selectedCharacter.hair} isEditing={isEditing} editValue={editedCharacter.hair} onChange={(v) => updateField('hair', v)} />
+                        <Field label="Face" value={selectedCharacter.face} isEditing={isEditing} editValue={editedCharacter.face} onChange={(v) => updateField('face', v)} />
+                        <Field label="Body" value={selectedCharacter.body} isEditing={isEditing} editValue={editedCharacter.body} onChange={(v) => updateField('body', v)} />
+                        <Field label="Skin" value={selectedCharacter.skin} isEditing={isEditing} editValue={editedCharacter.skin} onChange={(v) => updateField('skin', v)} />
                       </div>
                     </div>
                   </div>
@@ -707,45 +757,71 @@ function CharactersContent({
                       }}
                     />
                   ) : templates ? (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                      {/* View Row */}
                       <div>
-                        <h4 className="text-xs font-medium text-slate-500 mb-2">Views & Angles</h4>
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">1. 视图 (View)</h4>
                         <div className="flex flex-wrap gap-2">
-                          {templates.available_types.filter(t => ['front', 'side', 'back', 'close-up'].some(k => t.id.includes(k) || t.label.toLowerCase().includes(k))).map(type => (
+                          {(templates.templates['三视图'] || []).map(type => (
                             <button
                               key={type.id}
-                              onClick={() => toggleType(type.id)}
-                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTypes.includes(type.id)
-                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium'
+                              onClick={() => updateSelection('view', type.id)}
+                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.view === type.id
+                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
                                 : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                                 }`}
                             >
-                              {selectedTypes.includes(type.id) && '✓ '} {type.label}
+                              {selections.view === type.id && '● '} {type.label}
                             </button>
                           ))}
                         </div>
                       </div>
 
+                      {/* Expression Row */}
                       <div>
-                        <h4 className="text-xs font-medium text-slate-500 mb-2">Expressions</h4>
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">2. 表情 (Expression)</h4>
                         <div className="flex flex-wrap gap-2">
-                          {templates.available_types.filter(t => !['front', 'side', 'back', 'close-up'].some(k => t.id.includes(k) || t.label.toLowerCase().includes(k))).map(type => (
+                          {(templates.templates['表情系列'] || []).map(type => (
                             <button
                               key={type.id}
-                              onClick={() => toggleType(type.id)}
-                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTypes.includes(type.id)
-                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium'
+                              onClick={() => updateSelection('expression', type.id)}
+                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.expression === type.id
+                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
                                 : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                                 }`}
                             >
-                              {selectedTypes.includes(type.id) && '✓ '} {type.label}
+                              {selections.expression === type.id && '● '} {type.label}
                             </button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="pt-2">
-                        <h4 className="text-xs font-medium text-slate-500 mb-2">Selected: {selectedTypes.length} types</h4>
+                      {/* Action Row */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">3. 动作 (Action)</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {(templates.templates['动作系列'] || []).map(type => (
+                            <button
+                              key={type.id}
+                              onClick={() => updateSelection('action', type.id)}
+                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.action === type.id
+                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                }`}
+                            >
+                              {selections.action === type.id && '● '} {type.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Current selection:</span>
+                        <div className="flex gap-1">
+                          {Object.values(selections).filter(Boolean).map(s => (
+                            <span key={s} className="px-1.5 py-0.5 bg-slate-100 text-[10px] rounded text-slate-500">{s}</span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -761,30 +837,83 @@ function CharactersContent({
                     <span className="flex items-center gap-2">
                       <span>🖼️</span> Generated Gallery
                     </span>
-                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
-                      {selectedCharacter.images?.length || 0} images
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setIsManagingGallery(!isManagingGallery)}
+                        className={`text-xs px-2 py-1 rounded-md transition-colors ${isManagingGallery
+                          ? 'bg-primary-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                      >
+                        {isManagingGallery ? '✓ Done' : '⚙️ Manage'}
+                      </button>
+                      <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
+                        {selectedCharacter.images?.length || 0} images
+                      </span>
+                    </div>
                   </h3>
 
                   <div className="flex-1 overflow-y-auto pr-1">
                     {selectedCharacter.images && selectedCharacter.images.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {selectedCharacter.images.map((img) => (
-                          <div key={img.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[3/4] shadow-sm hover:shadow-md transition-all">
+                        {selectedCharacter.images.map((img, index) => (
+                          <div
+                            key={img.id}
+                            className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[3/4] shadow-sm hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => handleDownload(fileUrl.image(img.imagePath), `char_${selectedCharacter.name}_${img.imageType}_${img.id.slice(0, 4)}.png`)}
+                          >
                             <img
                               src={fileUrl.image(img.imagePath)}
                               alt={img.imageType}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                              <span className="text-xs text-white font-medium capitalize truncate">{img.imageType}</span>
-                              <div className="flex gap-2 mt-2">
-                                <button className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors text-xs flex-1">
-                                  View
-                                </button>
-                                <button className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors text-xs">
-                                  ⬇
-                                </button>
+
+                            {/* Hover info box - shows to the left or right depending on grid position */}
+                            <div className={`absolute top-0 w-64 p-3 bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] hidden lg:block
+                              ${(index + 1) % 3 === 0 ? 'right-full mr-3' : 'left-full ml-3'}`}>
+                              <div className="text-[10px] font-bold text-primary-600 mb-1.5 uppercase tracking-widest border-b border-slate-100 pb-1">Prompt Details</div>
+                              <div className="space-y-2">
+                                <div className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                                  {img.promptUsed || 'No prompt information available.'}
+                                </div>
+                                {img.seed && (
+                                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Seed:</span>
+                                    <span className="text-[10px] text-slate-500 font-mono">{img.seed}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Overlay with single download button */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] text-white/90 font-medium capitalize truncate pl-1">{img.imageType}</span>
+                                <div className="flex gap-1">
+                                  {isManagingGallery ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteImage(img.id)
+                                      }}
+                                      className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
+                                      title="Delete Image"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors"
+                                      title="Download Image"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -873,8 +1002,7 @@ function ScenesContent({
   const selectedScene = scenes[selectedIndex]
 
   // Generation state
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generateProgress, setGenerateProgress] = useState(0)
+  const [generatingSceneId, setGeneratingSceneId] = useState<string | null>(null)
   const [generateMessage, setGenerateMessage] = useState('')
   const pollingRef = useRef<number | null>(null)
 
@@ -954,64 +1082,110 @@ function ScenesContent({
     }
   }, [])
 
-  const startGenerationTask = async (apiCall: () => Promise<{ task_id: string }>) => {
-    setIsGenerating(true)
-    setGenerateProgress(0)
-    setGenerateMessage('Starting...')
+  const startPolling = useCallback((taskId: string, targetId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+
+    setGeneratingSceneId(targetId)
+    setGenerateMessage('Syncing task status...')
+
+    pollingRef.current = window.setInterval(async () => {
+      try {
+        const status = await generationApi.getTaskStatus(taskId)
+        setGenerateMessage(status.message || 'Generating...')
+
+        if (status.status === 'completed') {
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+          setGenerateMessage('Done!')
+
+          const updatedScenes = await analysisApi.getScenes(projectId)
+          setScenes(updatedScenes)
+
+          setTimeout(() => {
+            setGeneratingSceneId(null)
+            setGenerateMessage('')
+          }, 2000)
+        } else if (status.status === 'failed') {
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          pollingRef.current = null
+          setGenerateMessage(`Failed: ${status.error || 'Unknown error'}`)
+          setTimeout(() => {
+            setGeneratingSceneId(null)
+            setGenerateMessage('')
+          }, 5000)
+        }
+      } catch (err) {
+        console.error('Poll status failed:', err)
+      }
+    }, 1000)
+  }, [projectId, setScenes])
+
+  useEffect(() => {
+    // Status Recovery: Check for active tasks on mount
+    generationApi.getActiveTasks(projectId).then(tasks => {
+      Object.entries(tasks).forEach(([taskId, status]) => {
+        if (status.target_id && !status.target_id.startsWith('all_') && status.target_id !== 'library') {
+          // If it's a scene task (and we are in ScenesContent), resume
+          // Note: In ScenesContent we check if the ID refers to a scene.
+          // For simplicity, we assume any task with target_id that isn't 'all_...' or 'library' is a scene if we're here.
+          // (CharactersContent does the same, but they share the same project_id space)
+          // To be safer, we could check if target_id exists in 'scenes' array.
+          startPolling(taskId, status.target_id)
+        }
+      })
+    }).catch(err => console.error('Failed to recover active scenes tasks:', err))
+  }, [projectId, startPolling])
+
+  const handleGenerateImage = async () => {
+    if (!selectedScene?.id || generatingSceneId) return
 
     try {
-      const response = await apiCall()
-      const taskId = response.task_id
-
-      pollingRef.current = window.setInterval(async () => {
-        try {
-          const status = await generationApi.getTaskStatus(taskId)
-          setGenerateProgress(status.progress)
-          setGenerateMessage(status.message || 'Processing...')
-
-          if (status.status === 'completed') {
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current)
-              pollingRef.current = null
-            }
-            setIsGenerating(false)
-            setGenerateMessage('Done!')
-            const updated = await analysisApi.getScenes(projectId)
-            setScenes(updated)
-
-            setTimeout(() => {
-              setGenerateMessage('')
-              setGenerateProgress(0)
-            }, 2000)
-
-          } else if (status.status === 'failed') {
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current)
-              pollingRef.current = null
-            }
-            setIsGenerating(false)
-            setGenerateMessage('Failed')
-            alert(`Generation failed: ${status.error}`)
-          }
-        } catch (err) {
-          console.error('Poll failed', err)
-        }
-      }, 1000)
+      const response = await generationApi.generateSceneImage(projectId, selectedScene.id)
+      startPolling(response.task_id, selectedScene.id)
     } catch (err) {
-      console.error('Start failed', err)
-      setIsGenerating(false)
-      setGenerateMessage('Failed to start')
+      console.error('Generate image failed:', err)
+      setGeneratingSceneId(null)
+      setGenerateMessage('Failed to start task')
     }
   }
 
-  const handleGenerateImage = () => {
-    if (!selectedScene?.id || isGenerating) return
-    startGenerationTask(() => generationApi.generateSceneImage(projectId, selectedScene.id))
+  const handleGenerateVideo = async () => {
+    if (!selectedScene?.id || !selectedScene.sceneImage || generatingSceneId) return
+
+    try {
+      const response = await generationApi.generateSceneVideo(projectId, selectedScene.id)
+      startPolling(response.task_id, selectedScene.id)
+    } catch (err) {
+      console.error('Generate video failed:', err)
+      setGeneratingSceneId(null)
+      setGenerateMessage('Failed to start task')
+    }
   }
 
-  const handleGenerateVideo = () => {
-    if (!selectedScene?.id || isGenerating) return
-    startGenerationTask(() => generationApi.generateSceneVideo(projectId, selectedScene.id))
+  const handleDeleteSceneImage = async () => {
+    if (!selectedScene?.sceneImage?.id) return
+    if (!confirm('Permanently delete this scene image?')) return
+    try {
+      await analysisApi.deleteSceneImage(projectId, selectedScene.sceneImage.id)
+      const updated = await analysisApi.getScenes(projectId)
+      setScenes(updated)
+    } catch (err) {
+      console.error('Delete scene image failed:', err)
+      alert('Failed to delete image')
+    }
+  }
+
+  const handleDeleteVideo = async () => {
+    if (!selectedScene?.videoClip?.id) return
+    if (!confirm('Permanently delete this video clip?')) return
+    try {
+      await analysisApi.deleteVideoClip(projectId, selectedScene.videoClip.id)
+      const updated = await analysisApi.getScenes(projectId)
+      setScenes(updated)
+    } catch (err) {
+      console.error('Delete video failed:', err)
+      alert('Failed to delete video')
+    }
   }
 
   return (
@@ -1140,22 +1314,40 @@ function ScenesContent({
                   <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
                     <h3 className="text-sm font-semibold text-slate-900">Media Assets</h3>
                     <div className="flex gap-2">
-                      <button onClick={handleGenerateImage} disabled={isGenerating} className="btn btn-secondary text-xs">Gen Image</button>
-                      <button onClick={handleGenerateVideo} disabled={isGenerating || !selectedScene.sceneImage} className="btn btn-primary text-xs">Gen Video</button>
+                      <button onClick={handleGenerateImage} disabled={!!generatingSceneId} className="btn btn-secondary text-xs">
+                        {generatingSceneId === selectedScene.id ? '⏳ Gen Image...' : 'Gen Image'}
+                      </button>
+                      <button onClick={handleGenerateVideo} disabled={!!generatingSceneId || !selectedScene.sceneImage} className="btn btn-primary text-xs">
+                        {generatingSceneId === selectedScene.id ? '⏳ Gen Video...' : 'Gen Video'}
+                      </button>
                     </div>
                   </div>
 
-                  {(isGenerating || generateMessage) && (
-                    <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 mb-4 text-xs flex items-center gap-3">
-                      <span className="animate-spin text-primary-500">⏳</span>
-                      <span className="font-medium text-primary-700">{generateMessage} ({generateProgress}%)</span>
+                  {/* Simple Status Message (Scoped to active scene) */}
+                  {generatingSceneId === selectedScene.id && generateMessage && (
+                    <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg shadow-sm animate-fade-in flex items-center gap-3">
+                      <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full flex-shrink-0" />
+                      <span className="text-sm font-medium text-primary-700">
+                        {generateMessage}
+                      </span>
                     </div>
                   )}
 
                   <div className="space-y-4">
                     <div className="aspect-video bg-slate-100 rounded-xl overflow-hidden border border-slate-200 relative group">
                       {selectedScene.sceneImage ? (
-                        <img src={fileUrl.image(selectedScene.sceneImage.imagePath)} className="w-full h-full object-cover" />
+                        <>
+                          <img src={fileUrl.image(selectedScene.sceneImage.imagePath)} className="w-full h-full object-cover" />
+                          <button
+                            onClick={handleDeleteSceneImage}
+                            className="absolute top-2 left-2 p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg text-white shadow-lg backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 z-10"
+                            title="Delete Image"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-slate-400 flex-col">
                           <span className="text-4xl mb-2">🖼️</span>
@@ -1169,7 +1361,18 @@ function ScenesContent({
 
                     <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 relative group">
                       {selectedScene.videoClip ? (
-                        <video src={fileUrl.video(selectedScene.videoClip.videoPath)} controls className="w-full h-full object-contain" />
+                        <>
+                          <video src={fileUrl.video(selectedScene.videoClip.videoPath)} controls className="w-full h-full object-contain" />
+                          <button
+                            onClick={handleDeleteVideo}
+                            className="absolute top-2 left-2 p-1.5 bg-red-500/80 hover:bg-red-600 rounded-lg text-white shadow-lg backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 z-10"
+                            title="Delete Video"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-slate-600 flex-col">
                           <span className="text-4xl mb-2 opacity-50">🎬</span>
@@ -1219,19 +1422,31 @@ function TagManager({
   }
 
   const handleSave = async () => {
-    if (!editForm.id || !editForm.label) return
+    const label = editForm.label?.trim()
+    if (!label) return
 
-    const newType = {
-      id: editForm.id,
-      label: editForm.label,
-      prompt_suffix: editForm.prompt_suffix || ''
-    } as ImageType
+    let newType: ImageType
+    if (isAdding) {
+      // Generate a simple ID from label or timestamp
+      const id = editForm.id || `tag_${Date.now()}`
+      newType = {
+        id,
+        label,
+        prompt_suffix: editForm.prompt_suffix || label // Default suffix to label
+      }
+    } else {
+      newType = {
+        ...(editForm as ImageType),
+        label,
+        prompt_suffix: editForm.prompt_suffix || label
+      }
+    }
 
     let newAvailableTypes = [...templates.available_types]
 
     if (isAdding) {
       if (newAvailableTypes.some(t => t.id === newType.id)) {
-        alert('ID already exists')
+        alert('Tag already exists')
         return
       }
       newAvailableTypes.push(newType)
@@ -1263,25 +1478,33 @@ function TagManager({
         {templates.available_types.map(type => (
           <div key={type.id} className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg text-sm group hover:border-primary-200 transition-colors">
             {editingId === type.id ? (
-              <div className="flex-1 space-y-2">
-                <div className="flex gap-2">
-                  <input className="input text-xs w-1/3 py-1" placeholder="ID" value={editForm.id} disabled />
-                  <input className="input text-xs flex-1 py-1" placeholder="Label" value={editForm.label} onChange={e => setEditForm({ ...editForm, label: e.target.value })} />
-                </div>
-                <input className="input text-xs w-full py-1" placeholder="Prompt Suffix" value={editForm.prompt_suffix} onChange={e => setEditForm({ ...editForm, prompt_suffix: e.target.value })} />
+              <div className="flex-1 flex flex-col gap-2">
+                <input
+                  autoFocus
+                  className="input text-sm py-1.5 w-full"
+                  placeholder="Enter tag name"
+                  value={editForm.label}
+                  onChange={e => setEditForm({ ...editForm, label: e.target.value })}
+                  onKeyDown={e => e.key === 'Enter' && handleSave()}
+                />
                 <div className="flex gap-2 justify-end">
-                  <button onClick={handleSave} className="px-2 py-1 bg-primary-600 text-white rounded text-xs font-medium">Save</button>
-                  <button onClick={handleCancel} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">Cancel</button>
+                  <button onClick={handleSave} className="px-3 py-1 bg-primary-600 text-white rounded text-xs font-medium shadow-sm">Save</button>
+                  <button onClick={handleCancel} className="px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs">Cancel</button>
                 </div>
               </div>
             ) : (
               <>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-slate-700 truncate">{type.label}</div>
-                  <div className="text-xs text-slate-400 truncate">{type.prompt_suffix}</div>
+                  <div className="text-sm font-medium text-slate-700 truncate">{type.label}</div>
                 </div>
-                <button onClick={() => handleEdit(type)} className="p-1 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors opacity-0 group-hover:opacity-100">✏️</button>
-                <button onClick={() => handleDelete(type.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100">🗑️</button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => handleEdit(type)} className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Edit">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  </button>
+                  <button onClick={() => handleDelete(type.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Delete">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -1296,15 +1519,21 @@ function TagManager({
       )}
 
       {isAdding && (
-        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2 animate-fade-in">
-          <div className="flex gap-2">
-            <input className="input text-xs w-1/3 py-1.5" placeholder="ID (e.g. smile)" value={editForm.id} onChange={e => setEditForm({ ...editForm, id: e.target.value })} />
-            <input className="input text-xs flex-1 py-1.5" placeholder="Label" value={editForm.label} onChange={e => setEditForm({ ...editForm, label: e.target.value })} />
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-fade-in shadow-inner">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight ml-1">New Tag Name</label>
+            <input
+              autoFocus
+              className="input text-sm w-full py-2 shadow-sm"
+              placeholder="e.g. Happy, Jumping..."
+              value={editForm.label}
+              onChange={e => setEditForm({ ...editForm, label: e.target.value })}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+            />
           </div>
-          <input className="input text-xs w-full py-1.5" placeholder="Prompt Suffix (e.g. smiling face)" value={editForm.prompt_suffix} onChange={e => setEditForm({ ...editForm, prompt_suffix: e.target.value })} />
-          <div className="flex gap-2 justify-end mt-2">
-            <button onClick={handleSave} className="btn btn-primary text-xs py-1 px-3">Add Tag</button>
-            <button onClick={handleCancel} className="btn btn-ghost text-xs py-1 px-3">Cancel</button>
+          <div className="flex gap-2 justify-end pt-1">
+            <button onClick={handleSave} className="btn btn-primary btn-sm px-4">Add Tag</button>
+            <button onClick={handleCancel} className="btn btn-ghost btn-sm px-4">Cancel</button>
           </div>
         </div>
       )}

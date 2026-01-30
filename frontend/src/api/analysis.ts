@@ -35,4 +35,16 @@ export const analysisApi = {
   // 更新场景
   updateScene: (projectId: string, sceneId: string, data: Partial<Scene>) =>
     api.put<Scene>(`/projects/${projectId}/scenes/${sceneId}`, data),
+
+  // 删除角色图像
+  deleteCharacterImage: (projectId: string, imageId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/characters/images/${imageId}`),
+
+  // 删除场景图像
+  deleteSceneImage: (projectId: string, imageId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/scenes/images/${imageId}`),
+
+  // 删除场景视频
+  deleteVideoClip: (projectId: string, videoId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/scenes/videos/${videoId}`),
 }
