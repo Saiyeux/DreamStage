@@ -109,6 +109,7 @@ async def generate_scene_image(
     db: AsyncSession = Depends(get_db),
 ):
     """为指定场景生成图像"""
+    logger.info(f"Received generate_scene_image request: project_id={project_id}, scene_id={request.scene_id}, workflow_id={request.workflow_id}")
     result = await db.execute(
         select(Scene)
         .options(selectinload(Scene.scene_image))
@@ -174,6 +175,7 @@ async def generate_scene_video(
     db: AsyncSession = Depends(get_db),
 ):
     """为指定场景生成视频"""
+    logger.info(f"Received generate_scene_video request: project_id={project_id}, scene_id={request.scene_id}, workflow_id={request.workflow_id}")
     result = await db.execute(
         select(Scene)
         .options(selectinload(Scene.scene_image), selectinload(Scene.video_clip))

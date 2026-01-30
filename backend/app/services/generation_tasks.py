@@ -469,6 +469,7 @@ class GenerationTasks:
                 output_filename=output_filename,
                 project_id=scene.project_id,
                 reference_image=reference_image,
+                seed=params.get("seed", -1) if params else -1
             )
 
             # 保存到数据库
@@ -538,9 +539,13 @@ class GenerationTasks:
                             height=workflow_params.get("height", 1344),
                             output_filename=output_filename,
                             project_id=project_id,
+                            seed=params.get("seed", -1) if params else -1
                         )
 
                         # 保存到数据库
+                        # 删除旧图片
+                        await db.execute(delete(SceneImage).where(SceneImage.scene_id == scene.id))
+                        
                         scene_image = SceneImage(
                             id=str(uuid.uuid4()),
                             scene_id=scene.id,
@@ -615,12 +620,15 @@ class GenerationTasks:
                 steps=workflow_params.get("steps", 30),
                 cfg=workflow_params.get("cfg", 3.0),
                 frame_rate=frame_rate,
-                output_filename=output_filename,
                 project_id=scene.project_id,
+                seed=params.get("seed", -1) if params else -1
             )
 
             # 保存到数据库
             async with async_session_maker() as db:
+                # 删除旧视频
+                await db.execute(delete(VideoClip).where(VideoClip.scene_id == scene.id))
+
                 video_clip = VideoClip(
                     id=str(uuid.uuid4()),
                     scene_id=scene.id,
@@ -689,8 +697,8 @@ class GenerationTasks:
                             steps=workflow_params.get("steps", 30),
                             cfg=workflow_params.get("cfg", 3.0),
                             frame_rate=frame_rate,
-                            output_filename=output_filename,
                             project_id=project_id,
+                            seed=params.get("seed", -1) if params else -1
                         )
 
                         # 保存到数据库

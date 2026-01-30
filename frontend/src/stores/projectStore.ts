@@ -161,7 +161,6 @@ export const useProjectStore = create<ProjectState>()(
         characters: state.characters,
         scenes: state.scenes,
         analysisState: state.analysisState,
-        analysisState: state.analysisState,
         selectedWorkflows: state.selectedWorkflows,
         workflowParams: state.workflowParams,
       }),
