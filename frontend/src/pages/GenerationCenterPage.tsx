@@ -28,7 +28,6 @@ export function GenerationCenterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 加载数据 (可复用)
   const loadData = useCallback(async () => {
     if (!projectId) return
 
@@ -47,30 +46,28 @@ export function GenerationCenterPage() {
       setCharacters(charactersData)
       setScenes(scenesData)
     } catch (err) {
-      setError('加载项目失败')
+      setError('Failed to load project data')
       console.error('Load project failed:', err)
     } finally {
       setLoading(false)
     }
   }, [projectId, urlProjectId, currentProject, setCurrentProject, setCharacters, setScenes])
 
-  // 初始加载
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  // 无项目时的空状态
   if (!projectId) {
     return (
-      <div className="bg-white rounded-xl p-12 shadow-sm text-center">
-        <div className="text-6xl mb-4">🎨</div>
-        <h2 className="text-xl font-bold text-gray-800 mb-2">请先选择项目</h2>
-        <p className="text-gray-500 mb-6">完成剧本分析后，可在此生成角色库和视频</p>
+      <div className="card p-12 text-center max-w-2xl mx-auto mt-12 bg-white">
+        <div className="text-6xl mb-6 opacity-30">🎨</div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">No Project Selected</h2>
+        <p className="text-slate-500 mb-8">Please complete script analysis before generating assets.</p>
         <button
           onClick={() => navigate('/upload')}
-          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          className="btn btn-primary px-8"
         >
-          上传剧本
+          Upload Script
         </button>
       </div>
     )
@@ -78,93 +75,78 @@ export function GenerationCenterPage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl p-12 shadow-sm text-center">
-        <div className="text-4xl mb-4 animate-pulse">⏳</div>
-        <p className="text-gray-500">加载中...</p>
+      <div className="card p-16 text-center max-w-2xl mx-auto mt-12">
+        <div className="w-16 h-16 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin mx-auto mb-6"></div>
+        <p className="text-slate-500 font-medium text-lg">Loading generation center...</p>
       </div>
     )
   }
 
-  // 计算前置条件
   const hasCharacterLibrary = characters.some(c => c.images && c.images.length > 0)
   const hasSceneImages = scenes.some(s => s.sceneImage)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="glass-effect rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-              🎨 生成中心
-            </h2>
-            <p className="text-sm text-gray-600 mt-2">
-              项目: <span className="font-semibold text-gray-800">{currentProject?.name || '未命名'}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => navigate(`/analysis?project=${projectId}`)}
-            className="px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl font-semibold hover:from-gray-600 hover:to-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-          >
-            ← 返回分析
-          </button>
+      <div className="card p-6 border-l-4 border-primary-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+            <span className="p-2 bg-primary-50 rounded-lg text-2xl">🎨</span>
+            Generation Center
+          </h2>
+          <p className="text-sm text-slate-500 mt-1 pl-14">
+            Project: <span className="font-semibold text-slate-900">{currentProject?.name || 'Untitled'}</span>
+          </p>
         </div>
+        <button
+          onClick={() => navigate(`/analysis?project=${projectId}`)}
+          className="btn btn-secondary flex items-center gap-2 text-sm"
+        >
+          ← Back to Analysis
+        </button>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl">
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           {error}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="glass-effect rounded-2xl shadow-xl overflow-hidden">
-        <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-          <div className="flex gap-2 p-2">
-            <button
-              onClick={() => setActiveTab('characters')}
-              className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-300 ${
-                activeTab === 'characters'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-105'
-                  : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
+      {/* Tabs container */}
+      <div className="card overflow-hidden shadow-lg shadow-slate-200/50">
+        <div className="border-b border-slate-200 bg-slate-50/50 p-1.5 flex gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('characters')}
+            className={`flex-1 min-w-[120px] px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'characters'
+                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <span className="text-lg">📸</span>
-                <span>角色库</span>
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('scenes')}
-              className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-300 ${
-                activeTab === 'scenes'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-105'
-                  : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
+          >
+            <span className="text-lg">📸</span> Character Library
+          </button>
+          <button
+            onClick={() => setActiveTab('scenes')}
+            className={`flex-1 min-w-[120px] px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'scenes'
+                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <span className="text-lg">🖼️</span>
-                <span>场景图</span>
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('videos')}
-              className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-300 ${
-                activeTab === 'videos'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-105'
-                  : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
+          >
+            <span className="text-lg">🖼️</span> Scene Images
+          </button>
+          <button
+            onClick={() => setActiveTab('videos')}
+            className={`flex-1 min-w-[120px] px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'videos'
+                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               }`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <span className="text-lg">🎬</span>
-                <span>视频生成</span>
-              </span>
-            </button>
-          </div>
+          >
+            <span className="text-lg">🎬</span> Video Generation
+          </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 bg-white min-h-[500px]">
           {activeTab === 'characters' && (
             <CharacterLibraryTab
               projectId={projectId}
@@ -214,15 +196,11 @@ function CharacterLibraryTab({
   const [error, setError] = useState<string | null>(null)
   const pollingRef = useRef<number | null>(null)
 
-  // 模板配置
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
   const [selectedTypes, setSelectedTypes] = useState<ImageType[]>([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
-
-  // 角色特定的类型配置
   const [characterCustomTypes, setCharacterCustomTypes] = useState<Record<string, ImageType[]>>({})
 
-  // 加载模板配置
   useEffect(() => {
     configApi.getCharacterImageTemplates().then((data) => {
       setTemplates(data)
@@ -230,7 +208,6 @@ function CharacterLibraryTab({
     }).catch(console.error)
   }, [])
 
-  // 清理轮询
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -239,19 +216,16 @@ function CharacterLibraryTab({
     }
   }, [])
 
-  // 添加类型
   const addType = (type: ImageType) => {
     if (!selectedTypes.find(t => t.id === type.id)) {
       setSelectedTypes([...selectedTypes, type])
     }
   }
 
-  // 删除类型
   const removeType = (typeId: string) => {
     setSelectedTypes(selectedTypes.filter(t => t.id !== typeId))
   }
 
-  // 保存角色特定的类型配置
   const saveCharacterCustomTypes = (characterId: string, types: ImageType[]) => {
     setCharacterCustomTypes(prev => ({
       ...prev,
@@ -259,7 +233,6 @@ function CharacterLibraryTab({
     }))
   }
 
-  // 获取角色的有效类型配置（优先使用角色特定的，没有则使用全局）
   const getCharacterEffectiveTypes = (characterId: string): ImageType[] => {
     const customTypes = characterCustomTypes[characterId]
     if (customTypes && customTypes.length > 0) {
@@ -268,44 +241,18 @@ function CharacterLibraryTab({
     return selectedTypes
   }
 
-  // 应用模板（预留功能）
-  // const applyTemplate = (templateName: string) => {
-  //   if (templates?.templates[templateName]) {
-  //     setSelectedTypes([...templates.templates[templateName]])
-  //   }
-  //   setShowTemplateModal(false)
-  // }
-
-  // 空状态
   if (characters.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-4">📸</div>
-        <p className="text-gray-500 mb-4">暂无角色数据</p>
-        <p className="text-sm text-gray-400 mb-6">请先完成剧本分析，识别角色后再生成角色库</p>
+      <div className="text-center py-20">
+        <div className="text-6xl mb-4 opacity-20">📸</div>
+        <p className="text-slate-500 mb-4 font-medium">No characters found.</p>
+        <p className="text-sm text-slate-400 mb-8 max-w-md mx-auto">Please complete script analysis to identify characters before generating images.</p>
         <button
           onClick={onNavigateAnalysis}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          className="btn btn-secondary"
         >
-          前往剧本分析
+          Go to Script Analysis
         </button>
-
-        <div className="mt-8 p-4 bg-gray-50 rounded-lg text-left max-w-md mx-auto">
-          <h4 className="font-medium text-gray-700 mb-2">角色图类型说明</h4>
-          <p className="text-sm text-gray-500 mb-2">每个角色将生成以下类型的参考图：</p>
-          <div className="flex flex-wrap gap-2">
-            {selectedTypes.map((type, i) => (
-              <span
-                key={type.id}
-                className={`px-2 py-1 text-xs rounded ${
-                  i === 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                {type.label} {i === 0 && '⭐'}
-              </span>
-            ))}
-          </div>
-        </div>
       </div>
     )
   }
@@ -314,15 +261,13 @@ function CharacterLibraryTab({
     setGenerating(true)
     setProgress(0)
     setError(null)
-    setStatusMessage('正在启动生成任务...')
+    setStatusMessage('Starting generation task...')
 
     try {
-      // 传递选中的类型到后端
       const imageTypes = selectedTypes.map(t => t.id)
       const response = await generationApi.generateCharacterLibrary(projectId, imageTypes)
       const taskId = response.task_id
 
-      // 轮询任务状态
       pollingRef.current = window.setInterval(async () => {
         try {
           const status = await generationApi.getTaskStatus(taskId)
@@ -332,10 +277,10 @@ function CharacterLibraryTab({
           if (status.status === 'completed') {
             setGenerating(false)
             if (pollingRef.current) clearInterval(pollingRef.current)
-            onRefresh() // 刷新数据
+            onRefresh()
           } else if (status.status === 'failed') {
             setGenerating(false)
-            setError(status.error || '生成失败')
+            setError(status.error || 'Generation failed')
             if (pollingRef.current) clearInterval(pollingRef.current)
           }
         } catch (err) {
@@ -344,62 +289,60 @@ function CharacterLibraryTab({
       }, 1000)
     } catch (err) {
       setGenerating(false)
-      setError('启动任务失败，请检查 ComfyUI 服务')
+      setError('Failed to start generation. Check backend service.')
       console.error('Start generation failed:', err)
     }
   }
 
   return (
     <div>
-      {/* 类型配置区 */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-gray-700">图片类型配置</h4>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowTemplateModal(true)}
-              className="text-sm text-blue-500 hover:text-blue-600"
-            >
-              📋 选择模板
-            </button>
-          </div>
+      {/* Type Config */}
+      <div className="mb-8 p-6 bg-slate-50 rounded-xl border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="font-bold text-slate-800 flex items-center gap-2">
+            <span>⚙️</span> Image Types Configuration
+          </h4>
+          <button
+            onClick={() => setShowTemplateModal(true)}
+            className="text-sm text-primary-600 hover:text-primary-700 font-medium hover:underline"
+          >
+            📋 Select Templates
+          </button>
         </div>
 
-        {/* 已选类型 */}
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-4">
           {selectedTypes.map((type) => (
             <span
               key={type.id}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-primary-200 text-primary-700 text-sm rounded-lg shadow-sm"
             >
-              {type.label}
+              <span className="font-medium">{type.label}</span>
               <button
                 onClick={() => removeType(type.id)}
-                className="ml-1 text-blue-500 hover:text-red-500"
-                title="删除"
+                className="text-primary-400 hover:text-red-500 transition-colors"
+                title="Remove"
               >
                 ×
               </button>
             </span>
           ))}
           {selectedTypes.length === 0 && (
-            <span className="text-sm text-gray-400">请添加至少一个类型</span>
+            <span className="text-sm text-slate-400 italic py-1">Please add at least one image type...</span>
           )}
         </div>
 
-        {/* 添加类型下拉 */}
         {templates && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">添加类型:</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-500 font-medium">Add Type:</span>
             <select
-              className="text-sm border border-gray-300 rounded px-2 py-1"
+              className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
               value=""
               onChange={(e) => {
                 const type = templates.available_types.find(t => t.id === e.target.value)
                 if (type) addType(type)
               }}
             >
-              <option value="">选择类型...</option>
+              <option value="">Select type...</option>
               {templates.available_types
                 .filter(t => !selectedTypes.find(s => s.id === t.id))
                 .map((type) => (
@@ -412,39 +355,47 @@ function CharacterLibraryTab({
         )}
       </div>
 
-      {/* Status Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-gray-600">
-          {generating ? `🔄 ${statusMessage} (${progress}%)` : '⏸️ 待开始'}
+      {/* Control Bar */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur py-4 border-b border-slate-100 mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {generating ? (
+            <div className="flex items-center gap-3 bg-primary-50 px-4 py-2 rounded-lg border border-primary-100">
+              <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium text-primary-700">{statusMessage} <span className="opacity-75">({progress}%)</span></span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg text-sm">
+              <span>⏸️</span> Idle
+            </div>
+          )}
         </div>
         <button
           onClick={startGeneration}
           disabled={generating || selectedTypes.length === 0}
-          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          className="btn btn-primary px-8 shadow-lg shadow-primary-500/20"
         >
-          {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
+          {generating ? 'Generating...' : '▶ Start Generation'}
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
-          ❌ {error}
+        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl border border-red-100 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          {error}
         </div>
       )}
 
       {generating && (
-        <div className="relative h-3 bg-gray-200 rounded-full mb-6 overflow-hidden shadow-inner">
+        <div className="h-1.5 bg-slate-100 rounded-full mb-8 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-full transition-all duration-300 relative"
+            className="h-full bg-primary-500 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
-          >
-            <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
-          </div>
+          />
         </div>
       )}
 
       {/* Character Cards */}
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {characters.map((character) => (
           <CharacterGenerationCard
             key={character.id}
@@ -458,17 +409,17 @@ function CharacterLibraryTab({
         ))}
       </div>
 
-      <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-        💡 角色库完成后，系统将使用这些参考图保持场景中角色一致性
+      <div className="mt-8 p-4 bg-blue-50/50 rounded-xl text-sm text-slate-600 flex items-start gap-3 border border-blue-100">
+        <span className="text-xl">💡</span>
+        <p className="mt-0.5">Once the character library is complete, the system will use these reference images to maintain character consistency across all generated scenes.</p>
       </div>
 
-      {/* 模板选择弹窗 */}
+      {/* Modals */}
       {showTemplateModal && templates && (
         <TemplateSelectionModal
           templates={templates}
           selectedTypes={selectedTypes}
           onSelect={(types) => {
-            // 合并所选模板的类型
             const allTypes = new Map<string, ImageType>()
             types.forEach(type => {
               if (!allTypes.has(type.id)) {
@@ -485,7 +436,6 @@ function CharacterLibraryTab({
   )
 }
 
-// 模板选择弹窗组件 - 多选打勾类型
 function TemplateSelectionModal({
   templates,
   selectedTypes,
@@ -500,24 +450,18 @@ function TemplateSelectionModal({
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const [customTypes, setCustomTypes] = useState<string[]>(
     selectedTypes.filter(t => {
-      // 检查是否属于某个模板
       return !Object.values(templates.templates).some(templateTypes =>
         templateTypes.some(templateType => templateType.id === t.id)
       )
     }).map(t => t.id)
   )
 
-  // 计算当前选中的所有类型
   const currentSelectedTypes = useCallback(() => {
     const typeMap = new Map<string, ImageType>()
-
-    // 添加自定义类型
     customTypes.forEach(typeId => {
       const type = templates.available_types.find(t => t.id === typeId)
       if (type) typeMap.set(typeId, type)
     })
-
-    // 添加模板中的类型
     selectedTemplates.forEach(templateName => {
       templates.templates[templateName]?.forEach(type => {
         if (!typeMap.has(type.id)) {
@@ -525,11 +469,9 @@ function TemplateSelectionModal({
         }
       })
     })
-
     return Array.from(typeMap.values())
   }, [templates, selectedTemplates, customTypes])
 
-  // 切换模板选择
   const toggleTemplate = (templateName: string) => {
     setSelectedTemplates(prev =>
       prev.includes(templateName)
@@ -538,7 +480,6 @@ function TemplateSelectionModal({
     )
   }
 
-  // 切换自定义类型
   const toggleCustomType = (typeId: string) => {
     setCustomTypes(prev =>
       prev.includes(typeId)
@@ -548,114 +489,106 @@ function TemplateSelectionModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">选择图片类型模板</h3>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto animate-fade-in">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-slate-800">Select Image Type Templates</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
           >
-            ✕
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        {/* 模板选择区 - 打勾类型 */}
-        <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">模板组合（可多选）</h4>
-          <div className="space-y-2">
-            {Object.entries(templates.templates).map(([name, types]) => (
-              <label
-                key={name}
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  selectedTemplates.includes(name)
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedTemplates.includes(name)}
-                  onChange={() => toggleTemplate(name)}
-                  className="w-4 h-4 text-blue-500 rounded"
-                />
-                <div className="flex-1">
-                  <div className="font-medium">{name}</div>
-                  <div className="text-sm text-gray-500">
-                    {types.map(t => t.label).join('、')}
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* 自定义类型 - 打勾选择 */}
-        <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">自定义类型</h4>
-          <div className="flex flex-wrap gap-2">
-            {templates.available_types.map((type) => {
-              // 排除已在模板中的类型
-              const isInTemplate = Object.values(templates.templates).some(templateTypes =>
-                templateTypes.some(t => t.id === type.id)
-              )
-              if (isInTemplate) return null
-
-              const isSelected = customTypes.includes(type.id)
-              return (
+        <div className="space-y-6">
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Template Combinations (Multi-select)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {Object.entries(templates.templates).map(([name, types]) => (
                 <label
-                  key={type.id}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                  }`}
+                  key={name}
+                  className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 ${selectedTemplates.includes(name)
+                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                      : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
                 >
                   <input
                     type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleCustomType(type.id)}
-                    className="w-3 h-3 text-blue-500 rounded"
+                    checked={selectedTemplates.includes(name)}
+                    onChange={() => toggleTemplate(name)}
+                    className="mt-1 w-5 h-5 text-primary-600 rounded focus:ring-primary-500 border-gray-300"
                   />
-                  <span className="text-sm">{type.label}</span>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-900 mb-1">{name}</div>
+                    <div className="text-xs text-slate-500 leading-relaxed">
+                      {types.map(t => t.label).join(', ')}
+                    </div>
+                  </div>
                 </label>
-              )
-            })}
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Custom Types</h4>
+            <div className="flex flex-wrap gap-2">
+              {templates.available_types.map((type) => {
+                const isInTemplate = Object.values(templates.templates).some(templateTypes =>
+                  templateTypes.some(t => t.id === type.id)
+                )
+                if (isInTemplate) return null
+
+                const isSelected = customTypes.includes(type.id)
+                return (
+                  <label
+                    key={type.id}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${isSelected
+                        ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleCustomType(type.id)}
+                      className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 border-gray-300"
+                    />
+                    <span className="text-sm">{type.label}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        {/* 预览当前选择 */}
-        <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">当前选择预览</h4>
-          <div className="flex flex-wrap gap-2">
-            {currentSelectedTypes().map((type) => (
-              <span
-                key={type.id}
-                className="px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded"
-              >
-                {type.label}
-              </span>
-            ))}
-            {currentSelectedTypes().length === 0 && (
-              <span className="text-sm text-gray-400">未选择任何类型</span>
-            )}
+        <div className="mt-8 pt-6 border-t border-slate-100 rounded-lg">
+          <div className="mb-4">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Preview Selection</h4>
+            <div className="flex flex-wrap gap-2">
+              {currentSelectedTypes().map((type) => (
+                <span key={type.id} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200 font-medium">
+                  {type.label}
+                </span>
+              ))}
+              {currentSelectedTypes().length === 0 && <span className="text-sm text-slate-400 italic">No types selected</span>}
+            </div>
           </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-          >
-            取消
-          </button>
-          <button
-            onClick={() => onSelect(currentSelectedTypes())}
-            disabled={currentSelectedTypes().length === 0}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-          >
-            应用选择
-          </button>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="btn btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSelect(currentSelectedTypes())}
+              disabled={currentSelectedTypes().length === 0}
+              className="btn btn-primary"
+            >
+              Apply Selection
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -678,22 +611,20 @@ function CharacterGenerationCard({
   onRefresh?: () => void
 }) {
   const statusLabel = {
-    pending: '⬜ 待生成',
-    generating: '🔄 生成中',
-    completed: '✅ 完成',
+    pending: 'Waiting',
+    generating: 'Generating',
+    completed: 'Completed',
   }
 
-  const avatar = character.gender?.includes('女') ? '👩' : character.gender?.includes('男') ? '👨' : '👤'
+  const avatar = character.gender?.includes('Female') || character.gender?.includes('女') ? '👩' : character.gender?.includes('Male') || character.gender?.includes('男') ? '👨' : '👤'
   const images = character.images || []
   const imageCount = images.length
 
-  // 单个角色生成状态
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatingTypeId, setGeneratingTypeId] = useState<string | null>(null)
   const [genProgress, setGenProgress] = useState(0)
   const pollingRef = useRef<number | null>(null)
 
-  // 清理轮询
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -702,7 +633,6 @@ function CharacterGenerationCard({
     }
   }, [])
 
-  // 生成单张图片
   const generateSingleImage = async (typeId: string) => {
     setIsGenerating(true)
     setGeneratingTypeId(typeId)
@@ -712,7 +642,6 @@ function CharacterGenerationCard({
       const response = await generationApi.generateCharacterImages(projectId, character.id, [typeId])
       const taskId = response.task_id
 
-      // 轮询任务状态
       pollingRef.current = window.setInterval(async () => {
         try {
           const taskStatus = await generationApi.getTaskStatus(taskId)
@@ -737,17 +666,14 @@ function CharacterGenerationCard({
     }
   }
 
-  // 根据类型查找图片
   const getImageByType = (typeId: string) => {
     return images.find(img => img.imageType === typeId)
   }
 
-  // 角色特定的类型配置
   const [showTypeConfig, setShowTypeConfig] = useState(false)
   const [localSelectedTypes, setLocalSelectedTypes] = useState<ImageType[]>(selectedTypes)
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
 
-  // 同步父组件传来的 selectedTypes
   useEffect(() => {
     setLocalSelectedTypes(selectedTypes)
   }, [selectedTypes])
@@ -758,22 +684,18 @@ function CharacterGenerationCard({
     }
   }, [showTypeConfig])
 
-  // 添加类型
   const addLocalType = (type: ImageType) => {
     if (!localSelectedTypes.find(t => t.id === type.id)) {
       setLocalSelectedTypes([...localSelectedTypes, type])
     }
   }
 
-  // 删除类型
   const removeLocalType = (typeId: string) => {
     setLocalSelectedTypes(localSelectedTypes.filter(t => t.id !== typeId))
   }
 
-  // 应用模板到角色
   const applyTemplateToCharacter = (templateName: string) => {
     if (templates?.templates[templateName]) {
-      // 合并现有类型和模板类型
       const newTypes = [...localSelectedTypes]
       templates.templates[templateName].forEach(type => {
         if (!newTypes.find(t => t.id === type.id)) {
@@ -785,56 +707,59 @@ function CharacterGenerationCard({
   }
 
   return (
-    <div className="glass-effect border-2 border-gray-200 hover:border-purple-300 rounded-xl p-5 transition-all duration-300 hover:shadow-xl">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{avatar}</span>
+    <div className="card p-5 group hover:shadow-lg transition-all duration-300 border border-slate-200">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-2xl border border-slate-200">
+            {avatar}
+          </div>
           <div>
-            <span className="font-bold text-gray-800">{character.name}</span>
-            <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-              {character.roleType}
-            </span>
+            <div className="font-bold text-slate-900 text-lg">{character.name}</div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+                {character.roleType}
+              </span>
+              <span className="text-xs text-slate-400">{imageCount} images</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium px-3 py-1 rounded-full ${
-            status === 'completed'
-              ? 'bg-green-100 text-green-700'
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${status === 'completed'
+              ? 'bg-green-50 text-green-700 border-green-100'
               : status === 'generating'
-              ? 'bg-blue-100 text-blue-700 animate-pulse'
-              : 'bg-gray-100 text-gray-600'
-          }`}>
+                ? 'bg-primary-50 text-primary-700 border-primary-100 animate-pulse'
+                : 'bg-slate-50 text-slate-500 border-slate-100'
+            }`}>
             {statusLabel[status]}
           </span>
           <button
             onClick={() => setShowTypeConfig(true)}
-            className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-medium transition-all duration-300"
-            title="配置该角色的图片类型"
+            className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            title="Configure Types"
           >
-            ⚙️ 类型
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-3 flex-wrap">
         {selectedTypes.map((type) => {
           const img = getImageByType(type.id)
           const isThisGenerating = isGenerating && generatingTypeId === type.id
           return (
             <div
               key={type.id}
-              className="relative group"
+              className="relative group/img"
             >
               <div
-                className={`w-16 h-20 rounded-lg flex items-center justify-center text-xs overflow-hidden ${
-                  img
-                    ? 'bg-gray-100'
+                className={`w-20 h-24 rounded-lg flex items-center justify-center text-xs overflow-hidden border transition-all ${img
+                    ? 'border-slate-200 bg-slate-50'
                     : isThisGenerating
-                    ? 'bg-blue-100 text-blue-500'
-                    : status === 'generating'
-                    ? 'bg-blue-50 text-blue-400'
-                    : 'bg-gray-100 text-gray-400'
-                }`}
+                      ? 'border-primary-300 bg-primary-50 text-primary-600'
+                      : status === 'generating'
+                        ? 'border-primary-200 bg-primary-50/50 text-primary-400'
+                        : 'border-slate-100 bg-slate-50 text-slate-300'
+                  }`}
                 title={type.label}
               >
                 {img ? (
@@ -848,34 +773,26 @@ function CharacterGenerationCard({
                   />
                 ) : isThisGenerating ? (
                   <div className="text-center">
-                    <span className="animate-spin inline-block">⏳</span>
-                    <div className="text-[10px] mt-1">{genProgress}%</div>
+                    <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                    <div className="text-[10px] font-medium">{genProgress}%</div>
                   </div>
                 ) : status === 'generating' ? (
-                  '⏳'
+                  <span className="animate-pulse text-lg">⏳</span>
                 ) : (
-                  type.label
+                  <span className="text-[10px] px-1 text-center font-medium">{type.label}</span>
                 )}
               </div>
-              {/* 生成按钮 - 悬停时显示 */}
-              {!img && !isGenerating && status !== 'generating' && (
-                <button
-                  onClick={() => generateSingleImage(type.id)}
-                  className="absolute inset-0 bg-purple-600/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-medium"
-                  title={`生成${type.label}`}
-                >
-                  生成
-                </button>
-              )}
-              {/* 重新生成按钮 - 已有图片时悬停显示 */}
-              {img && !isGenerating && status !== 'generating' && (
-                <button
-                  onClick={() => generateSingleImage(type.id)}
-                  className="absolute inset-0 bg-purple-600/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-medium"
-                  title={`重新生成${type.label}`}
-                >
-                  重新生成
-                </button>
+
+              {/* Action Overlay */}
+              {!isGenerating && status !== 'generating' && (
+                <div className="absolute inset-0 bg-slate-900/60 rounded-lg opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                  <button
+                    onClick={() => generateSingleImage(type.id)}
+                    className="text-white text-[10px] font-bold uppercase tracking-wide px-2 py-1 bg-primary-600 hover:bg-primary-500 rounded shadow-sm transform scale-90 hover:scale-100 transition-all"
+                  >
+                    {img ? 'Regen' : 'Gen'}
+                  </button>
+                </div>
               )}
             </div>
           )
@@ -883,66 +800,61 @@ function CharacterGenerationCard({
       </div>
 
       {status === 'completed' && imageCount > 0 && (
-        <div className="flex gap-2 mt-3">
-          <button className="text-sm text-blue-500 hover:text-blue-600">
-            🔄 重新生成
+        <div className="mt-5 pt-4 border-t border-slate-100 flex gap-3 opacity-50 hover:opacity-100 transition-opacity">
+          <button className="text-xs font-medium text-slate-500 hover:text-primary-600 transition-colors flex items-center gap-1">
+            <span>📥</span> Export
           </button>
-          <button className="text-sm text-blue-500 hover:text-blue-600">
-            ➕ 添加变体
-          </button>
-          <button className="text-sm text-blue-500 hover:text-blue-600">
-            📥 导出角色
+          <button className="text-xs font-medium text-slate-500 hover:text-primary-600 transition-colors flex items-center gap-1">
+            <span>🔄</span> Regen All
           </button>
         </div>
       )}
 
-      {/* 角色类型配置弹窗 */}
+      {/* Type Config Modal */}
       {showTypeConfig && templates && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">配置 {character.name} 的图片类型</h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto animate-fade-in">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-slate-800">Configure {character.name}</h3>
               <button
                 onClick={() => setShowTypeConfig(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-slate-400 hover:text-slate-600"
               >
                 ✕
               </button>
             </div>
 
-            {/* 已选类型 */}
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">已选类型</h4>
+            <div className="mb-6">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Selected Types</h4>
               <div className="flex flex-wrap gap-2">
                 {localSelectedTypes.map((type) => (
                   <span
                     key={type.id}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 text-sm rounded-lg border border-primary-100"
                   >
                     {type.label}
                     <button
                       onClick={() => removeLocalType(type.id)}
-                      className="ml-1 text-blue-500 hover:text-red-500"
+                      className="text-primary-400 hover:text-red-500 transition-colors"
                     >
                       ×
                     </button>
                   </span>
                 ))}
                 {localSelectedTypes.length === 0 && (
-                  <span className="text-sm text-gray-400">请添加至少一个类型</span>
+                  <span className="text-sm text-slate-400 italic">No types selected</span>
                 )}
               </div>
             </div>
 
-            {/* 快速添加模板 */}
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">快速添加模板</h4>
+            <div className="mb-6">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Quick Templates</h4>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(templates.templates).map(([name]) => (
                   <button
                     key={name}
                     onClick={() => applyTemplateToCharacter(name)}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200"
+                    className="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm rounded-lg hover:bg-slate-200 transition-colors font-medium"
                   >
                     {name}
                   </button>
@@ -950,9 +862,8 @@ function CharacterGenerationCard({
               </div>
             </div>
 
-            {/* 添加可用类型 */}
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">添加类型</h4>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Add Available Types</h4>
               <div className="flex flex-wrap gap-2">
                 {templates.available_types
                   .filter(t => !localSelectedTypes.find(s => s.id === t.id))
@@ -960,35 +871,34 @@ function CharacterGenerationCard({
                     <button
                       key={type.id}
                       onClick={() => addLocalType(type)}
-                      className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200"
+                      className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 text-sm rounded-lg hover:border-primary-300 hover:text-primary-600 transition-colors"
                     >
-                      {type.label}
+                      + {type.label}
                     </button>
                   ))}
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setLocalSelectedTypes(selectedTypes)
                   setShowTypeConfig(false)
                 }}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="btn btn-secondary"
               >
-                取消
+                Cancel
               </button>
               <button
                 onClick={() => {
-                  // 保存角色特定的类型配置
                   if (onSaveCharacterTypes) {
                     onSaveCharacterTypes(localSelectedTypes)
                   }
                   setShowTypeConfig(false)
                 }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="btn btn-primary"
               >
-                保存
+                Save Changes
               </button>
             </div>
           </div>
@@ -1026,18 +936,16 @@ function SceneImageTab({
     }
   }, [])
 
-  // 空状态
   if (scenes.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-4">🖼️</div>
-        <p className="text-gray-500 mb-4">暂无场景数据</p>
-        <p className="text-sm text-gray-400 mb-6">请先完成剧本分析，识别分镜后再生成场景图</p>
+      <div className="text-center py-20">
+        <div className="text-6xl mb-4 opacity-20">🖼️</div>
+        <p className="text-slate-500 mb-8 font-medium">No scenes found. Please complete script analysis first.</p>
         <button
           onClick={onNavigateAnalysis}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          className="btn btn-secondary"
         >
-          前往剧本分析
+          Go to Script Analysis
         </button>
       </div>
     )
@@ -1059,9 +967,9 @@ function SceneImageTab({
 
           if (status.status === 'completed' || status.status === 'failed') {
             setGenerating(false)
-            if (status.status === 'failed') setError(status.error || '生成失败')
+            if (status.status === 'failed') setError(status.error || 'Generation failed')
             if (pollingRef.current) clearInterval(pollingRef.current)
-            if (status.status === 'completed') onRefresh() // 刷新数据
+            if (status.status === 'completed') onRefresh()
           }
         } catch (err) {
           console.error('Poll status failed:', err)
@@ -1069,118 +977,120 @@ function SceneImageTab({
       }, 1000)
     } catch (err) {
       setGenerating(false)
-      setError('启动任务失败')
+      setError('Failed to start generation task')
     }
   }
 
-  // 当前场景
   const currentSceneData = scenes[currentScene - 1]
 
   return (
     <div>
       {/* Status Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm">
+      <div className="flex items-center justify-between mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-6 text-sm">
           {hasCharacterLibrary ? (
-            <span className="text-green-600">✅ 前置条件: 角色库已完成</span>
+            <span className="text-green-600 font-medium flex items-center gap-2">
+              <span className="bg-green-100 p-1 rounded-full">✓</span> Character Library Ready
+            </span>
           ) : (
-            <span className="text-orange-500">⚠️ 前置条件: 请先生成角色库</span>
+            <span className="text-amber-600 font-medium flex items-center gap-2">
+              <span className="bg-amber-100 p-1 rounded-full">!</span> Character Library Missing
+            </span>
           )}
-          <span className="ml-4 text-gray-600">
-            {generating ? `🔄 生成中 (${progress}%)` : completedScenes > 0 ? `✅ ${completedScenes}/${totalScenes}` : '⏸️ 待开始'}
+          <div className="h-4 w-px bg-slate-300"></div>
+          <span className="text-slate-600">
+            {generating ? `Generating... (${progress}%)` : completedScenes > 0 ? `Completed: ${completedScenes} / ${totalScenes}` : 'Ready to generate'}
           </span>
         </div>
         <button
           onClick={startGeneration}
           disabled={!hasCharacterLibrary || generating}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          className="btn btn-primary shadow-lg shadow-primary-500/20"
         >
-          {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
+          {generating ? '⏳ Generating...' : '▶ Generate All Scenes'}
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
-          ❌ {error}
+        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {error}
         </div>
       )}
 
       {totalScenes > 0 && (
-        <div className="h-2 bg-gray-200 rounded-full mb-6">
+        <div className="h-1.5 bg-slate-100 rounded-full mb-8 overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full"
+            className="h-full bg-primary-500 rounded-full transition-all duration-500"
             style={{ width: `${(completedScenes / totalScenes) * 100}%` }}
           />
         </div>
       )}
 
       {/* Main Preview */}
-      <div className="bg-gray-100 rounded-lg aspect-[9/16] max-w-md mx-auto flex items-center justify-center mb-4 overflow-hidden">
+      <div className="bg-slate-900 rounded-2xl aspect-[16/9] md:aspect-[21/9] max-h-[60vh] mx-auto flex items-center justify-center mb-6 overflow-hidden relative group shadow-2xl">
         {currentSceneData?.sceneImage ? (
           <img
             src={fileUrl.image(currentSceneData.sceneImage.imagePath)}
-            alt={`场景 #${currentScene}`}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-              e.currentTarget.parentElement!.innerHTML = `
-                <div class="text-center">
-                  <div class="text-6xl mb-2">🖼️</div>
-                  <p class="text-gray-500">图片加载失败</p>
-                </div>
-              `
-            }}
+            alt={`Scene #${currentScene}`}
+            className="w-full h-full object-contain"
           />
         ) : (
-          <div className="text-center">
-            <div className="text-6xl mb-2">🖼️</div>
-            <p className="text-gray-500">场景 #{currentScene} 预览</p>
-            {generating && <p className="text-sm text-blue-500 mt-2">生成中...</p>}
+          <div className="text-center text-slate-700">
+            <div className="text-8xl mb-4 opacity-20">🖼️</div>
+            <p className="text-slate-500 text-lg font-medium">Scene #{currentSceneData?.sceneNumber} Preview</p>
+            {generating && <p className="text-primary-500 mt-2 animate-pulse">Generating...</p>}
           </div>
         )}
+
+        {/* Scene Info Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          <h3 className="text-xl font-bold">Scene {currentSceneData?.sceneNumber}: {currentSceneData?.location}</h3>
+          <p className="text-sm text-slate-300 mt-1 line-clamp-2">{currentSceneData?.visualDescription}</p>
+        </div>
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-center gap-4 mb-4">
+      <div className="flex items-center justify-center gap-6 mb-8">
         <button
           onClick={() => setCurrentScene((s) => Math.max(1, s - 1))}
-          className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+          className="p-3 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+          disabled={currentScene <= 1}
         >
-          ◀ 上一场景
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
-        <span className="text-sm text-gray-600">
-          {currentScene} / {totalScenes || 0}
+        <span className="text-lg font-mono font-bold text-slate-700">
+          {currentScene} <span className="text-slate-400 font-normal">/</span> {totalScenes}
         </span>
         <button
           onClick={() => setCurrentScene((s) => Math.min(totalScenes, s + 1))}
-          className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+          className="p-3 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+          disabled={currentScene >= totalScenes}
         >
-          下一场景 ▶
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
       </div>
 
       {/* Thumbnails */}
       {totalScenes > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin px-1">
           {scenes.map((scene, i) => (
             <button
               key={scene.id}
               onClick={() => setCurrentScene(i + 1)}
-              className={`flex-shrink-0 w-12 h-16 rounded overflow-hidden ${
-                i + 1 === currentScene ? 'ring-2 ring-blue-500' : ''
-              } ${
-                scene.sceneImage ? '' : 'bg-gray-100'
-              }`}
+              className={`flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden border-2 transition-all ${i + 1 === currentScene ? 'border-primary-500 ring-2 ring-primary-100 scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+                } ${scene.sceneImage ? 'bg-slate-800' : 'bg-slate-100'
+                }`}
             >
               {scene.sceneImage ? (
                 <img
                   src={fileUrl.image(scene.sceneImage.imagePath)}
-                  alt={`场景 ${scene.sceneNumber}`}
+                  alt={`Scene ${scene.sceneNumber}`}
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-xs text-gray-400">
-                  <span>{generating && i >= completedScenes ? '⏳' : '⬜'}</span>
+                <div className="w-full h-full flex flex-col items-center justify-center text-xs text-slate-400 font-medium">
+                  {generating && i >= completedScenes ? <span className="animate-spin text-lg mb-1">⏳</span> : <span className="text-lg mb-1">⬜</span>}
                   <span>{scene.sceneNumber}</span>
                 </div>
               )}
@@ -1188,10 +1098,6 @@ function SceneImageTab({
           ))}
         </div>
       )}
-
-      <div className="mt-4 text-sm text-gray-600 text-center">
-        ✅ 已完成: {completedScenes} | ⬜ 待生成: {totalScenes - completedScenes}
-      </div>
     </div>
   )
 }
@@ -1224,18 +1130,16 @@ function VideoGenerationTab({
     }
   }, [])
 
-  // 空状态
   if (scenes.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-4">🎬</div>
-        <p className="text-gray-500 mb-4">暂无场景数据</p>
-        <p className="text-sm text-gray-400 mb-6">请先完成剧本分析和场景图生成，再生成视频</p>
+      <div className="text-center py-20">
+        <div className="text-6xl mb-4 opacity-20">🎬</div>
+        <p className="text-slate-500 mb-8 font-medium">No scenes found.</p>
         <button
           onClick={onNavigateAnalysis}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          className="btn btn-secondary"
         >
-          前往剧本分析
+          Go to Script Analysis
         </button>
       </div>
     )
@@ -1257,9 +1161,9 @@ function VideoGenerationTab({
 
           if (status.status === 'completed' || status.status === 'failed') {
             setGenerating(false)
-            if (status.status === 'failed') setError(status.error || '生成失败')
+            if (status.status === 'failed') setError(status.error || 'Generation failed')
             if (pollingRef.current) clearInterval(pollingRef.current)
-            if (status.status === 'completed') onRefresh() // 刷新数据
+            if (status.status === 'completed') onRefresh()
           }
         } catch (err) {
           console.error('Poll status failed:', err)
@@ -1267,114 +1171,110 @@ function VideoGenerationTab({
       }, 1000)
     } catch (err) {
       setGenerating(false)
-      setError('启动任务失败')
+      setError('Failed to start video generation')
     }
   }
 
-  // 当前场景
   const currentSceneData = scenes[currentScene - 1]
 
   return (
     <div>
       {/* Status Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm">
+      <div className="flex items-center justify-between mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-6 text-sm">
           {hasSceneImages ? (
-            <span className="text-green-600">✅ 前置条件: 场景图已完成</span>
+            <span className="text-green-600 font-medium flex items-center gap-2">
+              <span className="bg-green-100 p-1 rounded-full">✓</span> Scene Images Ready
+            </span>
           ) : (
-            <span className="text-orange-500">⚠️ 前置条件: 请先生成场景图</span>
+            <span className="text-amber-600 font-medium flex items-center gap-2">
+              <span className="bg-amber-100 p-1 rounded-full">!</span> Scene Images Missing
+            </span>
           )}
-          <span className="ml-4 text-gray-600">
-            {generating ? `🔄 生成中 (${progress}%)` : completedVideos > 0 ? `✅ ${completedVideos}/${totalScenes}` : '⏸️ 待开始'}
+          <div className="h-4 w-px bg-slate-300"></div>
+          <span className="text-slate-600">
+            {generating ? `Processing... (${progress}%)` : completedVideos > 0 ? `Completed: ${completedVideos} / ${totalScenes}` : 'Ready to generate'}
           </span>
         </div>
         <button
           onClick={startGeneration}
           disabled={!hasSceneImages || generating}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          className="btn btn-primary shadow-lg shadow-primary-500/20"
         >
-          {generating ? '⏳ 生成中...' : '▶️ 开始生成'}
+          {generating ? '⏳ Generating Videos...' : '▶ Generate All Videos'}
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
-          ❌ {error}
+        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {error}
         </div>
       )}
 
       {(generating || totalScenes > 0) && (
-        <div className="h-2 bg-gray-200 rounded-full mb-6">
+        <div className="h-1.5 bg-slate-100 rounded-full mb-8 overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all"
+            className="h-full bg-primary-500 rounded-full transition-all duration-500"
             style={{ width: `${generating ? progress : (completedVideos / totalScenes) * 100}%` }}
           />
         </div>
       )}
 
       {/* Video Preview */}
-      <div className="bg-black rounded-lg aspect-[9/16] max-w-md mx-auto flex items-center justify-center mb-4 overflow-hidden">
+      <div className="bg-black rounded-2xl aspect-[16/9] md:aspect-[21/9] max-h-[70vh] mx-auto flex items-center justify-center mb-6 overflow-hidden shadow-2xl relative">
         {currentSceneData?.videoClip ? (
           <video
             src={fileUrl.video(currentSceneData.videoClip.videoPath)}
             controls
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             poster={currentSceneData.sceneImage ? fileUrl.image(currentSceneData.sceneImage.imagePath) : undefined}
           />
         ) : (
-          <div className="text-center text-white">
-            <div className="text-6xl mb-2">🎬</div>
-            <p className="text-gray-400">场景 #{currentScene} 视频</p>
-            <p className="text-sm text-gray-500 mt-2">768x1344 | 24fps | 4s</p>
-            {generating && <p className="text-sm text-blue-400 mt-2">生成中...</p>}
+          <div className="text-center text-white/50">
+            <div className="text-8xl mb-4 opacity-50">🎬</div>
+            <p className="text-white text-lg font-medium">Scene #{currentScene} Video</p>
+            <p className="text-sm opacity-60 mt-2 font-mono">768x1344 | 24fps | 4s</p>
+            {generating && <p className="text-primary-400 mt-4 animate-pulse">Generating...</p>}
           </div>
         )}
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-center gap-4 mb-4">
+      <div className="flex items-center justify-center gap-6 mb-8">
         <button
           onClick={() => setCurrentScene((s) => Math.max(1, s - 1))}
-          className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+          className="p-3 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+          disabled={currentScene <= 1}
         >
-          ◀ 上一场景
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
-        <span className="text-sm text-gray-600">
-          {currentScene} / {totalScenes || 0}
-        </span>
+        <div className="text-center">
+          <span className="text-lg font-mono font-bold text-slate-700">
+            {currentScene} <span className="text-slate-400 font-normal">/</span> {totalScenes}
+          </span>
+          <div className="text-xs text-slate-400 mt-1">{currentSceneData?.location || 'Unknown Location'}</div>
+        </div>
         <button
           onClick={() => setCurrentScene((s) => Math.min(totalScenes, s + 1))}
-          className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+          className="p-3 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+          disabled={currentScene >= totalScenes}
         >
-          下一场景 ▶
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
       </div>
 
       {/* Actions */}
-      <div className="flex justify-center gap-2 mb-6">
-        <button className="px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
-          🔄 重新生成
+      <div className="flex justify-center gap-3 mb-8">
+        <button className="btn btn-secondary text-sm py-2 px-4 shadow-sm">
+          🔄 Regenerate
         </button>
-        <button className="px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
-          ✏️ 编辑动作Prompt
+        <button className="btn btn-secondary text-sm py-2 px-4 shadow-sm">
+          ✏️ Edit Action Prompt
         </button>
-        <button className="px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
-          📥 下载片段
+        <button className="btn btn-secondary text-sm py-2 px-4 shadow-sm">
+          📥 Download
         </button>
-      </div>
-
-      {/* Queue - only show when there are pending tasks */}
-      {totalScenes > completedVideos && (
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-700 mb-2">生成队列</h4>
-          <div className="space-y-2 text-sm text-gray-500">
-            <p>暂无生成任务</p>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-4 text-sm text-gray-600 text-center">
-        ✅ 已完成: {completedVideos} | ⬜ 待生成: {totalScenes - completedVideos}
       </div>
     </div>
   )

@@ -7,7 +7,7 @@ export function ScriptUploadPage() {
   const navigate = useNavigate()
   const { currentProject, setCurrentProject, reset } = useProjectStore()
 
-  // 本地 UI 状态
+  // Local UI State
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingName, setPendingName] = useState('')
   const [summary, setSummary] = useState('')
@@ -15,7 +15,7 @@ export function ScriptUploadPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 从后端刷新项目状态，确保显示最新状态
+  // Refresh project from backend
   useEffect(() => {
     const refreshProject = async () => {
       if (currentProject?.id) {
@@ -28,16 +28,16 @@ export function ScriptUploadPage() {
       }
     }
     refreshProject()
-  }, []) // 仅在页面加载时执行一次
+  }, [])
 
-  // 从 store 恢复 summary
+  // Restore summary from store
   useEffect(() => {
     if (currentProject) {
       setSummary(currentProject.summary || '')
     }
   }, [currentProject])
 
-  // 计算显示信息
+  // Computed Values
   const projectName = currentProject?.name || pendingName
   const isUploaded = !!currentProject
   const fileName = currentProject?.name || pendingFile?.name
@@ -49,7 +49,6 @@ export function ScriptUploadPage() {
     e.preventDefault()
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile && (droppedFile.name.endsWith('.pdf') || droppedFile.name.endsWith('.txt'))) {
-      // 如果已有项目，先重置
       if (currentProject) {
         reset()
         setSummary('')
@@ -60,7 +59,6 @@ export function ScriptUploadPage() {
       setPendingName(nameWithoutExt)
       setError(null)
 
-      // 立即上传
       await uploadFile(droppedFile, nameWithoutExt)
     }
   }, [currentProject, reset])
@@ -68,7 +66,6 @@ export function ScriptUploadPage() {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      // 如果已有项目，先重置
       if (currentProject) {
         reset()
         setSummary('')
@@ -79,7 +76,6 @@ export function ScriptUploadPage() {
       setPendingName(nameWithoutExt)
       setError(null)
 
-      // 立即上传
       await uploadFile(selectedFile, nameWithoutExt)
     }
   }
@@ -93,7 +89,7 @@ export function ScriptUploadPage() {
       setPendingFile(null)
       setPendingName('')
     } catch (err) {
-      setError('上传失败，请重试')
+      setError('Upload failed, please try again')
       console.error('Upload failed:', err)
     } finally {
       setUploading(false)
@@ -110,16 +106,15 @@ export function ScriptUploadPage() {
       const response = await analysisApi.analyzeSummary(currentProject.id)
       if (response.success && response.data?.summary) {
         setSummary(response.data.summary as string)
-        // 更新 store 中的项目
         setCurrentProject({
           ...currentProject,
           summary: response.data.summary as string,
         })
       } else {
-        setError(response.message || '生成简介失败')
+        setError(response.message || 'Failed to generate summary')
       }
     } catch (err) {
-      setError('生成简介失败，请重试')
+      setError('Failed to generate summary, please try again')
       console.error('Generate summary failed:', err)
     } finally {
       setAnalyzing(false)
@@ -141,7 +136,6 @@ export function ScriptUploadPage() {
 
   const handleNameChange = async (newName: string) => {
     if (currentProject && newName !== currentProject.name) {
-      // 更新后端
       try {
         const updated = await projectsApi.update(currentProject.id, { name: newName })
         setCurrentProject(updated)
@@ -154,19 +148,19 @@ export function ScriptUploadPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto px-4 py-8">
       {/* Project Name */}
-      <div className="glass-effect rounded-2xl p-6 shadow-xl">
-        <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <div className="card p-6">
+        <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
           <span className="text-lg">📝</span>
-          <span>项目名称</span>
+          <span>Project Name</span>
         </label>
         <input
           type="text"
           value={projectName}
           onChange={(e) => handleNameChange(e.target.value)}
-          placeholder="输入项目名称，如：都市恋曲 第一集"
-          className="w-full px-5 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-lg font-medium"
+          placeholder="Enter project name..."
+          className="input w-full text-lg font-medium"
           disabled={uploading}
         />
       </div>
@@ -174,17 +168,17 @@ export function ScriptUploadPage() {
       {/* Upload and Summary */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* File Upload */}
-        <div className="glass-effect rounded-2xl p-6 shadow-xl">
-          <h3 className="text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
+        <div className="card p-6 h-full flex flex-col">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
             <span className="text-xl">📤</span>
-            <span>文件上传</span>
+            <span>Script Upload</span>
           </h3>
 
           {!isUploaded && !pendingFile ? (
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed border-purple-300 rounded-xl p-10 text-center hover:border-purple-500 hover:bg-purple-50/50 transition-all duration-300 cursor-pointer group"
+              className="flex-1 border-2 border-dashed border-primary-200 rounded-xl p-8 text-center hover:border-primary-500 hover:bg-primary-50/50 transition-all duration-300 cursor-pointer group flex flex-col items-center justify-center"
             >
               <input
                 type="file"
@@ -194,151 +188,139 @@ export function ScriptUploadPage() {
                 id="file-upload"
                 disabled={uploading}
               />
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">📁</div>
-                <p className="text-gray-700 font-semibold text-lg mb-2">拖拽文件到此处</p>
-                <p className="text-gray-500 text-sm mb-3">或点击选择文件上传</p>
-                <p className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full inline-block font-medium">
-                  支持 PDF / TXT 格式
-                </p>
+              <label htmlFor="file-upload" className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300 text-primary-200 group-hover:text-primary-400">📁</div>
+                <p className="text-slate-700 font-semibold text-lg mb-2">Drag & Drop Script Here</p>
+                <p className="text-slate-500 text-sm mb-4">or click to browse</p>
+                <span className="text-xs bg-primary-100 text-primary-700 px-3 py-1 rounded-full font-medium">
+                  PDF / TXT supported
+                </span>
               </label>
             </div>
           ) : (
-            <div className="p-5 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-700 font-bold flex items-center gap-2 text-lg">
-                    {uploading ? (
-                      <>
-                        <span className="animate-spin text-2xl">⏳</span>
-                        <span>上传中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-2xl">✅</span>
-                        <span>{fileName}</span>
-                      </>
+            <div className="flex-1 p-6 bg-green-50/50 rounded-xl border-2 border-green-200 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">{uploading ? '⏳' : '✅'}</span>
+                  <div>
+                    <h4 className="font-bold text-green-800 text-lg leading-tight">
+                      {uploading ? 'Uploading...' : fileName}
+                    </h4>
+                    {fileChars && (
+                      <span className="text-xs text-green-600 font-medium">
+                        {fileChars.toLocaleString()} characters
+                      </span>
                     )}
-                  </p>
-                  {fileChars && (
-                    <p className="text-sm text-green-600 mt-1 font-medium">
-                      📊 {fileChars.toLocaleString()} 字符
-                    </p>
-                  )}
-                  {isUploaded && (
-                    <p className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full inline-block mt-2 font-medium">
-                      ☁️ 已保存到服务器
-                    </p>
-                  )}
+                  </div>
                 </div>
-                <button
-                  onClick={handleClearProject}
-                  disabled={uploading}
-                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 bg-red-100 hover:bg-red-200 rounded-lg disabled:opacity-50 transition-all duration-300"
-                >
-                  🗑️ 清除
-                </button>
+                {isUploaded && !uploading && (
+                  <div className="ml-9">
+                    <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium inline-block">
+                      ☁️  Uploaded securely
+                    </span>
+                  </div>
+                )}
               </div>
+
+              <button
+                onClick={handleClearProject}
+                disabled={uploading}
+                className="w-full mt-6 py-2.5 text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg disabled:opacity-50 transition-all"
+              >
+                Remove File
+              </button>
             </div>
           )}
         </div>
 
         {/* Summary */}
-        <div className="glass-effect rounded-2xl p-6 shadow-xl">
-          <h3 className="text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4 flex items-center gap-2">
+        <div className="card p-6 h-full flex flex-col">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
             <span className="text-xl">📖</span>
-            <span>剧情简介</span>
+            <span>Plot Summary</span>
           </h3>
 
           {!summary ? (
-            <div className="text-center py-12">
-              <div className="text-5xl mb-4">✨</div>
-              <p className="text-gray-600 mb-6 font-medium">
-                {isUploaded ? '点击生成剧情简介' : '上传剧本后可生成简介'}
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
+              <div className="text-4xl mb-4 opacity-30">✨</div>
+              <p className="text-slate-500 mb-6 font-medium px-4">
+                {isUploaded ? 'Generate a summary to understand the script plot.' : 'Upload a script first to generate a summary.'}
               </p>
               <button
                 onClick={generateSummary}
                 disabled={!isUploaded || analyzing}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                className="btn btn-primary w-full max-w-xs shadow-lg shadow-primary-500/20"
               >
-                {analyzing ? '⏳ 生成中...' : '🤖 AI生成简介'}
+                {analyzing ? 'Generating...' : 'Generate Summary'}
               </button>
             </div>
           ) : (
-            <div>
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-5 text-gray-800 leading-relaxed max-h-48 overflow-y-auto border-l-4 border-purple-500 shadow-inner">
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 bg-gradient-to-br from-slate-50 to-white rounded-xl p-4 text-slate-700 leading-relaxed max-h-[300px] overflow-y-auto border border-slate-200 shadow-inner mb-4 text-sm scrollbar-thin">
                 {summary}
               </div>
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={generateSummary}
-                  disabled={analyzing}
-                  className="px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-50 transition-all duration-300"
-                >
-                  {analyzing ? '⏳ 生成中...' : '🔄 重新生成'}
-                </button>
-              </div>
+              <button
+                onClick={generateSummary}
+                disabled={analyzing}
+                className="btn btn-secondary w-full"
+              >
+                {analyzing ? 'Regenerating...' : 'Regenerate Summary'}
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Project Status */}
+      {/* Project Status Bar */}
       {currentProject && (
-        <div className="glass-effect rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 font-medium">项目ID:</span>
-                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-mono font-semibold">
-                  {currentProject.id.slice(0, 8)}...
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 font-medium">状态:</span>
-                <span className={`px-3 py-1 rounded-full font-semibold ${
-                  currentProject.status === 'draft' ? 'bg-gray-100 text-gray-700' :
-                  currentProject.status === 'analyzing' ? 'bg-blue-100 text-blue-700 animate-pulse' :
-                  currentProject.status === 'analyzed' ? 'bg-green-100 text-green-700' :
-                  currentProject.status === 'generating' ? 'bg-purple-100 text-purple-700' :
-                  currentProject.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {currentProject.status === 'draft' ? '📝 草稿' :
-                  currentProject.status === 'analyzing' ? '🔄 分析中' :
-                  currentProject.status === 'analyzed' ? '✅ 已分析' :
-                  currentProject.status === 'generating' ? '🎨 生成中' :
-                  currentProject.status === 'completed' ? '🎉 已完成' :
-                  currentProject.status}
-                </span>
-              </div>
-            </div>
-            {isAnalyzed && (
-              <span className="px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-                ✓ 可以开始生成
+        <div className="card p-5 flex items-center justify-between bg-slate-50 border-slate-200">
+          <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 font-medium">ID:</span>
+              <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 text-xs">
+                {currentProject.id.slice(0, 8)}
               </span>
-            )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 font-medium">Status:</span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${currentProject.status === 'draft' ? 'bg-slate-200 text-slate-700' :
+                  currentProject.status === 'analyzing' ? 'bg-blue-100 text-blue-700 animate-pulse' :
+                    currentProject.status === 'analyzed' ? 'bg-green-100 text-green-700' :
+                      currentProject.status === 'generating' ? 'bg-primary-100 text-primary-700' :
+                        currentProject.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-slate-100 text-slate-700'
+                }`}>
+                {currentProject.status}
+              </span>
+            </div>
           </div>
+          {isAnalyzed && (
+            <span className="flex items-center gap-1.5 text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+              Ready to Generate
+            </span>
+          )}
         </div>
       )}
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center">
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center border border-red-100 flex items-center justify-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           {error}
         </div>
       )}
 
-      {/* Action Button */}
-      <div className="flex justify-center pt-4">
+      {/* Main Action */}
+      <div className="flex justify-center pt-4 pb-8">
         <button
           onClick={startAnalysis}
           disabled={!isUploaded || uploading}
-          className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-indigo-700 shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
+          className="btn btn-primary px-12 py-4 text-base rounded-full shadow-xl shadow-primary-500/20 hover:scale-105 transition-transform"
         >
-          {isAnalyzing ? '🔄 分析中...' :
-           isAnalyzed ? '📊 查看分析结果 →' :
-           '▶️ 开始分析剧本'}
+          {isAnalyzing ? 'Analyzing Script...' :
+            isAnalyzed ? 'View Analysis Results →' :
+              'Start Script Analysis ▶'}
         </button>
       </div>
     </div>

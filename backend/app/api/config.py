@@ -78,8 +78,26 @@ async def get_character_image_templates():
             "available_types": [],
         }
 
+
     with open(config_file, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+@router.put("/character-image-templates")
+async def update_character_image_templates(data: dict[str, Any]):
+    """更新角色图类型模板配置"""
+    config_file = CONFIG_DIR / "character_image_templates.json"
+    
+    try:
+        # Ensure the directory exists (it should, but safety first)
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            
+        return {"success": True, "message": "角色图类型模板配置已更新"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新配置失败: {str(e)}")
 
 
 # ============ 提示词配置 API ============

@@ -18,7 +18,7 @@ export function ConfigPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // 配置数据
+  // Configuration Data
   const [analysisPrompts, setAnalysisPrompts] = useState<AnalysisPromptsConfig | null>(null)
   const [characterPrompts, setCharacterPrompts] = useState<CharacterPromptsConfig | null>(null)
   const [scenePrompts, setScenePrompts] = useState<ScenePromptsConfig | null>(null)
@@ -26,7 +26,7 @@ export function ConfigPage() {
   const [chunkConfig, setChunkConfig] = useState<ChunkConfig | null>(null)
   const [workflowConfig, setWorkflowConfig] = useState<WorkflowConfig | null>(null)
 
-  // 加载配置
+  // Load Config
   useEffect(() => {
     loadConfig(activeTab)
   }, [activeTab])
@@ -56,7 +56,7 @@ export function ConfigPage() {
           break
       }
     } catch (err) {
-      setMessage({ type: 'error', text: '加载配置失败' })
+      setMessage({ type: 'error', text: 'Failed to load configuration' })
       console.error('Load config failed:', err)
     } finally {
       setLoading(false)
@@ -87,9 +87,9 @@ export function ConfigPage() {
           if (workflowConfig) await configApi.updateWorkflowConfig(workflowConfig)
           break
       }
-      setMessage({ type: 'success', text: '保存成功' })
+      setMessage({ type: 'success', text: 'Configuration saved successfully' })
     } catch (err) {
-      setMessage({ type: 'error', text: '保存失败' })
+      setMessage({ type: 'error', text: 'Failed to save configuration' })
       console.error('Save config failed:', err)
     } finally {
       setSaving(false)
@@ -97,42 +97,42 @@ export function ConfigPage() {
   }
 
   const tabs: { id: ConfigTab; label: string; icon: string }[] = [
-    { id: 'analysis', label: 'LLM 分析提示词', icon: '🤖' },
-    { id: 'character', label: '角色图提示词', icon: '👤' },
-    { id: 'scene', label: '场景图提示词', icon: '🖼️' },
-    { id: 'action', label: '视频动作提示词', icon: '🎬' },
-    { id: 'chunk', label: '分块配置', icon: '📄' },
-    { id: 'workflow', label: '工作流配置', icon: '🔧' },
+    { id: 'analysis', label: 'Analysis Prompts', icon: '🤖' },
+    { id: 'character', label: 'Character Prompts', icon: '👤' },
+    { id: 'scene', label: 'Scene Prompts', icon: '🖼️' },
+    { id: 'action', label: 'Action Prompts', icon: '🎬' },
+    { id: 'chunk', label: 'Chunking Config', icon: '📄' },
+    { id: 'workflow', label: 'Workflow Config', icon: '🔧' },
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="glass-effect rounded-2xl p-6 shadow-xl">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-          ⚙️ 配置管理
+      <div className="card p-6 border-l-4 border-primary-500">
+        <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+          <span className="p-2 bg-primary-50 rounded-lg text-2xl">⚙️</span>
+          Settings & Configuration
         </h2>
-        <p className="text-sm text-gray-600 mt-2">
-          编辑提示词模板和系统配置
+        <p className="text-sm text-slate-500 mt-1 pl-14">
+          Manage system prompts, workflow templates, and global parameters.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="glass-effect rounded-2xl shadow-xl overflow-hidden">
-        <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-          <div className="flex gap-1 p-2 overflow-x-auto">
+      <div className="card shadow-sm overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50/50">
+          <div className="flex gap-2 p-2 overflow-x-auto scrollbar-thin">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-white hover:text-purple-600 hover:shadow-md'
-                }`}
+                className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === tab.id
+                    ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                  }`}
               >
                 <span className="flex items-center gap-2">
-                  <span>{tab.icon}</span>
+                  <span className="opacity-75">{tab.icon}</span>
                   <span>{tab.label}</span>
                 </span>
               </button>
@@ -144,68 +144,70 @@ export function ConfigPage() {
           {/* Message */}
           {message && (
             <div
-              className={`mb-4 p-3 rounded-lg text-sm ${
-                message.type === 'success'
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
-              }`}
+              className={`mb-6 p-4 rounded-xl text-sm flex items-center gap-3 border ${message.type === 'success'
+                  ? 'bg-green-50 text-green-700 border-green-100'
+                  : 'bg-red-50 text-red-700 border-red-100'
+                }`}
             >
-              {message.type === 'success' ? '✅' : '❌'} {message.text}
+              <span className="text-xl">{message.type === 'success' ? '✅' : '❌'}</span>
+              <span className="font-medium">{message.text}</span>
             </div>
           )}
 
           {loading ? (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-4 animate-pulse">⏳</div>
-              <p className="text-gray-500">加载中...</p>
+            <div className="text-center py-16">
+              <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-slate-500 font-medium">Loading configuration...</p>
             </div>
           ) : (
             <>
-              {activeTab === 'analysis' && analysisPrompts && (
-                <AnalysisPromptsEditor
-                  data={analysisPrompts}
-                  onChange={setAnalysisPrompts}
-                />
-              )}
-              {activeTab === 'character' && characterPrompts && (
-                <CharacterPromptsEditor
-                  data={characterPrompts}
-                  onChange={setCharacterPrompts}
-                />
-              )}
-              {activeTab === 'scene' && scenePrompts && (
-                <ScenePromptsEditor
-                  data={scenePrompts}
-                  onChange={setScenePrompts}
-                />
-              )}
-              {activeTab === 'action' && actionPrompts && (
-                <ActionPromptsEditor
-                  data={actionPrompts}
-                  onChange={setActionPrompts}
-                />
-              )}
-              {activeTab === 'chunk' && chunkConfig && (
-                <ChunkConfigEditor
-                  data={chunkConfig}
-                  onChange={setChunkConfig}
-                />
-              )}
-              {activeTab === 'workflow' && workflowConfig && (
-                <WorkflowConfigEditor
-                  data={workflowConfig}
-                  onChange={setWorkflowConfig}
-                />
-              )}
+              <div className="animate-fade-in">
+                {activeTab === 'analysis' && analysisPrompts && (
+                  <AnalysisPromptsEditor
+                    data={analysisPrompts}
+                    onChange={setAnalysisPrompts}
+                  />
+                )}
+                {activeTab === 'character' && characterPrompts && (
+                  <CharacterPromptsEditor
+                    data={characterPrompts}
+                    onChange={setCharacterPrompts}
+                  />
+                )}
+                {activeTab === 'scene' && scenePrompts && (
+                  <ScenePromptsEditor
+                    data={scenePrompts}
+                    onChange={setScenePrompts}
+                  />
+                )}
+                {activeTab === 'action' && actionPrompts && (
+                  <ActionPromptsEditor
+                    data={actionPrompts}
+                    onChange={setActionPrompts}
+                  />
+                )}
+                {activeTab === 'chunk' && chunkConfig && (
+                  <ChunkConfigEditor
+                    data={chunkConfig}
+                    onChange={setChunkConfig}
+                  />
+                )}
+                {activeTab === 'workflow' && workflowConfig && (
+                  <WorkflowConfigEditor
+                    data={workflowConfig}
+                    onChange={setWorkflowConfig}
+                  />
+                )}
+              </div>
 
               {/* Save Button */}
-              <div className="mt-6 flex justify-end">
+              <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
                 <button
                   onClick={saveConfig}
                   disabled={saving}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="btn btn-primary px-8 py-3 shadow-lg shadow-primary-500/20"
                 >
-                  {saving ? '⏳ 保存中...' : '💾 保存配置'}
+                  {saving ? 'Saving...' : 'Save Configuration'}
                 </button>
               </div>
             </>
@@ -216,7 +218,7 @@ export function ConfigPage() {
   )
 }
 
-// ============ 分析提示词编辑器 ============
+// ============ Analysis Prompts Editor ============
 function AnalysisPromptsEditor({
   data,
   onChange,
@@ -227,35 +229,35 @@ function AnalysisPromptsEditor({
   const [expandedSection, setExpandedSection] = useState<string | null>('summary')
 
   const sections = [
-    { key: 'summary', label: '剧情简介分析', icon: '📝' },
-    { key: 'characters', label: '角色分析', icon: '👥' },
-    { key: 'scenes', label: '分镜分析', icon: '🎬' },
+    { key: 'summary', label: 'Summary Analysis', icon: '📝' },
+    { key: 'characters', label: 'Character Analysis', icon: '👥' },
+    { key: 'scenes', label: 'Scene Analysis', icon: '🎬' },
   ] as const
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-600 mb-4">
-        配置 LLM 分析剧本时使用的提示词模板。支持变量替换，如 {'{{script_text}}'}, {'{{chunk_index}}'} 等。
-      </p>
+    <div className="space-y-6">
+      <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        Templates for LLM analysis. Supports variables like <code className="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-700 mx-1">{'{script_text}'}</code>, <code className="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-700 mx-1">{'{chunk_index}'}</code>.
+      </div>
 
       {sections.map(({ key, label, icon }) => (
-        <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
+        <div key={key} className={`border rounded-xl transition-all duration-200 ${expandedSection === key ? 'border-primary-200 shadow-sm bg-white' : 'border-slate-200 bg-slate-50/30'}`}>
           <button
             onClick={() => setExpandedSection(expandedSection === key ? null : key)}
-            className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors rounded-xl"
           >
-            <span className="font-medium flex items-center gap-2">
-              <span>{icon}</span>
+            <span className="font-semibold text-slate-800 flex items-center gap-3">
+              <span className="text-xl">{icon}</span>
               <span>{label}</span>
             </span>
-            <span className="text-gray-400">{expandedSection === key ? '▼' : '▶'}</span>
+            <span className={`text-slate-400 transform transition-transform ${expandedSection === key ? 'rotate-180' : ''}`}>▼</span>
           </button>
 
           {expandedSection === key && (
-            <div className="p-4 space-y-4">
+            <div className="p-5 border-t border-slate-100 space-y-5 bg-white rounded-b-xl">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  系统提示 (System)
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  System Prompt
                 </label>
                 <input
                   type="text"
@@ -266,13 +268,13 @@ function AnalysisPromptsEditor({
                       [key]: { ...data[key], system: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="input w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  提示词模板 (Template)
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Prompt Template
                 </label>
                 <textarea
                   value={data[key].template}
@@ -283,14 +285,14 @@ function AnalysisPromptsEditor({
                     })
                   }
                   rows={12}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                  className="input w-full font-mono text-xs leading-relaxed"
                 />
               </div>
 
               {key === 'characters' && data.characters.existing_hint_template && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    已有角色提示模板
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Existing Characters Hint Template
                   </label>
                   <textarea
                     value={data.characters.existing_hint_template}
@@ -301,7 +303,7 @@ function AnalysisPromptsEditor({
                       })
                     }
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                    className="input w-full font-mono text-xs leading-relaxed"
                   />
                 </div>
               )}
@@ -313,7 +315,7 @@ function AnalysisPromptsEditor({
   )
 }
 
-// ============ 角色图提示词编辑器 ============
+// ============ Character Prompts Editor ============
 function CharacterPromptsEditor({
   data,
   onChange,
@@ -322,19 +324,19 @@ function CharacterPromptsEditor({
   onChange: (data: CharacterPromptsConfig) => void
 }) {
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        配置生成角色图像时的提示词模板和风格预设。
-      </p>
+    <div className="space-y-8">
+      <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        Configuration for character image generation prompts and style presets.
+      </div>
 
-      {/* 基础配置 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">基础配置</h4>
+      {/* Basic Config */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Basic Configuration</h4>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              质量后缀 (Quality Suffix)
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Quality Suffix
             </label>
             <textarea
               value={data.character_portrait.quality_suffix}
@@ -345,13 +347,13 @@ function CharacterPromptsEditor({
                 })
               }
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              负面提示词 (Negative Prompt)
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Negative Prompt
             </label>
             <textarea
               value={data.character_portrait.negative_prompt}
@@ -362,19 +364,19 @@ function CharacterPromptsEditor({
                 })
               }
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-xs"
             />
           </div>
         </div>
       </div>
 
-      {/* 性别映射 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">性别映射</h4>
-        <div className="grid grid-cols-3 gap-4">
+      {/* Gender Mapping */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Gender Mapping</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {Object.entries(data.gender_mapping).map(([key, value]) => (
             <div key={key}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{key}</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{key}</label>
               <input
                 type="text"
                 value={value}
@@ -384,23 +386,23 @@ function CharacterPromptsEditor({
                     gender_mapping: { ...data.gender_mapping, [key]: e.target.value },
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="input w-full"
               />
             </div>
           ))}
         </div>
       </div>
 
-      {/* 风格预设 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">风格预设</h4>
-        <div className="space-y-4">
+      {/* Style Presets */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Style Presets</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.entries(data.style_presets).map(([name, preset]) => (
-            <div key={name} className="p-3 bg-gray-50 rounded-lg">
-              <div className="font-medium text-gray-700 mb-2">{name}</div>
-              <div className="space-y-2">
+            <div key={name} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-300 transition-colors">
+              <div className="font-bold text-slate-800 mb-3">{name}</div>
+              <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-500">质量后缀</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Quality Suffix</label>
                   <input
                     type="text"
                     value={preset.quality_suffix}
@@ -413,11 +415,11 @@ function CharacterPromptsEditor({
                         },
                       })
                     }
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="input w-full text-xs py-1.5"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">负面提示词</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Negative Prompt</label>
                   <input
                     type="text"
                     value={preset.negative_prompt}
@@ -430,7 +432,7 @@ function CharacterPromptsEditor({
                         },
                       })
                     }
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    className="input w-full text-xs py-1.5"
                   />
                 </div>
               </div>
@@ -442,7 +444,7 @@ function CharacterPromptsEditor({
   )
 }
 
-// ============ 场景图提示词编辑器 ============
+// ============ Scene Prompts Editor ============
 function ScenePromptsEditor({
   data,
   onChange,
@@ -451,19 +453,18 @@ function ScenePromptsEditor({
   onChange: (data: ScenePromptsConfig) => void
 }) {
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        配置生成场景图像时的提示词模板。
-      </p>
+    <div className="space-y-8">
+      <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        Configuration for scene image generation prompts.
+      </div>
 
-      {/* 基础配置 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">基础配置</h4>
-        <div className="space-y-4">
+      {/* Basic Config */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Basic Configuration</h4>
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">角色模板</label>
-            <input
-              type="text"
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Character Template</label>
+            <textarea
               value={data.scene_image.character_template}
               onChange={(e) =>
                 onChange({
@@ -471,11 +472,12 @@ function ScenePromptsEditor({
                   scene_image: { ...data.scene_image, character_template: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              rows={2}
+              className="input w-full font-mono text-xs"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">质量后缀</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quality Suffix</label>
             <textarea
               value={data.scene_image.quality_suffix}
               onChange={(e) =>
@@ -485,11 +487,11 @@ function ScenePromptsEditor({
                 })
               }
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-xs"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">负面提示词</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Negative Prompt</label>
             <textarea
               value={data.scene_image.negative_prompt}
               onChange={(e) =>
@@ -499,22 +501,21 @@ function ScenePromptsEditor({
                 })
               }
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-xs"
             />
           </div>
         </div>
       </div>
 
-      {/* 时间映射 */}
+      {/* Mappings */}
       <MappingEditor
-        title="时间映射"
+        title="Time of Day Mapping"
         data={data.time_of_day_mapping}
         onChange={(mapping) => onChange({ ...data, time_of_day_mapping: mapping })}
       />
 
-      {/* 氛围增强 */}
       <MappingEditor
-        title="氛围增强"
+        title="Atmosphere Enhancement"
         data={data.atmosphere_enhancements}
         onChange={(mapping) => onChange({ ...data, atmosphere_enhancements: mapping })}
       />
@@ -522,7 +523,7 @@ function ScenePromptsEditor({
   )
 }
 
-// ============ 视频动作提示词编辑器 ============
+// ============ Action Prompts Editor ============
 function ActionPromptsEditor({
   data,
   onChange,
@@ -531,26 +532,26 @@ function ActionPromptsEditor({
   onChange: (data: ActionPromptsConfig) => void
 }) {
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        配置生成视频时的动作提示词模板。
-      </p>
+    <div className="space-y-8">
+      <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        Configuration for video generation prompts.
+      </div>
 
-      {/* 基础配置 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">基础配置</h4>
-        <div className="space-y-4">
+      {/* Basic Config */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Basic Configuration</h4>
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">默认动作</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Default Action</label>
             <input
               type="text"
               value={data.default_action}
               onChange={(e) => onChange({ ...data, default_action: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">质量后缀</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quality Suffix</label>
             <input
               type="text"
               value={data.video_action.quality_suffix}
@@ -560,11 +561,11 @@ function ActionPromptsEditor({
                   video_action: { ...data.video_action, quality_suffix: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">负面提示词</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Negative Prompt</label>
             <input
               type="text"
               value={data.video_action.negative_prompt}
@@ -574,22 +575,20 @@ function ActionPromptsEditor({
                   video_action: { ...data.video_action, negative_prompt: e.target.value },
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="input w-full font-mono text-sm"
             />
           </div>
         </div>
       </div>
 
-      {/* 镜头运动映射 */}
       <MappingEditor
-        title="镜头运动映射"
+        title="Camera Movement Mapping"
         data={data.camera_movement_mapping}
         onChange={(mapping) => onChange({ ...data, camera_movement_mapping: mapping })}
       />
 
-      {/* 动作增强 */}
       <MappingEditor
-        title="动作增强"
+        title="Action Enhancement"
         data={data.action_enhancements}
         onChange={(mapping) => onChange({ ...data, action_enhancements: mapping })}
       />
@@ -597,7 +596,7 @@ function ActionPromptsEditor({
   )
 }
 
-// ============ 分块配置编辑器 ============
+// ============ Chunk Config Editor ============
 function ChunkConfigEditor({
   data,
   onChange,
@@ -625,53 +624,59 @@ function ChunkConfigEditor({
   }
 
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        配置剧本分块方式。支持按章节标记分块或按字符数分块。
-      </p>
+    <div className="space-y-8">
+      <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        Configure script chunking strategy. Supports chunking by chapter markers or character count.
+      </div>
 
-      {/* 分块模式 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">分块模式</h4>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+      {/* Mode */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Chunking Mode</h4>
+        <div className="flex gap-6">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${data.chunk_mode === 'chapter' ? 'border-primary-500 bg-primary-50' : 'border-slate-300'}`}>
+              {data.chunk_mode === 'chapter' && <div className="w-2.5 h-2.5 rounded-full bg-primary-500"></div>}
+            </div>
             <input
               type="radio"
               name="chunk_mode"
               value="chapter"
               checked={data.chunk_mode === 'chapter'}
               onChange={() => onChange({ ...data, chunk_mode: 'chapter' })}
-              className="w-4 h-4 text-purple-600"
+              className="hidden"
             />
-            <span>按章节分块</span>
+            <span className="font-medium text-slate-700 group-hover:text-primary-600 transition-colors">By Chapter</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${data.chunk_mode === 'size' ? 'border-primary-500 bg-primary-50' : 'border-slate-300'}`}>
+              {data.chunk_mode === 'size' && <div className="w-2.5 h-2.5 rounded-full bg-primary-500"></div>}
+            </div>
             <input
               type="radio"
               name="chunk_mode"
               value="size"
               checked={data.chunk_mode === 'size'}
               onChange={() => onChange({ ...data, chunk_mode: 'size' })}
-              className="w-4 h-4 text-purple-600"
+              className="hidden"
             />
-            <span>按字符数分块</span>
+            <span className="font-medium text-slate-700 group-hover:text-primary-600 transition-colors">By Size</span>
           </label>
         </div>
       </div>
 
-      {/* 章节分隔符 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">章节分隔符（支持正则表达式）</h4>
+      {/* Chapter Delimiters */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Chapter Delimiters (Regex Supported)</h4>
         <div className="flex flex-wrap gap-2 mb-4">
           {data.chapter_delimiters.map((delimiter, index) => (
             <span
               key={index}
-              className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 text-sm rounded-lg"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 text-sm rounded-lg border border-slate-200"
             >
-              <code className="font-mono">{delimiter}</code>
+              <code className="font-mono text-xs">{delimiter}</code>
               <button
                 onClick={() => removeDelimiter(index)}
-                className="ml-1 text-purple-500 hover:text-red-500"
+                className="text-slate-400 hover:text-red-500 transition-colors"
               >
                 ×
               </button>
@@ -684,25 +689,25 @@ function ChunkConfigEditor({
             value={newDelimiter}
             onChange={(e) => setNewDelimiter(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addDelimiter()}
-            placeholder="添加分隔符..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+            placeholder="Add delimiter regex..."
+            className="input flex-1 font-mono text-sm"
           />
           <button
             onClick={addDelimiter}
-            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200"
+            className="btn btn-secondary"
           >
-            添加
+            Add
           </button>
         </div>
       </div>
 
-      {/* 大小配置 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-4">分块大小配置</h4>
-        <div className="grid grid-cols-3 gap-4">
+      {/* Size Config */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Size Configuration</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              回退分块大小
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Fallback Chunk Size
             </label>
             <input
               type="number"
@@ -710,12 +715,12 @@ function ChunkConfigEditor({
               onChange={(e) =>
                 onChange({ ...data, fallback_chunk_size: parseInt(e.target.value) || 8000 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="input w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              最小分块大小
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Min Chunk Size
             </label>
             <input
               type="number"
@@ -723,12 +728,12 @@ function ChunkConfigEditor({
               onChange={(e) =>
                 onChange({ ...data, min_chunk_size: parseInt(e.target.value) || 1000 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="input w-full"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              最大分块大小
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Max Chunk Size
             </label>
             <input
               type="number"
@@ -736,7 +741,7 @@ function ChunkConfigEditor({
               onChange={(e) =>
                 onChange({ ...data, max_chunk_size: parseInt(e.target.value) || 16000 })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="input w-full"
             />
           </div>
         </div>
@@ -745,7 +750,7 @@ function ChunkConfigEditor({
   )
 }
 
-// ============ 通用映射编辑器 ============
+// ============ Mapping Editor ============
 function MappingEditor({
   title,
   data,
@@ -773,60 +778,60 @@ function MappingEditor({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
-      <h4 className="font-medium text-gray-800 mb-4">{title}</h4>
-      <div className="space-y-2 mb-4">
+    <div className="card p-5">
+      <h4 className="font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">{title}</h4>
+      <div className="space-y-3 mb-5">
         {Object.entries(data).map(([key, value]) => (
-          <div key={key} className="flex gap-2 items-center">
+          <div key={key} className="flex gap-3 items-center group">
             <input
               type="text"
               value={key}
               readOnly
-              className="w-1/4 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm"
+              className="w-1/3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
             />
-            <span className="text-gray-400">→</span>
+            <span className="text-slate-300">→</span>
             <input
               type="text"
               value={value}
               onChange={(e) => onChange({ ...data, [key]: e.target.value })}
-              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+              className="flex-1 input text-sm"
             />
             <button
               onClick={() => removeMapping(key)}
-              className="text-red-500 hover:text-red-700 px-2"
+              className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-2"
             >
               ×
             </button>
           </div>
         ))}
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-3 p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
         <input
           type="text"
           value={newKey}
           onChange={(e) => setNewKey(e.target.value)}
-          placeholder="键"
-          className="w-1/4 px-2 py-1 border border-gray-300 rounded text-sm"
+          placeholder="New Key"
+          className="input w-1/3 text-sm bg-white"
         />
         <input
           type="text"
           value={newValue}
           onChange={(e) => setNewValue(e.target.value)}
-          placeholder="值"
-          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+          placeholder="New Value"
+          className="input flex-1 text-sm bg-white"
         />
         <button
           onClick={addMapping}
-          className="px-3 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 text-sm"
+          className="btn btn-secondary text-sm px-4"
         >
-          添加
+          Add
         </button>
       </div>
     </div>
   )
 }
 
-// ============ 工作流配置编辑器 ============
+// ============ Workflow Config Editor ============
 function WorkflowConfigEditor({
   data,
   onChange,
@@ -837,9 +842,9 @@ function WorkflowConfigEditor({
   const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null)
 
   const workflowTypes: { key: keyof Pick<WorkflowConfig, 'character_workflows' | 'scene_workflows' | 'video_workflows'>; label: string; icon: string }[] = [
-    { key: 'character_workflows', label: '角色图工作流', icon: '👤' },
-    { key: 'scene_workflows', label: '场景图工作流', icon: '🖼️' },
-    { key: 'video_workflows', label: '视频工作流', icon: '🎬' },
+    { key: 'character_workflows', label: 'Character Workflows', icon: '👤' },
+    { key: 'scene_workflows', label: 'Scene Workflows', icon: '🖼️' },
+    { key: 'video_workflows', label: 'Video Workflows', icon: '🎬' },
   ]
 
   const updateWorkflow = (
@@ -868,8 +873,8 @@ function WorkflowConfigEditor({
   ) => {
     const newWorkflow: WorkflowItem = {
       id: `new_${Date.now()}`,
-      name: '新工作流',
-      description: '请配置工作流描述',
+      name: 'New Workflow',
+      description: 'Workflow description',
       workflow_file: '',
       default: data[type].length === 0,
       params: {},
@@ -882,7 +887,6 @@ function WorkflowConfigEditor({
     index: number
   ) => {
     const workflows = data[type].filter((_, i) => i !== index)
-    // 如果删除的是默认工作流，将第一个设为默认
     if (data[type][index].default && workflows.length > 0) {
       workflows[0] = { ...workflows[0], default: true }
     }
@@ -890,47 +894,47 @@ function WorkflowConfigEditor({
   }
 
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        配置 ComfyUI 工作流文件和参数。每种类型可配置多个工作流，选择一个作为默认。
-      </p>
+    <div className="space-y-8">
+      <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        Configure ComfyUI workflow files and parameters.
+      </div>
 
-      {/* 工作流目录 */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-800 mb-2">工作流目录</h4>
+      {/* Workflow Directory */}
+      <div className="card p-5">
+        <h4 className="font-bold text-slate-900 mb-2">Workflow Directory</h4>
         <input
           type="text"
           value={data.workflow_directory}
           onChange={(e) => onChange({ ...data, workflow_directory: e.target.value })}
           placeholder="comfyui_workflows"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+          className="input w-full font-mono text-sm"
         />
-        <p className="text-xs text-gray-500 mt-1">
-          ComfyUI 工作流 JSON 文件所在的目录（相对于后端工作目录）
+        <p className="text-xs text-slate-500 mt-2">
+          Directory containing ComfyUI workflow JSON files (relative to backend).
         </p>
       </div>
 
-      {/* 各类型工作流 */}
+      {/* Workflow Types */}
       {workflowTypes.map(({ key, label, icon }) => (
-        <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
-            <span className="font-medium flex items-center gap-2">
-              <span>{icon}</span>
+        <div key={key} className="card overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <span className="font-bold text-slate-800 flex items-center gap-2">
+              <span className="text-xl">{icon}</span>
               <span>{label}</span>
-              <span className="text-sm text-gray-500">({data[key].length} 个)</span>
+              <span className="text-sm font-normal text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-sm ml-2">{data[key].length}</span>
             </span>
             <button
               onClick={() => addWorkflow(key)}
-              className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm"
+              className="btn btn-secondary text-xs py-1.5"
             >
-              + 添加工作流
+              + Add Workflow
             </button>
           </div>
 
-          <div className="p-4 space-y-3">
+          <div className="p-5 space-y-4">
             {data[key].length === 0 ? (
-              <div className="text-center py-4 text-gray-400">
-                暂无工作流配置，点击上方按钮添加
+              <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                No workflows configured.
               </div>
             ) : (
               data[key].map((workflow, index) => (
@@ -956,7 +960,7 @@ function WorkflowConfigEditor({
   )
 }
 
-// ============ 单个工作流编辑器 ============
+// ============ Workflow Item Editor ============
 function WorkflowItemEditor({
   workflow,
   isExpanded,
@@ -1002,20 +1006,20 @@ function WorkflowItemEditor({
   }
 
   return (
-    <div className={`border rounded-lg ${workflow.default ? 'border-purple-300 bg-purple-50/50' : 'border-gray-200'}`}>
+    <div className={`border rounded-xl transition-all duration-200 ${workflow.default ? 'border-primary-300 ring-4 ring-primary-50 bg-white' : 'border-slate-200 bg-white'}`}>
       {/* Header */}
       <div
-        className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+        className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 rounded-xl transition-colors"
         onClick={onToggle}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-hidden">
           {workflow.default && (
-            <span className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
-              默认
+            <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-primary-200">
+              Default
             </span>
           )}
-          <span className="font-medium">{workflow.name}</span>
-          <span className="text-sm text-gray-500">{workflow.workflow_file || '(未配置文件)'}</span>
+          <span className="font-semibold text-slate-800 truncate">{workflow.name}</span>
+          <span className="text-xs text-slate-400 font-mono hidden sm:inline-block truncate max-w-[200px]">{workflow.workflow_file || '(No File)'}</span>
         </div>
         <div className="flex items-center gap-2">
           {!workflow.default && (
@@ -1024,9 +1028,9 @@ function WorkflowItemEditor({
                 e.stopPropagation()
                 onSetDefault()
               }}
-              className="px-2 py-1 text-xs text-purple-600 hover:bg-purple-100 rounded"
+              className="px-2 py-1 text-xs font-medium text-slate-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
             >
-              设为默认
+              Set Default
             </button>
           )}
           <button
@@ -1034,108 +1038,108 @@ function WorkflowItemEditor({
               e.stopPropagation()
               onRemove()
             }}
-            className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded"
+            className="px-2 py-1 text-xs font-medium text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
           >
-            删除
+            Remove
           </button>
-          <span className="text-gray-400">{isExpanded ? '▼' : '▶'}</span>
+          <span className={`text-slate-300 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
         </div>
       </div>
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="px-4 py-3 border-t border-gray-200 space-y-4">
-          {/* 基本信息 */}
-          <div className="grid grid-cols-2 gap-4">
+        <div className="px-5 py-5 border-t border-slate-100 space-y-5 bg-slate-50/50 rounded-b-xl">
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ID</label>
               <input
                 type="text"
                 value={workflow.id}
                 onChange={(e) => onChange({ ...workflow, id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm font-mono"
+                className="input w-full font-mono text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">名称</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Name</label>
               <input
                 type="text"
                 value={workflow.name}
                 onChange={(e) => onChange({ ...workflow, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="input w-full text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">描述</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description</label>
             <input
               type="text"
               value={workflow.description}
               onChange={(e) => onChange({ ...workflow, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+              className="input w-full text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">工作流文件</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Workflow File.json</label>
             <input
               type="text"
               value={workflow.workflow_file}
               onChange={(e) => onChange({ ...workflow, workflow_file: e.target.value })}
-              placeholder="例如: character_portrait_flux2.json"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm font-mono"
+              placeholder="e.g., character_portrait_flux2.json"
+              className="input w-full font-mono text-sm"
             />
           </div>
 
-          {/* 参数 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">工作流参数</label>
-            <div className="space-y-2 mb-3">
+          {/* Parameters */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Workflow Parameters</label>
+            <div className="space-y-3 mb-4">
               {Object.entries(workflow.params).map(([key, value]) => (
-                <div key={key} className="flex gap-2 items-center">
+                <div key={key} className="flex gap-3 items-center group">
                   <input
                     type="text"
                     value={key}
                     readOnly
-                    className="w-1/3 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm font-mono"
+                    className="w-1/3 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-mono text-slate-600"
                   />
-                  <span className="text-gray-400">=</span>
+                  <span className="text-slate-300">=</span>
                   <input
                     type="text"
                     value={String(value ?? '')}
                     onChange={(e) => updateParam(key, e.target.value)}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                    className="flex-1 px-2 py-1.5 border border-slate-200 rounded text-xs font-mono focus:border-primary-400 outline-none transition-colors"
                   />
                   <button
                     onClick={() => removeParam(key)}
-                    className="text-red-500 hover:text-red-700 px-2"
+                    className="text-slate-300 hover:text-red-500 px-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     ×
                   </button>
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3 pt-3 border-t border-slate-100">
               <input
                 type="text"
                 value={newParamKey}
                 onChange={(e) => setNewParamKey(e.target.value)}
-                placeholder="参数名"
-                className="w-1/3 px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                placeholder="Param Name"
+                className="w-1/3 px-2 py-1.5 border border-slate-200 rounded text-xs font-mono focus:border-primary-400 outline-none"
               />
               <input
                 type="text"
                 value={newParamValue}
                 onChange={(e) => setNewParamValue(e.target.value)}
-                placeholder="值（数字或字符串）"
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                placeholder="Value"
+                className="flex-1 px-2 py-1.5 border border-slate-200 rounded text-xs font-mono focus:border-primary-400 outline-none"
               />
               <button
                 onClick={addParam}
-                className="px-3 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 text-sm"
+                className="btn btn-secondary text-xs py-1 px-3"
               >
-                添加
+                Add
               </button>
             </div>
           </div>

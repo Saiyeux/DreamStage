@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Character, Scene } from '@/types'
-import { projectsApi, analysisApi, charactersApi, generationApi } from '@/api'
+import { projectsApi, analysisApi, charactersApi, generationApi, configApi } from '@/api'
+import type { ImageType, CharacterImageTemplates } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
 import { analysisService } from '@/services/analysisService'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
@@ -48,7 +49,7 @@ export function ScriptAnalysisPage() {
       }
     } else if (isStreaming) {
       appendTerminalOutput('')
-      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 检测到连接中断，已重置状态`)
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] Connection lost, state reset`)
       setAnalysisState({
         isStreaming: false,
         currentAnalyzing: null
@@ -93,7 +94,7 @@ export function ScriptAnalysisPage() {
 
   const createAnalysisCallbacks = useCallback((analysisType: 'characters' | 'scenes') => ({
     onStart: () => {
-      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM 开始响应...`)
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM Responding...`)
       appendTerminalOutput('')
     },
     onChunk: (content: string) => {
@@ -101,15 +102,15 @@ export function ScriptAnalysisPage() {
     },
     onSaved: (count: number) => {
       appendTerminalOutput('')
-      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已保存 ${count} 条数据`)
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] Saved ${count} items`)
     },
     onParseError: (message: string) => {
       appendTerminalOutput('')
-      appendTerminalOutput(`[警告] 解析JSON失败: ${message}`)
+      appendTerminalOutput(`[WARN] JSON Parse Error: ${message}`)
     },
     onDone: async () => {
       appendTerminalOutput('')
-      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 分析完成`)
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] Analysis Complete`)
       setAnalysisState({
         isStreaming: false,
         currentAnalyzing: null
@@ -126,7 +127,7 @@ export function ScriptAnalysisPage() {
           }
         } catch (err) {
           console.error('Reload data failed:', err)
-          appendTerminalOutput(`[错误] 加载数据失败: ${err}`)
+          appendTerminalOutput(`[ERROR] Reload data failed: ${err}`)
         }
       }
 
@@ -134,7 +135,7 @@ export function ScriptAnalysisPage() {
     },
     onError: (message: string) => {
       appendTerminalOutput('')
-      appendTerminalOutput(`[错误] ${message}`)
+      appendTerminalOutput(`[ERROR] ${message}`)
       setAnalysisState({
         isStreaming: false,
         currentAnalyzing: null
@@ -143,7 +144,7 @@ export function ScriptAnalysisPage() {
     },
     onConnectionLost: () => {
       appendTerminalOutput('')
-      appendTerminalOutput('[连接断开]')
+      appendTerminalOutput('[Connection Lost]')
       setAnalysisState({
         isStreaming: false,
         currentAnalyzing: null
@@ -155,7 +156,7 @@ export function ScriptAnalysisPage() {
   const stopStream = async () => {
     analysisService.stop()
     appendTerminalOutput('')
-    appendTerminalOutput(`[${new Date().toLocaleTimeString()}] 已手动停止`)
+    appendTerminalOutput(`[${new Date().toLocaleTimeString()}] Stopped manually`)
     setAnalysisState({
       isStreaming: false,
       currentAnalyzing: null
@@ -173,11 +174,11 @@ export function ScriptAnalysisPage() {
       currentAnalyzing: analysisType,
     })
 
-    const typeName = analysisType === 'characters' ? '角色' : '场景'
+    const typeName = analysisType === 'characters' ? 'Characters' : 'Scenes'
     setAnalysisState({
       terminalOutput: [
-        `> 开始分析${typeName}...`,
-        `[${new Date().toLocaleTimeString()}] 连接 LLM 服务...`,
+        `> Starting analysis for ${typeName}...`,
+        `[${new Date().toLocaleTimeString()}] Connecting to LLM Service...`,
         '',
       ],
     })
@@ -192,23 +193,21 @@ export function ScriptAnalysisPage() {
     }
   }
 
-  // 无项目时的空状态
+  // Empty state
   if (!projectId) {
     return (
-      <div className="flex h-screen bg-[#FBFBFC]">
+      <div className="flex h-screen bg-slate-50">
         <ProjectSidebar
           currentProject={null}
           onProjectChange={handleProjectChange}
         />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-sm">
-            <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+            <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mx-auto mb-6 shadow-sm">
+              <span className="text-3xl">👋</span>
             </div>
-            <h2 className="text-base font-medium text-[#1D1D1F] mb-1">请先上传剧本</h2>
-            <p className="text-sm text-[#6B6F76]">上传剧本后，系统将自动分析角色和分镜</p>
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">Welcome to Studio</h2>
+            <p className="text-sm text-slate-500">Select or create a project to get started with script analysis</p>
           </div>
         </div>
       </div>
@@ -217,15 +216,15 @@ export function ScriptAnalysisPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-[#FBFBFC]">
+      <div className="flex h-screen bg-slate-50">
         <ProjectSidebar
           currentProject={currentProject}
           onProjectChange={handleProjectChange}
         />
         <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-[#6B6F76]">
-            <span className="w-4 h-4 border-2 border-[#E4E5E7] border-t-[#F97316] rounded-full animate-spin" />
-            <span className="text-sm">加载中...</span>
+          <div className="flex flex-col items-center gap-4">
+            <span className="w-8 h-8 border-2 border-slate-200 border-t-primary-500 rounded-full animate-spin" />
+            <span className="text-sm font-medium text-slate-500">Loading workspace...</span>
           </div>
         </div>
       </div>
@@ -233,8 +232,8 @@ export function ScriptAnalysisPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#FBFBFC]">
-      {/* 左侧边栏 */}
+    <div className="flex h-screen overflow-hidden bg-slate-50">
+      {/* Sidebar */}
       <ProjectSidebar
         currentProject={currentProject}
         onProjectChange={handleProjectChange}
@@ -244,60 +243,62 @@ export function ScriptAnalysisPage() {
         currentAnalyzing={currentAnalyzing}
       />
 
-      {/* 右侧主内容区 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 顶部标题栏 */}
-        <div className="bg-white border-b border-[#E4E5E7] px-6 py-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-medium text-[#1D1D1F]">
-              {currentProject?.name || '未命名项目'}
-            </h1>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10 basis-16 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center text-lg shadow-sm border border-indigo-100">
+                📝
+              </span>
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight truncate max-w-md">
+                {currentProject?.name || 'Untitled Project'}
+              </h1>
+            </div>
+
             {isStreaming && (
-              <span className="tag primary animate-pulse-subtle">
-                分析中
+              <span className="badge badge-accent animate-pulse-soft">
+                Processing
               </span>
             )}
           </div>
-        </div>
 
-        {/* Tab切换 - 胶囊式按钮 */}
-        <div className="bg-white border-b border-[#E4E5E7] px-6 py-3">
-          <div className="flex gap-2">
+          {/* View Toggle */}
+          <div className="flex bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => setActiveTab('characters')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                activeTab === 'characters'
-                  ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white shadow-sm'
-                  : 'bg-[#F7F8F9] text-[#6B6F76] hover:bg-[#FFEDD5] hover:text-[#EA580C]'
-              }`}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'characters'
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
             >
-              角色库
+              <span>👤</span> Characters
               {characters.length > 0 && (
-                <span className={`ml-1.5 text-xs ${activeTab === 'characters' ? 'text-white/80' : 'text-[#9CA0A8]'}`}>
+                <span className={`text-xs ${activeTab === 'characters' ? 'opacity-100' : 'opacity-60'} bg-slate-200 px-1.5 rounded-full`}>
                   {characters.length}
                 </span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('scenes')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                activeTab === 'scenes'
-                  ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white shadow-sm'
-                  : 'bg-[#F7F8F9] text-[#6B6F76] hover:bg-[#FFEDD5] hover:text-[#EA580C]'
-              }`}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'scenes'
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
             >
-              场景库
+              <span>🎬</span> Scenes
               {scenes.length > 0 && (
-                <span className={`ml-1.5 text-xs ${activeTab === 'scenes' ? 'text-white/80' : 'text-[#9CA0A8]'}`}>
+                <span className={`text-xs ${activeTab === 'scenes' ? 'opacity-100' : 'opacity-60'} bg-slate-200 px-1.5 rounded-full`}>
                   {scenes.length}
                 </span>
               )}
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* 主内容区域 */}
-        <div className="flex-1 overflow-hidden flex">
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden flex relative">
           {activeTab === 'characters' ? (
             <CharactersContent
               characters={characters}
@@ -311,33 +312,33 @@ export function ScriptAnalysisPage() {
           )}
         </div>
 
-        {/* 底部终端 */}
-        <div className="border-t border-[#E4E5E7] bg-[#1D1D1F]">
+        {/* Terminal */}
+        <div className="border-t border-slate-200 bg-slate-900 text-slate-400 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] shrink-0">
           <div
-            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-white/5"
+            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-white/5 transition-colors"
             onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
           >
             <div className="flex items-center gap-2">
-              <span className="text-[#F97316] text-xs font-mono">$</span>
-              <span className="text-[#9CA0A8] text-xs font-medium">Output</span>
+              <span className="text-green-400 text-xs font-mono">➜</span>
+              <span className="text-xs font-mono font-medium">Console Output</span>
               {isStreaming && (
-                <span className="flex items-center gap-1 text-xs text-[#F97316]">
-                  <span className="w-1.5 h-1.5 bg-[#F97316] rounded-full animate-pulse" />
-                  streaming
+                <span className="flex items-center gap-1.5 ml-2 px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400 text-[10px] font-medium border border-primary-500/20">
+                  <span className="w-1 h-1 bg-primary-400 rounded-full animate-pulse" />
+                  Streaming
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {isStreaming && (
                 <button
                   onClick={(e) => { e.stopPropagation(); stopStream(); }}
-                  className="px-2 py-1 bg-[#EF4444] text-white text-xs rounded font-medium hover:bg-[#DC2626] transition-colors duration-200"
+                  className="px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] rounded hover:bg-red-500/20 transition-colors"
                 >
-                  停止
+                  Stop Process
                 </button>
               )}
               <svg
-                className={`w-4 h-4 text-[#6B6F76] transition-transform ${terminalExpanded ? '' : 'rotate-180'}`}
+                className={`w-4 h-4 transition-transform duration-200 ${terminalExpanded ? '' : 'rotate-180'}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -350,20 +351,20 @@ export function ScriptAnalysisPage() {
           {terminalExpanded && (
             <div
               ref={terminalRef}
-              className="px-4 py-3 font-mono text-xs text-[#9CA0A8] overflow-y-auto bg-[#161618]"
-              style={{ maxHeight: '160px' }}
+              className="px-4 py-3 font-mono text-xs overflow-y-auto bg-black/20"
+              style={{ maxHeight: '200px', height: '160px' }}
             >
               {terminalOutput.length === 0 ? (
-                <p className="text-[#6B6F76]">等待任务...</p>
+                <p className="opacity-50 italic">Ready for tasks...</p>
               ) : (
                 terminalOutput.map((line, i) => (
-                  <div key={i} className="whitespace-pre-wrap break-all leading-relaxed">
+                  <div key={i} className="whitespace-pre-wrap break-all leading-tight py-0.5">
                     {line || '\u00A0'}
                   </div>
                 ))
               )}
               {isStreaming && (
-                <span className="inline-block w-1.5 h-3 bg-[#F97316] animate-pulse ml-0.5" />
+                <span className="inline-block w-2 h-4 bg-primary-500 animate-pulse align-middle ml-1" />
               )}
             </div>
           )}
@@ -373,7 +374,6 @@ export function ScriptAnalysisPage() {
   )
 }
 
-// 角色内容区
 function CharactersContent({
   characters,
   projectId
@@ -386,14 +386,23 @@ function CharactersContent({
   const [isEditing, setIsEditing] = useState(false)
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
   const [isSaving, setIsSaving] = useState(false)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const selectedCharacter = characters[selectedIndex]
 
-  // 生成相关状态
+  // Generation state
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateProgress, setGenerateProgress] = useState(0)
   const [generateMessage, setGenerateMessage] = useState('')
   const pollingRef = useRef<number | null>(null)
+
+  // Settings state
+  const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(['front']) // Default to front view
+  const [isManagingTags, setIsManagingTags] = useState(false)
+
+  useEffect(() => {
+    // Load image templates to get available types
+    configApi.getCharacterImageTemplates().then(setTemplates).catch(console.error)
+  }, [])
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index)
@@ -401,28 +410,16 @@ function CharactersContent({
     setEditedCharacter({})
   }
 
-  const handleScrollLeft = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' })
-    }
-  }
-
-  const handleScrollRight = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' })
-    }
-  }
-
   const handleEdit = () => {
+    if (!selectedCharacter) return
     setIsEditing(true)
     setEditedCharacter({
       name: selectedCharacter.name,
       gender: selectedCharacter.gender,
       age: selectedCharacter.age,
       roleType: selectedCharacter.roleType,
-      appearance: selectedCharacter.appearance,
       personality: selectedCharacter.personality,
-      clothing: selectedCharacter.clothing,
+      clothingStyle: selectedCharacter.clothingStyle,
     })
   }
 
@@ -442,15 +439,16 @@ function CharactersContent({
         age: editedCharacter.age,
         role_type: editedCharacter.roleType,
         personality: editedCharacter.personality,
-        clothing_style: editedCharacter.clothing,
+        clothing_style: editedCharacter.clothingStyle,
       })
 
-      alert('保存成功！')
+      alert('Successfully saved!')
       setIsEditing(false)
-      window.location.reload()
+      const updated = await analysisApi.getCharacters(projectId)
+      setCharacters(updated)
     } catch (err) {
       console.error('Save character failed:', err)
-      alert('保存失败，请重试')
+      alert('Failed to save, please try again')
     } finally {
       setIsSaving(false)
     }
@@ -460,7 +458,6 @@ function CharactersContent({
     setEditedCharacter(prev => ({ ...prev, [field]: value }))
   }
 
-  // 清理轮询
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -469,31 +466,32 @@ function CharactersContent({
     }
   }, [])
 
-  // 生成角色图
   const handleGenerate = async () => {
     if (!selectedCharacter?.id || isGenerating) return
+    if (selectedTypes.length === 0) {
+      alert('Please select at least one image type')
+      return
+    }
 
     setIsGenerating(true)
     setGenerateProgress(0)
-    setGenerateMessage('正在启动生成任务...')
+    setGenerateMessage('Starting task...')
 
     try {
-      // 调用生成 API，生成 front 类型的图片
       const response = await generationApi.generateCharacterImages(
         projectId,
         selectedCharacter.id,
-        ['front']
+        selectedTypes
       )
 
       const taskId = response.task_id
-      setGenerateMessage('生成中...')
+      setGenerateMessage('Generating...')
 
-      // 轮询任务状态
       pollingRef.current = window.setInterval(async () => {
         try {
           const status = await generationApi.getTaskStatus(taskId)
           setGenerateProgress(status.progress)
-          setGenerateMessage(status.message || '生成中...')
+          setGenerateMessage(status.message || 'Generating...')
 
           if (status.status === 'completed') {
             if (pollingRef.current) {
@@ -501,9 +499,8 @@ function CharactersContent({
               pollingRef.current = null
             }
             setIsGenerating(false)
-            setGenerateMessage('生成完成！')
+            setGenerateMessage('Done!')
 
-            // 刷新角色数据
             const updatedCharacters = await analysisApi.getCharacters(projectId)
             setCharacters(updatedCharacters)
 
@@ -517,7 +514,7 @@ function CharactersContent({
               pollingRef.current = null
             }
             setIsGenerating(false)
-            setGenerateMessage(`生成失败: ${status.error || '未知错误'}`)
+            setGenerateMessage(`Failed: ${status.error || 'Unknown error'}`)
           }
         } catch (err) {
           console.error('Poll status failed:', err)
@@ -526,272 +523,339 @@ function CharactersContent({
     } catch (err) {
       console.error('Generate failed:', err)
       setIsGenerating(false)
-      setGenerateMessage('启动生成任务失败')
+      setGenerateMessage('Failed to start task')
     }
+  }
+
+  const toggleType = (typeId: string) => {
+    setSelectedTypes(prev =>
+      prev.includes(typeId)
+        ? prev.filter(t => t !== typeId)
+        : [...prev, typeId]
+    )
   }
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      {/* 左侧详情面板 - 精致设计 */}
-      <div className="w-80 bg-white border-r border-[#E4E5E7] overflow-y-auto">
+      {/* List Pane */}
+      <div className="w-64 bg-white border-r border-slate-200 overflow-y-auto flex flex-col shrink-0">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Character List</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {characters.map((character, index) => (
+            <button
+              key={character.id}
+              onClick={() => handleSelect(index)}
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${index === selectedIndex
+                ? 'bg-primary-50 text-primary-700 shadow-sm border border-primary-100'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
+                }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${character.gender?.includes('女') || character.gender?.toLowerCase() === 'female' ? 'bg-pink-400' : 'bg-blue-400'
+                  }`} />
+                <span className="truncate">{character.name}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Detail Content */}
+      <div className="flex-1 bg-slate-50 overflow-y-auto p-6 lg:p-8">
         {characters.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-16 h-16 bg-[#FFF7ED] rounded-2xl flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-[#F97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+          <div className="h-full flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
+              <span className="text-3xl opacity-20">👤</span>
             </div>
-            <h3 className="text-sm font-medium text-[#1D1D1F] mb-1">暂无角色数据</h3>
-            <p className="text-xs text-[#9CA0A8]">请先分析角色</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">No Characters Found</h3>
+            <p className="text-sm text-slate-500">Run character analysis to populate this list.</p>
           </div>
         ) : (
-          <div className="p-4 overflow-y-auto">
-            {/* 标题栏 */}
-            <div className="flex items-center justify-between mb-4">
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={editedCharacter.name || ''}
-                  onChange={(e) => updateField('name', e.target.value)}
-                  className="flex-1 px-2 py-1 border border-[#E4E5E7] rounded text-base font-semibold focus:outline-none focus:border-[#F97316]"
-                />
-              ) : (
-                <h3 className="text-base font-semibold text-[#1D1D1F]">{selectedCharacter?.name}</h3>
-              )}
-              {!isEditing && (
-                <button
-                  onClick={handleEdit}
-                  className="text-xs text-[#F97316] hover:text-[#EA580C] font-medium transition-colors duration-200"
-                >
-                  编辑
-                </button>
-              )}
-            </div>
-
-            {/* 详情信息区 */}
-            <div className="space-y-4 text-sm">
-              <Field
-                label="类型"
-                value={selectedCharacter?.roleType}
-                isEditing={isEditing}
-                editValue={editedCharacter.roleType}
-                onChange={(v) => updateField('roleType', v)}
-              />
-              <Field
-                label="性别"
-                value={selectedCharacter?.gender}
-                isEditing={isEditing}
-                editValue={editedCharacter.gender}
-                onChange={(v) => updateField('gender', v)}
-              />
-              <Field
-                label="年龄"
-                value={selectedCharacter?.age}
-                isEditing={isEditing}
-                editValue={editedCharacter.age}
-                onChange={(v) => updateField('age', v)}
-              />
-              <Field
-                label="外貌"
-                value={selectedCharacter?.appearance}
-                isEditing={isEditing}
-                editValue={editedCharacter.appearance}
-                onChange={(v) => updateField('appearance', v)}
-                multiline
-              />
-              <Field
-                label="性格"
-                value={selectedCharacter?.personality}
-                isEditing={isEditing}
-                editValue={editedCharacter.personality}
-                onChange={(v) => updateField('personality', v)}
-                multiline
-              />
-              <Field
-                label="服装"
-                value={selectedCharacter?.clothing}
-                isEditing={isEditing}
-                editValue={editedCharacter.clothing}
-                onChange={(v) => updateField('clothing', v)}
-                multiline
-              />
-
-            {isEditing ? (
-              <div className="flex gap-2 pt-4 border-t border-[#E4E5E7]">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] disabled:opacity-50 shadow-sm transition-all duration-200"
-                >
-                  {isSaving ? '保存中...' : '保存修改'}
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={isSaving}
-                  className="flex-1 py-2.5 bg-[#F7F8F9] text-[#6B6F76] rounded-lg text-sm font-medium hover:bg-[#E4E5E7] disabled:opacity-50 transition-all duration-200"
-                >
-                  取消
-                </button>
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* Header / Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editedCharacter.name || ''}
+                    onChange={(e) => updateField('name', e.target.value)}
+                    className="input text-2xl font-bold px-3 py-1.5 w-full sm:w-64"
+                    placeholder="Character Name"
+                  />
+                ) : (
+                  <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                    {selectedCharacter?.name}
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${selectedCharacter.gender?.includes('Female') || selectedCharacter.gender?.includes('女')
+                      ? 'bg-pink-50 text-pink-600 border-pink-100'
+                      : 'bg-blue-50 text-blue-600 border-blue-100'
+                      }`}>
+                      {selectedCharacter.gender?.includes('Female') || selectedCharacter.gender?.includes('女') ? '♀' : '♂'} {selectedCharacter.gender}
+                    </span>
+                  </h2>
+                )}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="badge badge-neutral bg-white border border-slate-200">{selectedCharacter.roleType || 'Role'}</span>
+                  <span className="badge badge-neutral bg-white border border-slate-200">{selectedCharacter.age || 'Age'}</span>
+                </div>
               </div>
-            ) : (
-              <div className="pt-4 border-t border-[#E4E5E7] space-y-3">
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="w-full py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
-                >
-                  {isGenerating ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      生成中...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      生成角色图
-                    </>
-                  )}
-                </button>
 
-                {/* 进度条 */}
-                {(isGenerating || generateMessage) && (
-                  <div className="space-y-1.5">
-                    <div className="h-2 bg-[#E4E5E7] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#F97316] to-[#FB923C] transition-all duration-300"
-                        style={{ width: `${generateProgress}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-[#6B6F76] text-center">{generateMessage}</p>
+              <div className="flex gap-2">
+                {!isEditing ? (
+                  <>
+                    <button
+                      onClick={handleEdit}
+                      className="btn btn-secondary text-xs"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isGenerating}
+                      className="btn btn-primary text-xs shadow-md shadow-primary-500/20"
+                    >
+                      {isGenerating ? '⏳ Generating...' : '▶ Generate Selected'}
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="btn btn-primary text-xs"
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="btn btn-secondary text-xs"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 )}
               </div>
-            )}
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* 右侧内容区 */}
-      <div className="flex-1 bg-[#FBFBFC] overflow-hidden flex flex-col">
-        {characters.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+            {/* Progress Bar */}
+            {(isGenerating || generateMessage) && (
+              <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm animate-fade-in">
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="font-medium text-primary-600 flex items-center gap-2">
+                    {isGenerating && <span className="animate-spin w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full" />}
+                    {generateMessage}
+                  </span>
+                  <span className="text-slate-400">{generateProgress}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${generateProgress}%` }} />
+                </div>
               </div>
-              <p className="text-sm text-[#6B6F76]">暂无角色数据</p>
-              <p className="text-xs text-[#9CA0A8] mt-1">使用左侧"分析角色"按钮开始</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* 生成的图片 */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <h3 className="text-sm font-medium text-[#1D1D1F] mb-4">生成内容</h3>
-              {selectedCharacter?.characterImages && selectedCharacter.characterImages.length > 0 ? (
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedCharacter.characterImages.map((img) => (
-                    <div key={img.id} className="card overflow-hidden rounded-xl transition-all duration-200">
-                      <img
-                        src={fileUrl.image(img.imagePath)}
-                        alt={`${selectedCharacter.name} - ${img.imageType}`}
-                        className="w-full aspect-square object-cover"
-                      />
-                      <div className="p-3">
-                        <p className="text-sm font-medium text-[#1D1D1F]">{img.imageType}</p>
-                        <p className="text-xs text-[#9CA0A8] mt-0.5">
-                          {new Date(img.createdAt).toLocaleDateString()}
-                        </p>
+            )}
+
+            {/* Split Grid - 50/50 Ratio */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Left Column: Details & Settings */}
+              <div className="space-y-6">
+                {/* Basic Info */}
+                <div className="card p-6">
+                  <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                    <span>📄</span> Character Profile
+                  </h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                    <Field label="Role Type" value={selectedCharacter.roleType} isEditing={isEditing} editValue={editedCharacter.roleType} onChange={(v) => updateField('roleType', v)} />
+                    <Field label="Gender" value={selectedCharacter.gender} isEditing={isEditing} editValue={editedCharacter.gender} onChange={(v) => updateField('gender', v)} />
+                    <Field label="Age" value={selectedCharacter.age} isEditing={isEditing} editValue={editedCharacter.age} onChange={(v) => updateField('age', v)} />
+                  </div>
+                  <div className="mt-4 space-y-4">
+                    <Field label="Personality" value={selectedCharacter.personality} isEditing={isEditing} editValue={editedCharacter.personality} onChange={(v) => updateField('personality', v)} multiline />
+                    <Field label="Clothing Style" value={selectedCharacter.clothingStyle} isEditing={isEditing} editValue={editedCharacter.clothingStyle} onChange={(v) => updateField('clothingStyle', v)} multiline />
+                    <div className="border-t border-slate-100 pt-4 mt-4">
+                      <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Appearance Details</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div><span className="text-slate-400 text-xs block mb-0.5">Hair</span> {selectedCharacter.hair || 'N/A'}</div>
+                        <div><span className="text-slate-400 text-xs block mb-0.5">Face</span> {selectedCharacter.face || 'N/A'}</div>
+                        <div><span className="text-slate-400 text-xs block mb-0.5">Body</span> {selectedCharacter.body || 'N/A'}</div>
+                        <div><span className="text-slate-400 text-xs block mb-0.5">Skin</span> {selectedCharacter.skin || 'N/A'}</div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
                   </div>
-                  <p className="text-sm text-[#6B6F76]">暂无生成图片</p>
-                  <p className="text-xs text-[#9CA0A8] mt-1">点击"生成角色图"开始</p>
                 </div>
-              )}
-            </div>
 
-            {/* 角色选择器 - 卡片式 - 添加最小高度确保可见 */}
-            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px] rounded-b-xl">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-[#1D1D1F]">角色列表</h4>
-                <div className="flex gap-1">
-                  <button
-                    onClick={handleScrollLeft}
-                    className="w-7 h-7 bg-white border border-[#E4E5E7] rounded-full flex items-center justify-center hover:border-[#F97316] hover:text-[#F97316] shadow-sm"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleScrollRight}
-                    className="w-7 h-7 bg-white border border-[#E4E5E7] rounded-full flex items-center justify-center hover:border-[#F97316] hover:text-[#F97316] shadow-sm"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-default py-1 items-stretch">
-                {characters.map((character, index) => {
-                  const isSelected = index === selectedIndex
-                  const isFemale = character.gender?.includes('女')
-                  const isMale = character.gender?.includes('男')
-
-                  // 性别对应的颜色
-                  const getBgColor = () => {
-                    if (isSelected) return '#F97316'
-                    if (isFemale) return '#FDF2F8'
-                    if (isMale) return '#EFF6FF'
-                    return '#F7F8F9'
-                  }
-                  const getTextColor = () => {
-                    if (isSelected) return 'white'
-                    if (isFemale) return '#BE185D'
-                    if (isMale) return '#1D4ED8'
-                    return '#6B7280'
-                  }
-
-                  return (
+                {/* Settings Panel */}
+                <div className="card p-6">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                    <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                      <span>⚙️</span> Image Generation Settings
+                    </h3>
                     <button
-                      key={character.id}
-                      onClick={() => handleSelect(index)}
-                      className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
-                      style={{
-                        background: getBgColor(),
-                        color: getTextColor(),
-                      }}
+                      onClick={() => setIsManagingTags(!isManagingTags)}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
                     >
-                      {character.name}
+                      {isManagingTags ? 'Done' : 'Manage Tags'}
                     </button>
-                  )
-                })}
+                  </div>
+
+                  {isManagingTags && templates ? (
+                    <TagManager
+                      templates={templates}
+                      onUpdate={async (newTemplates) => {
+                        await configApi.updateCharacterImageTemplates(newTemplates)
+                        setTemplates(newTemplates)
+                      }}
+                    />
+                  ) : templates ? (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-medium text-slate-500 mb-2">Views & Angles</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {templates.available_types.filter(t => ['front', 'side', 'back', 'close-up'].some(k => t.id.includes(k) || t.label.toLowerCase().includes(k))).map(type => (
+                            <button
+                              key={type.id}
+                              onClick={() => toggleType(type.id)}
+                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTypes.includes(type.id)
+                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                }`}
+                            >
+                              {selectedTypes.includes(type.id) && '✓ '} {type.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-medium text-slate-500 mb-2">Expressions</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {templates.available_types.filter(t => !['front', 'side', 'back', 'close-up'].some(k => t.id.includes(k) || t.label.toLowerCase().includes(k))).map(type => (
+                            <button
+                              key={type.id}
+                              onClick={() => toggleType(type.id)}
+                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selectedTypes.includes(type.id)
+                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                }`}
+                            >
+                              {selectedTypes.includes(type.id) && '✓ '} {type.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <h4 className="text-xs font-medium text-slate-500 mb-2">Selected: {selectedTypes.length} types</h4>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-400 text-sm italic">Loading settings...</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Gallery */}
+              <div className="h-full">
+                <div className="card p-6 h-full min-h-[500px] flex flex-col">
+                  <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span>🖼️</span> Generated Gallery
+                    </span>
+                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
+                      {selectedCharacter.images?.length || 0} images
+                    </span>
+                  </h3>
+
+                  <div className="flex-1 overflow-y-auto pr-1">
+                    {selectedCharacter.images && selectedCharacter.images.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {selectedCharacter.images.map((img) => (
+                          <div key={img.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[3/4] shadow-sm hover:shadow-md transition-all">
+                            <img
+                              src={fileUrl.image(img.imagePath)}
+                              alt={img.imageType}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                              <span className="text-xs text-white font-medium capitalize truncate">{img.imageType}</span>
+                              <div className="flex gap-2 mt-2">
+                                <button className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors text-xs flex-1">
+                                  View
+                                </button>
+                                <button className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors text-xs">
+                                  ⬇
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center py-10 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50">
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-100">
+                          <span className="text-3xl opacity-30">🖼️</span>
+                        </div>
+                        <h4 className="text-slate-900 font-medium mb-1">No Images Yet</h4>
+                        <p className="text-xs text-slate-500 max-w-[200px]">
+                          Select image types on the left settings panel and click Generate to start.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
   )
 }
 
-// 场景内容区
+function Field({
+  label,
+  value,
+  isEditing,
+  editValue,
+  onChange,
+  multiline = false
+}: {
+  label: string
+  value?: string
+  isEditing: boolean
+  editValue?: string
+  onChange: (value: string) => void
+  multiline?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
+      {isEditing ? (
+        multiline ? (
+          <textarea
+            value={editValue || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="input w-full p-2 text-sm min-h-[80px]"
+            placeholder={`Enter ${label.toLowerCase()}...`}
+          />
+        ) : (
+          <input
+            type="text"
+            value={editValue || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="input w-full p-2 text-sm"
+            placeholder={`Enter ${label.toLowerCase()}...`}
+          />
+        )
+      ) : (
+        <span className={`text-sm text-slate-700 leading-relaxed ${!value ? 'italic text-slate-400' : ''}`}>
+          {value || 'Not specified'}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function ScenesContent({
   scenes,
   projectId
@@ -799,13 +863,25 @@ function ScenesContent({
   scenes: Scene[]
   projectId: string
 }) {
-  const navigate = useNavigate()
+  const { setScenes } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedScene, setEditedScene] = useState<Partial<Scene>>({})
+  const [isSaving, setIsSaving] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
   const selectedScene = scenes[selectedIndex]
+
+  // Generation state
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateProgress, setGenerateProgress] = useState(0)
+  const [generateMessage, setGenerateMessage] = useState('')
+  const pollingRef = useRef<number | null>(null)
 
   const handleSelect = (index: number) => {
     setSelectedIndex(index)
+    setIsEditing(false)
+    setEditedScene({})
   }
 
   const handleScrollLeft = () => {
@@ -820,254 +896,417 @@ function ScenesContent({
     }
   }
 
+  const handleEdit = () => {
+    if (!selectedScene) return
+    setIsEditing(true)
+    setEditedScene({
+      location: selectedScene.location,
+      timeOfDay: selectedScene.timeOfDay,
+      atmosphere: selectedScene.atmosphere,
+      environmentDesc: selectedScene.environmentDesc,
+      shotType: selectedScene.shotType,
+      cameraMovement: selectedScene.cameraMovement,
+      dialogue: selectedScene.dialogue,
+    })
+  }
+
+  const handleCancel = () => {
+    setIsEditing(false)
+    setEditedScene({})
+  }
+
+  const handleSave = async () => {
+    if (!selectedScene?.id) return
+
+    setIsSaving(true)
+    try {
+      await analysisApi.updateScene(projectId, selectedScene.id, {
+        location: editedScene.location,
+        timeOfDay: editedScene.timeOfDay,
+        atmosphere: editedScene.atmosphere,
+        environmentDesc: editedScene.environmentDesc,
+        shotType: editedScene.shotType,
+        cameraMovement: editedScene.cameraMovement,
+        dialogue: editedScene.dialogue,
+      })
+
+      alert('Successfully saved')
+      setIsEditing(false)
+      const updated = await analysisApi.getScenes(projectId)
+      setScenes(updated)
+    } catch (err) {
+      console.error('Save scene failed:', err)
+      alert('Failed to save')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const updateField = (field: keyof Scene, value: string) => {
+    setEditedScene(prev => ({ ...prev, [field]: value }))
+  }
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [])
+
+  const startGenerationTask = async (apiCall: () => Promise<{ task_id: string }>) => {
+    setIsGenerating(true)
+    setGenerateProgress(0)
+    setGenerateMessage('Starting...')
+
+    try {
+      const response = await apiCall()
+      const taskId = response.task_id
+
+      pollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await generationApi.getTaskStatus(taskId)
+          setGenerateProgress(status.progress)
+          setGenerateMessage(status.message || 'Processing...')
+
+          if (status.status === 'completed') {
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current)
+              pollingRef.current = null
+            }
+            setIsGenerating(false)
+            setGenerateMessage('Done!')
+            const updated = await analysisApi.getScenes(projectId)
+            setScenes(updated)
+
+            setTimeout(() => {
+              setGenerateMessage('')
+              setGenerateProgress(0)
+            }, 2000)
+
+          } else if (status.status === 'failed') {
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current)
+              pollingRef.current = null
+            }
+            setIsGenerating(false)
+            setGenerateMessage('Failed')
+            alert(`Generation failed: ${status.error}`)
+          }
+        } catch (err) {
+          console.error('Poll failed', err)
+        }
+      }, 1000)
+    } catch (err) {
+      console.error('Start failed', err)
+      setIsGenerating(false)
+      setGenerateMessage('Failed to start')
+    }
+  }
+
+  const handleGenerateImage = () => {
+    if (!selectedScene?.id || isGenerating) return
+    startGenerationTask(() => generationApi.generateSceneImage(projectId, selectedScene.id))
+  }
+
+  const handleGenerateVideo = () => {
+    if (!selectedScene?.id || isGenerating) return
+    startGenerationTask(() => generationApi.generateSceneVideo(projectId, selectedScene.id))
+  }
+
   return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* 左侧详情面板 - 精致设计 */}
-      <div className="w-80 bg-white border-r border-[#E4E5E7] overflow-y-auto">
-        {scenes.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-16 h-16 bg-[#FFF7ED] rounded-2xl flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-[#F97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-medium text-[#1D1D1F] mb-1">暂无场景数据</h3>
-            <p className="text-xs text-[#9CA0A8]">请先分析场景</p>
-          </div>
-        ) : (
-          <div className="p-4 overflow-y-auto">
-            {/* 标题栏 */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-[#1D1D1F]">
-                场景 #{selectedScene?.sceneNumber}
-              </h3>
-              <span className="text-xs text-[#9CA0A8]">{selectedScene?.timeOfDay}</span>
-            </div>
+    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
+      {/* Scene Selector Strip */}
+      <div className="h-40 bg-white border-b border-slate-200 shrink-0 relative flex flex-col">
+        <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scene Timeline</h3>
+          <div className="text-xs text-slate-400">{selectedIndex + 1} / {scenes.length}</div>
+        </div>
 
-            {/* 详情信息区 */}
-            <div className="space-y-4 text-sm">
-              <Field label="地点" value={selectedScene?.location} />
-              {selectedScene?.durationSeconds && (
-                <Field label="时长" value={`${selectedScene.durationSeconds}秒`} />
-              )}
-              <Field label="环境" value={selectedScene?.environment} multiline />
-              <Field label="镜头" value={selectedScene?.cameraAngle} />
+        <div className="flex-1 relative group">
+          {/* Scroll Buttons */}
+          <button
+            onClick={handleScrollLeft}
+            className="absolute left-0 top-0 bottom-0 width-10 bg-gradient-to-r from-white to-transparent z-10 hover:from-slate-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          </button>
+          <button
+            onClick={handleScrollRight}
+            className="absolute right-0 top-0 bottom-0 width-10 bg-gradient-to-l from-white to-transparent z-10 hover:from-slate-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </button>
 
-              {selectedScene?.characters && selectedScene.characters.length > 0 && (
-                <div>
-                  <label className="text-xs font-medium text-[#6B6F76] block mb-2">出场角色</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedScene.characters.map((char) => (
-                      <span
-                        key={char.characterId}
-                        className="px-2.5 py-1 bg-[#FFF7ED] text-[#F97316] text-xs rounded-full font-medium"
-                      >
-                        {char.characterName}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedScene?.dialogues && selectedScene.dialogues.length > 0 && (
-                <div>
-                  <label className="text-xs font-medium text-[#6B6F76] block mb-2">对白</label>
-                  <div className="bg-[#F7F8F9] rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
-                    {selectedScene.dialogues.map((dialogue, idx) => (
-                      <div key={idx} className="text-xs">
-                        <span className="font-semibold text-[#F97316]">{dialogue.characterName}</span>
-                        <p className="text-[#1D1D1F] mt-0.5 pl-2 border-l-2 border-[#FFEDD5]">{dialogue.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 操作按钮 */}
-              <div className="pt-4 border-t border-[#E4E5E7] space-y-2">
+          <div
+            ref={scrollContainerRef}
+            className="h-full overflow-x-auto flex items-center gap-4 px-4 scrollbar-hide snap-x"
+          >
+            {scenes.length === 0 ? (
+              <div className="w-full text-center text-slate-400 text-sm">No scenes found</div>
+            ) : (
+              scenes.map((scene, i) => (
                 <button
-                  onClick={() => navigate(`/generation?project=${projectId}`)}
-                  className="w-full py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
+                  key={scene.id}
+                  onClick={() => handleSelect(i)}
+                  className={`shrink-0 w-48 h-24 rounded-lg border-2 transition-all flex flex-col overflow-hidden relative snap-center ${i === selectedIndex
+                    ? 'border-primary-500 ring-2 ring-primary-100 shadow-md'
+                    : 'border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
+                    }`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  生成场景图
+                  {scene.sceneImage ? (
+                    <img src={fileUrl.image(scene.sceneImage.imagePath)} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 bg-slate-100 flex items-center justify-center">
+                      <span className="text-2xl opacity-20">🎬</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-black/60 p-1.5 text-white backdrop-blur-[1px]">
+                    <div className="text-xs font-bold truncate">Sc {i + 1}. {scene.location}</div>
+                  </div>
                 </button>
-                <button
-                  onClick={() => navigate(`/generation?project=${projectId}`)}
-                  className="w-full py-2.5 bg-white text-[#1D1D1F] border border-[#E4E5E7] rounded-lg text-sm font-medium hover:border-[#F97316] hover:text-[#F97316] flex items-center justify-center gap-2 transition-all duration-200"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  生成视频
-                </button>
-              </div>
-            </div>
+              ))
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* 右侧内容区 */}
-      <div className="flex-1 bg-[#FBFBFC] overflow-hidden flex flex-col">
-        {scenes.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-[#F7F8F9] rounded-lg flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+      {/* Detailed View */}
+      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+        {scenes.length > 0 ? (
+          <div className="max-w-6xl mx-auto">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                  <span className="text-slate-400 font-normal">#{selectedIndex + 1}</span>
+                  {isEditing ? (
+                    <input
+                      value={editedScene.location || ''}
+                      onChange={(e) => updateField('location', e.target.value)}
+                      className="input py-1 px-2 font-bold"
+                    />
+                  ) : selectedScene?.location}
+                </h2>
+                <p className="text-slate-500 mt-1 flex items-center gap-3">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-400"></span> {selectedScene?.timeOfDay}</span>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                  <span>{selectedScene?.atmosphere}</span>
+                </p>
               </div>
-              <p className="text-sm text-[#6B6F76]">暂无场景数据</p>
-              <p className="text-xs text-[#9CA0A8] mt-1">使用左侧"分析场景"按钮开始</p>
+
+              <div className="flex gap-2">
+                {isEditing ? (
+                  <>
+                    <button onClick={handleSave} disabled={isSaving} className="btn btn-primary text-xs">Save</button>
+                    <button onClick={handleCancel} className="btn btn-secondary text-xs">Cancel</button>
+                  </>
+                ) : (
+                  <button onClick={handleEdit} className="btn btn-secondary text-xs">✏️ Edit Scene</button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Script Info */}
+              <div className="space-y-6">
+                <div className="card p-6">
+                  <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100">Visual Description</h3>
+                  <Field label="Environment" value={selectedScene.environmentDesc} isEditing={isEditing} editValue={editedScene.environmentDesc} onChange={(v) => updateField('environmentDesc', v)} multiline />
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <Field label="Shot Type" value={selectedScene.shotType} isEditing={isEditing} editValue={editedScene.shotType} onChange={(v) => updateField('shotType', v)} />
+                    <Field label="Camera" value={selectedScene.cameraMovement} isEditing={isEditing} editValue={editedScene.cameraMovement} onChange={(v) => updateField('cameraMovement', v)} />
+                  </div>
+                </div>
+
+                <div className="card p-6 bg-slate-900 text-slate-200 border-none">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Dialogue</h3>
+                  <div className="font-mono text-sm leading-relaxed whitespace-pre-wrap opacity-90">
+                    {isEditing ? (
+                      <textarea
+                        value={editedScene.dialogue || ''}
+                        onChange={(e) => updateField('dialogue', e.target.value)}
+                        className="w-full bg-slate-800 border-slate-700 rounded p-3 text-slate-200 focus:ring-primary-500 focus:border-primary-500 min-h-[150px]"
+                      />
+                    ) : (
+                      selectedScene.dialogue || <span className="italic opacity-50">No dialogue</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Media Preview */}
+              <div className="space-y-6">
+                <div className="card p-6">
+                  <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                    <h3 className="text-sm font-semibold text-slate-900">Media Assets</h3>
+                    <div className="flex gap-2">
+                      <button onClick={handleGenerateImage} disabled={isGenerating} className="btn btn-secondary text-xs">Gen Image</button>
+                      <button onClick={handleGenerateVideo} disabled={isGenerating || !selectedScene.sceneImage} className="btn btn-primary text-xs">Gen Video</button>
+                    </div>
+                  </div>
+
+                  {(isGenerating || generateMessage) && (
+                    <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 mb-4 text-xs flex items-center gap-3">
+                      <span className="animate-spin text-primary-500">⏳</span>
+                      <span className="font-medium text-primary-700">{generateMessage} ({generateProgress}%)</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="aspect-video bg-slate-100 rounded-xl overflow-hidden border border-slate-200 relative group">
+                      {selectedScene.sceneImage ? (
+                        <img src={fileUrl.image(selectedScene.sceneImage.imagePath)} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-slate-400 flex-col">
+                          <span className="text-4xl mb-2">🖼️</span>
+                          <span className="text-sm">No Scene Image</span>
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded text-xs text-white backdrop-blur">
+                        Reference Image
+                      </div>
+                    </div>
+
+                    <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 relative group">
+                      {selectedScene.videoClip ? (
+                        <video src={fileUrl.video(selectedScene.videoClip.videoPath)} controls className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-slate-600 flex-col">
+                          <span className="text-4xl mb-2 opacity-50">🎬</span>
+                          <span className="text-sm">No Video Clip</span>
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 bg-primary-600 px-2 py-1 rounded text-xs text-white backdrop-blur shadow-sm">
+                        Motion Preview
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
-          <>
-            {/* 生成的内容 */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <h3 className="text-sm font-medium text-[#1D1D1F] mb-4">生成内容</h3>
-              {(selectedScene?.sceneImage || (selectedScene?.videoClips && selectedScene.videoClips.length > 0)) ? (
-                <div className="space-y-4">
-                  {selectedScene.sceneImage && (
-                    <div className="card overflow-hidden rounded-xl transition-all duration-200">
-                      <img
-                        src={fileUrl.image(selectedScene.sceneImage.imagePath)}
-                        alt={`场景 ${selectedScene.sceneNumber}`}
-                        className="w-full aspect-video object-cover"
-                      />
-                      <div className="p-3">
-                        <p className="text-sm font-medium text-[#1D1D1F]">场景图</p>
-                        <p className="text-xs text-[#9CA0A8] mt-0.5">
-                          {new Date(selectedScene.sceneImage.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedScene.videoClips && selectedScene.videoClips.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedScene.videoClips.map((video) => (
-                        <div key={video.id} className="card overflow-hidden rounded-xl transition-all duration-200">
-                          <video
-                            src={fileUrl.video(video.videoPath)}
-                            controls
-                            className="w-full aspect-video object-cover bg-black rounded-t-xl"
-                          />
-                          <div className="p-3">
-                            <p className="text-sm font-medium text-[#1D1D1F]">视频片段</p>
-                            <p className="text-xs text-[#9CA0A8] mt-0.5">
-                              {new Date(video.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-12 h-12 bg-[#F7F8F9] rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-[#9CA0A8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-[#6B6F76]">暂无生成内容</p>
-                  <p className="text-xs text-[#9CA0A8] mt-1">点击左侧按钮开始生成</p>
-                </div>
-              )}
-            </div>
-
-            {/* 场景选择器 - 卡片式 - 添加最小高度确保可见 */}
-            <div className="bg-gradient-to-t from-[#F9FAFB] to-white border-t border-[#E4E5E7] p-4 min-h-[120px] rounded-b-xl">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-[#1D1D1F]">场景列表</h4>
-                <div className="flex gap-1">
-                  <button
-                    onClick={handleScrollLeft}
-                    className="w-7 h-7 bg-white border border-[#E4E5E7] rounded-full flex items-center justify-center hover:border-[#F97316] hover:text-[#F97316] shadow-sm"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleScrollRight}
-                    className="w-7 h-7 bg-white border border-[#E4E5E7] rounded-full flex items-center justify-center hover:border-[#F97316] hover:text-[#F97316] shadow-sm"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-default py-1 items-stretch">
-                {scenes.map((scene, index) => {
-                  const isSelected = index === selectedIndex
-
-                  return (
-                    <button
-                      key={scene.id}
-                      onClick={() => handleSelect(index)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white shadow-sm'
-                          : 'bg-[#FFF7ED] text-[#EA580C] hover:bg-[#FFEDD5]'
-                      }`}
-                    >
-                      #{scene.sceneNumber} {scene.location || '未知'}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </>
+          <div className="h-full flex items-center justify-center text-slate-400">
+            Select a project with scenes analyzed
+          </div>
         )}
       </div>
     </div>
   )
 }
 
-// 字段组件
-function Field({
-  label,
-  value,
-  isEditing,
-  editValue,
-  onChange,
-  multiline
+function TagManager({
+  templates,
+  onUpdate
 }: {
-  label: string
-  value?: string
-  isEditing?: boolean
-  editValue?: string
-  onChange?: (v: string) => void
-  multiline?: boolean
+  templates: CharacterImageTemplates
+  onUpdate: (templates: CharacterImageTemplates) => Promise<void>
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Partial<ImageType>>({})
+  const [isAdding, setIsAdding] = useState(false)
+
+  const handleEdit = (type: ImageType) => {
+    setEditingId(type.id)
+    setEditForm({ ...type })
+    setIsAdding(false)
+  }
+
+  const handleCancel = () => {
+    setEditingId(null)
+    setEditForm({})
+    setIsAdding(false)
+  }
+
+  const handleSave = async () => {
+    if (!editForm.id || !editForm.label) return
+
+    const newType = {
+      id: editForm.id,
+      label: editForm.label,
+      prompt_suffix: editForm.prompt_suffix || ''
+    } as ImageType
+
+    let newAvailableTypes = [...templates.available_types]
+
+    if (isAdding) {
+      if (newAvailableTypes.some(t => t.id === newType.id)) {
+        alert('ID already exists')
+        return
+      }
+      newAvailableTypes.push(newType)
+    } else {
+      newAvailableTypes = newAvailableTypes.map(t => t.id === editingId ? newType : t)
+    }
+
+    await onUpdate({
+      ...templates,
+      available_types: newAvailableTypes
+    })
+
+    handleCancel()
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this tag?')) return
+    const newAvailableTypes = templates.available_types.filter(t => t.id !== id)
+    await onUpdate({
+      ...templates,
+      available_types: newAvailableTypes
+    })
+  }
+
   return (
-    <div>
-      <label className="text-xs text-[#6B6F76] block mb-1">{label}</label>
-      {isEditing && onChange ? (
-        multiline ? (
-          <textarea
-            value={editValue || ''}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full px-2 py-1.5 border border-[#E4E5E7] rounded-md text-sm resize-none focus:outline-none focus:border-[#F97316]"
-            rows={3}
-          />
-        ) : (
-          <input
-            type="text"
-            value={editValue || ''}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full px-2 py-1.5 border border-[#E4E5E7] rounded-md text-sm focus:outline-none focus:border-[#F97316]"
-          />
-        )
-      ) : (
-        <p className="text-sm text-[#1D1D1F] leading-relaxed">{value || '—'}</p>
+    <div className="space-y-3">
+      {/* List */}
+      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+        {templates.available_types.map(type => (
+          <div key={type.id} className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg text-sm group hover:border-primary-200 transition-colors">
+            {editingId === type.id ? (
+              <div className="flex-1 space-y-2">
+                <div className="flex gap-2">
+                  <input className="input text-xs w-1/3 py-1" placeholder="ID" value={editForm.id} disabled />
+                  <input className="input text-xs flex-1 py-1" placeholder="Label" value={editForm.label} onChange={e => setEditForm({ ...editForm, label: e.target.value })} />
+                </div>
+                <input className="input text-xs w-full py-1" placeholder="Prompt Suffix" value={editForm.prompt_suffix} onChange={e => setEditForm({ ...editForm, prompt_suffix: e.target.value })} />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={handleSave} className="px-2 py-1 bg-primary-600 text-white rounded text-xs font-medium">Save</button>
+                  <button onClick={handleCancel} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-slate-700 truncate">{type.label}</div>
+                  <div className="text-xs text-slate-400 truncate">{type.prompt_suffix}</div>
+                </div>
+                <button onClick={() => handleEdit(type)} className="p-1 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors opacity-0 group-hover:opacity-100">✏️</button>
+                <button onClick={() => handleDelete(type.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100">🗑️</button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add Button */}
+      {!isAdding && !editingId && (
+        <button onClick={() => { setIsAdding(true); setEditForm({ id: '', label: '', prompt_suffix: '' }) }} className="w-full py-2 border border-dashed border-slate-300 rounded-lg text-slate-500 text-xs hover:border-primary-400 hover:text-primary-600 transition-colors hover:bg-slate-50">
+          + Add New Tag
+        </button>
+      )}
+
+      {isAdding && (
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2 animate-fade-in">
+          <div className="flex gap-2">
+            <input className="input text-xs w-1/3 py-1.5" placeholder="ID (e.g. smile)" value={editForm.id} onChange={e => setEditForm({ ...editForm, id: e.target.value })} />
+            <input className="input text-xs flex-1 py-1.5" placeholder="Label" value={editForm.label} onChange={e => setEditForm({ ...editForm, label: e.target.value })} />
+          </div>
+          <input className="input text-xs w-full py-1.5" placeholder="Prompt Suffix (e.g. smiling face)" value={editForm.prompt_suffix} onChange={e => setEditForm({ ...editForm, prompt_suffix: e.target.value })} />
+          <div className="flex gap-2 justify-end mt-2">
+            <button onClick={handleSave} className="btn btn-primary text-xs py-1 px-3">Add Tag</button>
+            <button onClick={handleCancel} className="btn btn-ghost text-xs py-1 px-3">Cancel</button>
+          </div>
+        </div>
       )}
     </div>
   )

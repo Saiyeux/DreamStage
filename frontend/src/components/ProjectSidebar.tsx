@@ -120,214 +120,193 @@ export function ProjectSidebar({
   }
 
   return (
-    <div className="w-60 bg-white border-r border-[#E4E5E7] flex flex-col h-screen overflow-y-auto">
-      {/* Logo / 标题 - 带图标 */}
-      <div className="px-4 py-4 border-b border-[#E4E5E7] flex-shrink-0">
+    <div className="w-72 bg-white border-r border-slate-200 flex flex-col h-screen overflow-y-auto shadow-sm">
+      {/* Sidebar Header */}
+      <div className="px-6 py-6 border-b border-slate-100 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#F97316] to-[#FB923C] rounded-xl flex items-center justify-center shadow-sm">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center shadow-md shadow-primary-500/20">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-bold text-[#1D1D1F]">AI Drama</h1>
-            <p className="text-[10px] text-[#9CA0A8]">智能剧本工作室</p>
+            <h1 className="text-sm font-bold text-slate-900 tracking-tight">Studio Panel</h1>
+            <p className="text-[11px] font-medium text-slate-400">Project Management</p>
           </div>
         </div>
       </div>
 
-      {/* 项目选择 - 卡片式 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
-        <label className="text-xs font-medium text-[#6B6F76] mb-2 block flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
-          项目
-        </label>
-        <select
-          value={currentProject?.id || ''}
-          onChange={(e) => onProjectChange?.(e.target.value)}
-          className="w-full px-3 py-2 bg-[#F7F8F9] border border-[#E4E5E7] rounded-lg text-sm text-[#1D1D1F] focus:outline-none focus:border-[#F97316] focus:ring-2 focus:ring-[#F97316]/10 cursor-pointer transition-all duration-200"
-        >
-          <option value="">选择项目...</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-        {currentProject && (
-          <button
-            onClick={handleDeleteProject}
-            className="w-full mt-2 py-1.5 text-xs text-[#EF4444] hover:bg-[#FEF2F2] rounded-lg font-medium transition-colors flex items-center justify-center gap-1"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            删除项目
-          </button>
-        )}
-      </div>
+      <div className="p-4 space-y-6 flex-1 overflow-y-auto">
+        {/* Project Selection */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Current Project
+            </label>
+            {currentProject && (
+              <button
+                onClick={handleDeleteProject}
+                className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors"
+                title="Delete Project"
+              >
+                Delete
+              </button>
+            )}
+          </div>
 
-      {/* 剧情简介 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-medium text-[#6B6F76] flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            简介
+          <select
+            value={currentProject?.id || ''}
+            onChange={(e) => onProjectChange?.(e.target.value)}
+            className="w-full input text-sm mb-3 cursor-pointer"
+          >
+            <option value="">Select a project...</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.pdf"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-full btn btn-secondary justify-center text-xs py-2"
+          >
+            {isUploading ? (
+              <>
+                <span className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>New Project</span>
+              </div>
+            )}
+          </button>
+        </section>
+
+        {/* Project Summary */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Summary
+            </label>
+            {currentProject && (
+              <button
+                onClick={handleGenerateSummary}
+                disabled={isGeneratingSummary}
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50 transition-colors"
+              >
+                {isGeneratingSummary ? 'Generating...' : 'Regenerate'}
+              </button>
+            )}
+          </div>
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 min-h-[80px]">
+            {currentProject?.summary ? (
+              <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                {currentProject.summary}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 italic text-center py-4">
+                No summary available.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Analysis Tools */}
+        <section>
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-3">
+            Analysis Tools
           </label>
-          {currentProject && (
+          <div className="space-y-2.5">
             <button
-              onClick={handleGenerateSummary}
-              disabled={isGeneratingSummary}
-              className="text-xs text-[#F97316] hover:text-[#EA580C] font-medium disabled:opacity-50 flex items-center gap-1 transition-colors duration-200"
+              onClick={onAnalyzeCharacters}
+              disabled={!currentProject || isAnalyzing}
+              className={`w-full btn justify-between group ${currentAnalyzing === 'characters'
+                ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200'
+                : 'btn-secondary text-slate-600'
+                }`}
             >
-              {isGeneratingSummary ? (
-                <>
-                  <span className="w-3 h-3 border-2 border-[#F97316]/30 border-t-[#F97316] rounded-full animate-spin" />
-                  生成中
-                </>
-              ) : (
-                <>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  生成
-                </>
+              <span className="flex items-center gap-2">
+                <span className="text-lg">👥</span>
+                Character Analysis
+              </span>
+              {currentAnalyzing === 'characters' && (
+                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
               )}
             </button>
-          )}
-        </div>
-        <div className="bg-[#F7F8F9] rounded-lg p-3 text-xs text-[#6B6F76] min-h-[60px] leading-relaxed transition-colors duration-200">
-          {currentProject?.summary ? (
-            <p className="whitespace-pre-wrap text-[#1D1D1F]">{currentProject.summary}</p>
-          ) : (
-            <p className="text-[#9CA0A8] italic text-center py-2">暂无简介</p>
-          )}
-        </div>
+
+            <button
+              onClick={onAnalyzeScenes}
+              disabled={!currentProject || isAnalyzing}
+              className={`w-full btn justify-between group ${currentAnalyzing === 'scenes'
+                ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200'
+                : 'btn-secondary text-slate-600'
+                }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-lg">🎬</span>
+                Scene Analysis
+              </span>
+              {currentAnalyzing === 'scenes' && (
+                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
+              )}
+            </button>
+          </div>
+        </section>
       </div>
 
-      {/* 服务状态 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
-        <label className="text-xs font-medium text-[#6B6F76] mb-2 block flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-          </svg>
-          服务状态
+      {/* System Status Footer */}
+      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-3">
+          System Status
         </label>
         <div className="space-y-2">
-          <div className="flex items-center justify-between p-2 bg-[#F7F8F9] rounded-lg transition-colors duration-200">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#6B6F76]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-600 flex items-center gap-1.5">
+              <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" />
               </svg>
-              <span className="text-xs text-[#1D1D1F]">ComfyUI</span>
-            </div>
-            <div className={`status-dot ${healthStatus?.comfyui?.connected ? 'online' : 'offline'}`} />
+              ComfyUI
+            </span>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${healthStatus?.comfyui?.connected
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+              : 'bg-red-50 text-red-700 border-red-100'
+              }`}>
+              <span className={`w-1 h-1 rounded-full ${healthStatus?.comfyui?.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              {healthStatus?.comfyui?.connected ? 'Connected' : 'Offline'}
+            </span>
           </div>
-          <div className="flex items-center justify-between p-2 bg-[#F7F8F9] rounded-lg transition-colors duration-200">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#6B6F76]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-600 flex items-center gap-1.5">
+              <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="text-xs text-[#1D1D1F]">LLM</span>
-            </div>
-            <div className={`status-dot ${healthStatus?.llm?.connected ? 'online' : 'offline'}`} />
+              LLM Service
+            </span>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${healthStatus?.llm?.connected
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+              : 'bg-red-50 text-red-700 border-red-100'
+              }`}>
+              <span className={`w-1 h-1 rounded-full ${healthStatus?.llm?.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              {healthStatus?.llm?.connected ? 'Connected' : 'Offline'}
+            </span>
           </div>
         </div>
       </div>
-
-      {/* 操作区 */}
-      <div className="px-3 py-3 border-b border-[#E4E5E7] flex-shrink-0">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".txt,.pdf"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="w-full py-2.5 bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white rounded-lg text-sm font-medium hover:from-[#EA580C] hover:to-[#F97316] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2 transition-all duration-200"
-        >
-          {isUploading ? (
-            <>
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              上传中...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              上传剧本
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* 分析操作 */}
-      <div className="px-3 py-3 flex-1">
-        <label className="text-xs font-medium text-[#6B6F76] mb-2 block flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-          剧本分析
-        </label>
-        <div className="space-y-2">
-          <button
-            onClick={onAnalyzeCharacters}
-            disabled={!currentProject || isAnalyzing}
-            className={`w-full py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 flex items-center justify-center gap-2 ${
-              currentAnalyzing === 'characters'
-                ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white border-[#F97316] shadow-sm'
-                : 'bg-white text-[#1D1D1F] border-[#E4E5E7] hover:border-[#F97316] hover:text-[#F97316]'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {currentAnalyzing === 'characters' ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                分析角色中...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                分析角色
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={onAnalyzeScenes}
-            disabled={!currentProject || isAnalyzing}
-            className={`w-full py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 flex items-center justify-center gap-2 ${
-              currentAnalyzing === 'scenes'
-                ? 'bg-gradient-to-r from-[#F97316] to-[#FB923C] text-white border-[#F97316] shadow-sm'
-                : 'bg-white text-[#1D1D1F] border-[#E4E5E7] hover:border-[#F97316] hover:text-[#F97316]'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {currentAnalyzing === 'scenes' ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                分析场景中...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                分析场景
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
     </div>
   )
 }

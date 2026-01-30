@@ -115,6 +115,9 @@ export const configApi = {
   getCharacterImageTemplates: () =>
     api.get<CharacterImageTemplates>('/config/character-image-templates'),
 
+  updateCharacterImageTemplates: (data: CharacterImageTemplates) =>
+    api.put<CharacterImageTemplates>('/config/character-image-templates', data),
+
   getLLMConfig: () =>
     api.get<LLMConfig>('/config/llm'),
 
