@@ -123,3 +123,11 @@ export interface Task {
   result?: unknown
   error?: string
 }
+
+export interface Beat {
+  id: string
+  characterId: string
+  dialogue: string
+  action?: string
+  order: number
+}

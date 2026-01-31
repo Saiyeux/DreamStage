@@ -1,12 +1,16 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Project, Character, Scene } from '@/types'
+import type { Project, Character, Scene, Beat } from '@/types'
+
+
 
 interface ProjectState {
   // 当前项目
   currentProject: Project | null
   characters: Character[]
   scenes: Scene[]
+  beats: Beat[]
+  activeStageSceneId: string | null
 
   // 项目列表
   projects: Project[]
@@ -45,7 +49,17 @@ interface ProjectState {
   updateLastTerminalLine: (content: string) => void
   setSelectedWorkflow: (type: 'character' | 'scene' | 'video', id: string | null) => void
   setWorkflowParams: (type: 'character' | 'scene' | 'video', params: Record<string, any>) => void
+
+  // Act Workbench Actions
+  setBeats: (beats: Beat[]) => void
+  addBeat: (beat: Beat) => void
+  updateBeat: (id: string, updates: Partial<Beat>) => void
+  removeBeat: (id: string) => void
+  reorderBeats: (beats: Beat[]) => void
+  setActiveStageSceneId: (sceneId: string | null) => void
+
   reset: () => void
+
 }
 
 const initialAnalysisState = {
@@ -61,6 +75,8 @@ export const useProjectStore = create<ProjectState>()(
       currentProject: null,
       characters: [],
       scenes: [],
+      beats: [],
+      activeStageSceneId: null,
       projects: [],
       analysisState: { ...initialAnalysisState },
 
@@ -134,11 +150,29 @@ export const useProjectStore = create<ProjectState>()(
           workflowParams: { ...state.workflowParams, [type]: params },
         })),
 
+      setBeats: (beats) => set({ beats }),
+
+      addBeat: (beat) => set((state) => ({ beats: [...state.beats, beat] })),
+
+      updateBeat: (id, updates) =>
+        set((state) => ({
+          beats: state.beats.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+        })),
+
+      removeBeat: (id) => set((state) => ({ beats: state.beats.filter((b) => b.id !== id) })),
+
+      reorderBeats: (beats) => set({ beats }),
+
+      setActiveStageSceneId: (sceneId) => set({ activeStageSceneId: sceneId }),
+
+
       reset: () =>
         set({
           currentProject: null,
           characters: [],
           scenes: [],
+          beats: [],
+          activeStageSceneId: null,
           analysisState: { ...initialAnalysisState },
           selectedWorkflows: {
             character: null,
@@ -160,6 +194,8 @@ export const useProjectStore = create<ProjectState>()(
         currentProject: state.currentProject,
         characters: state.characters,
         scenes: state.scenes,
+        beats: state.beats,
+        activeStageSceneId: state.activeStageSceneId,
         analysisState: state.analysisState,
         selectedWorkflows: state.selectedWorkflows,
         workflowParams: state.workflowParams,
