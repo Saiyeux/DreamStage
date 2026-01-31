@@ -28,6 +28,8 @@ class CharacterResponse(CamelModel):
     scene_numbers: list[int] = []
     base_prompt: str | None = None
     main_image_id: str | None = None
+    is_finalized: bool = False
+    finalized_metadata: dict | None = None
     images: list[CharacterImageResponse] = []
 
 

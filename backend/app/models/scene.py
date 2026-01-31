@@ -27,6 +27,10 @@ class Scene(Base):
     characters_data: Mapped[list[dict] | None] = mapped_column(JSON, default=list)
     dialogue: Mapped[str | None] = mapped_column(Text)
 
+    # 定景状态
+    is_finalized: Mapped[bool] = mapped_column(Boolean, default=False)
+    finalized_metadata: Mapped[dict | None] = mapped_column(JSON)
+
     # 镜头信息
     shot_type: Mapped[str | None] = mapped_column(String(50))
     camera_movement: Mapped[str | None] = mapped_column(String(100))

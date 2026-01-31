@@ -31,6 +31,8 @@ export interface Character {
   basePrompt: string
   images: CharacterImage[]
   mainImageId?: string
+  isFinalized: boolean
+  finalizedMetadata?: Record<string, any>
 }
 
 export interface CharacterImage {
@@ -64,6 +66,8 @@ export interface Scene {
   negativePrompt: string
   sceneImage?: SceneImage
   videoClip?: VideoClip
+  isFinalized: boolean
+  finalizedMetadata?: Record<string, any>
 }
 
 export interface SceneCharacter {

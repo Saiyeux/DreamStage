@@ -94,6 +94,13 @@ class GenerateAllVideosRequest(CamelModel):
     params: dict[str, Any] | None = None
 
 
+
 class GenerateBulkRequest(CamelModel):
     workflow_id: str | None = None
     params: dict[str, Any] | None = None
+
+
+class AssetFinalizeRequest(CamelModel):
+    image_ids: list[str]
+    main_image_id: str | None = None
+

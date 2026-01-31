@@ -124,6 +124,38 @@ class AnalysisService {
   updateCallbacks(callbacks: AnalysisCallbacks): void {
     this.callbacks = callbacks
   }
+
+  /**
+   * 定角/定景
+   */
+  async finalizeAsset(
+    projectId: string,
+    assetType: 'characters' | 'scenes',
+    assetId: string,
+    imageIds: string[],
+    mainImageId?: string
+  ): Promise<void> {
+    const url = `/api/projects/${projectId}/${assetType}/${assetId}/finalize`
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ image_ids: imageIds, main_image_id: mainImageId })
+    })
+  }
+
+  /**
+   * 解除定角/定景
+   */
+  async unfinalizeAsset(
+    projectId: string,
+    assetType: 'characters' | 'scenes',
+    assetId: string
+  ): Promise<void> {
+    const url = `/api/projects/${projectId}/${assetType}/${assetId}/unfinalize`
+    await fetch(url, { method: 'POST' })
+  }
 }
 
 // 导出单例

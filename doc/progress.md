@@ -1,126 +1,30 @@
-# 开发进度
+# 视频合成整体流程
+ - 现在能单独生成角色图和场景图了，但这只是剧制的第一步。我们这个系统是要给导演选角，设计镜头的。生成谁都会，但要符合导演剧制的意图。
 
-> 最后更新: 2026-01-27
+## 锚定角色
+ - 现在可以在一个角色的画廊下，通过修改prompt生成多张图。但这些图都没有成为资产。就像很多生图服务一样，只给用户看或者下载，不能作为后续生成的素材。所以第一点，我们要建立角色库。
+ - 什么是角色库？character profile内的文字信息 + 生成的图片中用户选定的 = 角色库。
+ - 角色id绑定了这个角色的相关信息，用于使用。比如，在场景里，我点一下角色配置按钮，添加已经锚定的角色，这个时候，我再生成场景图和视频，输入就要用定下来的相关据角色的信息，包括文字和图片。这样才能保证生成的图片中的角色是同一个角色，也即用户定下的角色。
+ - 角色的性格，体貌特征，还有某些衣着特征不会变，但是可以换衣服。衣服可以在后续镜头提示中修改，锚定的内容是用户想要不变的特征。
+ - 这里就有一些额外的需求要做，比如同一个项目，我想添加文本进行角色和场景识别，我想手动添加角色、场景，手动编辑信息生成，都要加上对应功能。
 
-## 已完成
+## 场景库
+ - 一部戏里除了角色会反复出现，场景也会反复出现。所以必须要有固定的场景。场景和角色建立的过程基本上一致，文字信息+锚定图片信息。
+ - 有了固定的场景+角色，这个时候就要用prompt来控制镜头了。
+ - 此时输入LTX工作流的内容会非常负复杂，但目前要先跑通流程，所以先用简单的prompt，后续再优化。即：人物图 + 场景图作为图片输入，prompt里写清楚人物性格，动作，镜头等信息，生成视频。
 
-### 前端
-- [x] 项目框架 (React + Vite + TypeScript)
-- [x] Tailwind CSS 配置
-- [x] 路由配置 (react-router-dom)
-- [x] 状态管理 (Zustand stores)
-- [x] 页面结构
-  - [x] 首页 - 服务状态检测
-  - [x] 剧本上传页
-  - [x] 剧本分析页 (角色/分镜 tabs)
-  - [x] 生成中心页 (角色库/场景图/视频 tabs)
-- [x] API 封装层 (client, health, projects, analysis, generation)
-- [x] 首页对接后端 API
+## 镜头
+  - 先明确一点，我们当前有character和scene两个tab。
+  - 需要删除sccene页面的生成视频按钮，shot type和camera以及dialogue的输入框，这些在新的act tab中实现。
+  - Analysis Tools现在是角色+场景，但没有act。添加act分析。
+  - 我记得之前每个分析的提示词都是在后端json目录里可配置的，检查一下，如果不是，就改成可配置的。
+  - 配置场景和剧幕分析，场景的提示内容围绕着环境展开，剧幕的提示内容围绕着人物展开。
+  - 新的剧幕(act)页面结构应该长这样：
+    - 底部：用户选择场景，角色，
+    - 中间：对话内容
+    - 顶部：标题和信息等
+    - 右上角：生成视频
+  - 以上信息要先通过后端llm分析出内容，填充进去。如果用户不满意，可以手动编辑修改。
 
-### 后端
-- [x] 项目框架 (FastAPI + SQLAlchemy)
-- [x] 数据库模型 (Project, Character, Scene, etc.)
-- [x] Pydantic schemas
-- [x] API 路由骨架
-  - [x] GET /api/health
-  - [x] CRUD /api/projects
-  - [x] POST /api/projects/{id}/analyze/*
-  - [x] POST /api/projects/{id}/generate/*
-- [x] 服务层骨架
-  - [x] LLM 客户端 (Ollama/LM Studio)
-  - [x] ComfyUI 客户端
-  - [x] 剧本解析器 (PDF/TXT)
-  - [x] 后台生成任务
-
-### 文档
-- [x] CLAUDE.md - 项目指南
-- [x] 设计文档 (ai-drama-studio-design.md)
-- [x] 环境配置文档 (setup-guide.md)
-
-## 进行中
-
-- [ ] 原神风格 UI 美化
-
-## 已完成（本次）
-
-### Bug 修复 (01-27)
-- [x] **文本分块只分析第一块** - 实现完整多块分析
-  - 添加 `split_script_into_chunks()` 在段落边界分割文本
-  - 角色分析：跨块去重合并，使用 `merge_characters()` 按名字去重
-  - 分镜分析：跨块累计场景，自动重新编号保证连续
-  - 错误处理增强：LLM 调用和 JSON 解析单独 try/except
-  - 支持部分保存：出错时保存已成功分析的数据
-  - LLM 读取超时从 120s 增至 300s，防止慢响应断连
-  - 新增 SSE 事件类型：`chunk_start`, `chunk_done`, `chunk_error`, `partial_save`
-
-### Bug 修复 (01-24)
-- [x] 首页状态显示 bug - SSE 流式端点直接解析保存数据，避免重复 LLM 调用
-- [x] 页面切换状态丢失 - 分析状态 (terminalOutput, isStreaming) 迁移到 Zustand store 持久化
-
-### 之前完成
-
-### ComfyUI 生成功能
-- [x] ComfyUI Workflow JSON 文件
-  - [x] character_portrait_flux2.json - 角色肖像生成
-  - [x] scene_generation_flux2.json - 场景图生成 (支持 IPAdapter)
-  - [x] video_generation_ltx2.json - LTX-Video 2.0 视频生成
-- [x] comfyui_client 增强
-  - [x] generate_video 方法 (LTX2 视频生成)
-  - [x] 模板占位符替换
-  - [x] 视频相关节点参数更新
-- [x] generation_tasks 实现
-  - [x] _build_character_prompt 角色图 prompt 构建
-  - [x] _build_scene_prompt 场景图 prompt 构建
-  - [x] _build_action_prompt 视频动作 prompt 构建
-  - [x] 生成结果保存到数据库 (CharacterImage, SceneImage, VideoClip)
-- [x] 文件服务 API (GET /api/files/images/*, GET /api/files/videos/*)
-- [x] 前端生成完成后自动刷新数据
-- [x] 前端显示已生成的角色图、场景图和视频
-
-### 之前完成
-- [x] ComfyUI 模型目录检测（动态获取可用模型列表）
-- [x] 剧本上传页对接 API
-- [x] 剧本分析页对接 API
-- [x] 生成中心页对接 API
-- [x] 移除前端模拟数据，改为空状态提示
-- [x] Zustand store 集成，解决页面切换状态丢失
-- [x] Layout 显示当前项目，导航自动携带 project ID
-- [x] 上传剧本自动从文件名生成项目名
-- [x] HomePage 添加项目删除/停止按钮
-- [x] 后端 schemas 统一 camelCase 序列化
-- [x] ComfyUI client 任务追踪机制
-- [x] DELETE /projects/{id} 先停止任务再清理资源
-- [x] LLM 流式输出终端显示
-- [x] 页面状态刷新机制
-- [x] 角色头像性别区分
-
-## 待完成
-
-### 优先级高
-- [ ] 前端处理新 SSE 事件 (`chunk_start`, `chunk_done`, `chunk_error`) 显示分块进度
-- [ ] 测试长剧本多块分析是否正常工作
-- [ ] 停止任务功能完善（目前可用删除替代）
-- [ ] 配置 COMFYUI_OUTPUT_DIR 指向 ComfyUI 输出目录
-
-### 前端
-- [ ] WebSocket 实时进度推送 (替代轮询)
-- [ ] 多块分析进度条显示 (第 N/M 块)
-
-### 后端完善
-- [ ] 视频合成/导出功能 (FFmpeg)
-- [ ] 角色一致性控制 (自动选择参考图)
-
-### 其他
-- [ ] 前端 UI 美化 (参考原神风格)
-- [ ] 错误处理优化
-- [ ] 测试用例
-
-## 端口配置
-
-| 服务 | 端口 |
-|------|------|
-| Frontend (Vite) | 5173 |
-| Backend (FastAPI) | 8001 |
-| Ollama | 11434 |
-| LM Studio | 1234 |
-| ComfyUI | 8000 |
+## 其他
+ - 一些分析bug，比如分块的话容易漏掉关键信息，后端如果能实现加载文档并搜索相关内容进行分析是最好的。这也是我们要实现用户手动添加修改各类信息的原因。

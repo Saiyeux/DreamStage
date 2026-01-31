@@ -398,6 +398,8 @@ function CharactersContent({
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
   const [isSaving, setIsSaving] = useState(false)
   const selectedCharacter = characters[selectedIndex]
+  const [selectedImageIds, setSelectedImageIds] = useState<string[]>([])
+  const [isFinalizing, setIsFinalizing] = useState(false)
 
   // Generation state
   const [generatingCharId, setGeneratingCharId] = useState<string | null>(null)
@@ -600,6 +602,57 @@ function CharactersContent({
     }
   }
 
+
+  const handleFinalize = async () => {
+    if (!selectedCharacter || selectedImageIds.length === 0) return
+
+    if (!confirm(`Are you sure you want to finalize ${selectedCharacter.name} with ${selectedImageIds.length} selected images?\nThis will lock the character profile.`)) return
+
+    setIsFinalizing(true)
+    try {
+      await analysisService.finalizeAsset(
+        projectId,
+        'characters',
+        selectedCharacter.id,
+        selectedImageIds
+      )
+
+      // Refresh
+      const updated = await analysisApi.getCharacters(projectId)
+      setCharacters(updated)
+      setIsManagingGallery(false)
+      setSelectedImageIds([])
+    } catch (err) {
+      console.error('Finalize failed:', err)
+      alert('Failed to finalize character')
+    } finally {
+      setIsFinalizing(false)
+    }
+  }
+
+  const handleUnfinalize = async () => {
+    if (!selectedCharacter) return
+    if (!confirm('Unfinalize this character? You will be able to edit and generate new images again.')) return
+
+    try {
+      await analysisService.unfinalizeAsset(projectId, 'characters', selectedCharacter.id)
+      // Refresh
+      const updated = await analysisApi.getCharacters(projectId)
+      setCharacters(updated)
+    } catch (err) {
+      console.error('Unfinalize failed:', err)
+      alert('Failed to unfinalize')
+    }
+  }
+
+  const toggleImageSelection = (imageId: string) => {
+    setSelectedImageIds(prev =>
+      prev.includes(imageId)
+        ? prev.filter(id => id !== imageId)
+        : [...prev, imageId]
+    )
+  }
+
   const handleGenerate = async () => {
     if (!selectedCharacter?.id || generatingCharId) return
 
@@ -775,6 +828,34 @@ function CharactersContent({
                     </button>
                   </div>
                 )}
+                {/* Finalize Controls */}
+                {!isEditing && (
+                  selectedCharacter.isFinalized ? (
+                    <button
+                      onClick={handleUnfinalize}
+                      className="btn bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:border-amber-300 text-xs flex items-center gap-1"
+                    >
+                      <span>🔓</span> Unlock Character
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (isManagingGallery) {
+                          handleFinalize()
+                        } else {
+                          setIsManagingGallery(true)
+                          alert('Please select images to anchor this character, then click "Confirm Anchor"')
+                        }
+                      }}
+                      disabled={isFinalizing}
+                      className={`btn text-xs flex items-center gap-1 ${isManagingGallery
+                        ? 'btn-primary shadow-lg shadow-primary-500/30'
+                        : 'btn-secondary'}`}
+                    >
+                      {isFinalizing ? '⏳ Finalizing...' : (isManagingGallery ? '✅ Confirm Anchor' : '🔒 Finalize Role')}
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
@@ -931,15 +1012,20 @@ function CharactersContent({
                       <span>🖼️</span> Generated Gallery
                     </span>
                     <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setIsManagingGallery(!isManagingGallery)}
-                        className={`text-xs px-2 py-1 rounded-md transition-colors ${isManagingGallery
-                          ? 'bg-primary-600 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                      >
-                        {isManagingGallery ? '✓ Done' : '⚙️ Manage'}
-                      </button>
+                      {!selectedCharacter.isFinalized && (
+                        <button
+                          onClick={() => {
+                            setIsManagingGallery(!isManagingGallery)
+                            if (isManagingGallery) setSelectedImageIds([]) // Clear selection on exit
+                          }}
+                          className={`text-xs px-2 py-1 rounded-md transition-colors ${isManagingGallery
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                          {isManagingGallery ? 'Cancel Selection' : '⚙️ Manage / Anchor'}
+                        </button>
+                      )}
                       <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
                         {selectedCharacter.images?.length || 0} images
                       </span>
@@ -952,8 +1038,19 @@ function CharactersContent({
                         {selectedCharacter.images.map((img, index) => (
                           <div
                             key={img.id}
-                            className={`relative group rounded-xl overflow-hidden border border-slate-200 aspect-[3/4] shadow-sm hover:shadow-md transition-all ${img.isLoading ? 'cursor-wait bg-slate-50' : 'cursor-pointer'}`}
-                            onClick={() => !img.isLoading && setLightboxImage(fileUrl.image(img.imagePath))}
+                            className={`relative group rounded-xl overflow-hidden border transition-all aspect-[3/4] shadow-sm 
+                              ${img.isLoading ? 'cursor-wait bg-slate-50 border-slate-200' : 'cursor-pointer'}
+                              ${selectedImageIds.includes(img.id) ? 'ring-4 ring-primary-500 border-primary-500 shadow-xl scale-95' : 'border-slate-200 hover:shadow-md'}
+                              ${selectedCharacter.isFinalized && !selectedCharacter.finalizedMetadata?.selected_image_ids?.includes(img.id) ? 'opacity-40 grayscale' : ''}
+                          `}
+                            onClick={() => {
+                              if (img.isLoading) return
+                              if (isManagingGallery && !selectedCharacter.isFinalized) {
+                                toggleImageSelection(img.id)
+                              } else {
+                                setLightboxImage(fileUrl.image(img.imagePath))
+                              }
+                            }}
                           >
                             {img.isLoading ? (
                               <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-500">
@@ -995,18 +1092,26 @@ function CharactersContent({
                                   <span className="text-[10px] text-white/90 font-medium capitalize truncate pl-1">{img.imageType}</span>
                                   <div className="flex gap-1">
                                     {isManagingGallery ? (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteImage(img.id)
-                                        }}
-                                        className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
-                                        title="Delete Image"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                      </button>
+                                      selectedCharacter.isFinalized ? null : (
+                                        <div className="flex gap-2 w-full justify-between items-center">
+                                          {/* Selection Indicator */}
+                                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center
+                                                ${selectedImageIds.includes(img.id) ? 'bg-primary-500 border-primary-500' : 'border-white bg-black/20'}`}>
+                                            {selectedImageIds.includes(img.id) && <span className="text-white text-[10px]">✓</span>}
+                                          </div>
+
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleDeleteImage(img.id)
+                                            }}
+                                            className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
+                                            title="Delete Image"
+                                          >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                          </button>
+                                        </div>
+                                      )
                                     ) : (
                                       <button
                                         onClick={(e) => {
@@ -1025,6 +1130,7 @@ function CharactersContent({
                                 </div>
                               </div>
                             )}
+
                           </div>
                         ))}
                       </div>
@@ -1045,15 +1151,18 @@ function CharactersContent({
             </div>
           </div>
         )}
-      </div>
 
-      {/* Lightbox Overlay */}
-      {lightboxImage && (
-        <Lightbox
-          imageUrl={lightboxImage}
-          onClose={() => setLightboxImage(null)}
-        />
-      )}
+
+        {/* Lightbox Overlay */}
+        {
+          lightboxImage && (
+            <Lightbox
+              imageUrl={lightboxImage}
+              onClose={() => setLightboxImage(null)}
+            />
+          )
+        }
+      </div>
     </div>
   )
 }
@@ -1145,6 +1254,7 @@ function ScenesContent({
   const [isEditing, setIsEditing] = useState(false)
   const [editedScene, setEditedScene] = useState<Partial<Scene>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [isFinalizing, setIsFinalizing] = useState(false)
   // Removed unused scroll handlers from old carousel layout
 
   const selectedScene = scenes[selectedIndex]
@@ -1205,6 +1315,50 @@ function ScenesContent({
       setIsSaving(false)
     }
   }
+
+  const handleFinalize = async () => {
+    const imageIds = selectedScene?.sceneImage ? [selectedScene.sceneImage.id] : []
+    if (!selectedScene) return
+
+    if (!confirm(`Finalize scene #${selectedScene.sceneNumber}? This will lock the scene.`)) return
+
+    setIsFinalizing(true)
+    try {
+      await analysisService.finalizeAsset(
+        projectId,
+        'scenes',
+        selectedScene.id,
+        imageIds
+      )
+      const updated = await analysisApi.getScenes(projectId)
+      setScenes(updated)
+    } catch (err) {
+      console.error('Finalize scene failed:', err)
+      alert('Failed to finalize scene')
+    } finally {
+      setIsFinalizing(false)
+    }
+  }
+
+  const handleUnfinalize = async () => {
+    if (!selectedScene) return
+    if (!confirm('Unlock this scene?')) return
+
+    try {
+      await analysisService.unfinalizeAsset(
+        projectId,
+        'scenes',
+        selectedScene.id
+      )
+      const updated = await analysisApi.getScenes(projectId)
+      setScenes(updated)
+    } catch (err) {
+      console.error('Unfinalize scene failed:', err)
+      alert('Failed to unlock scene')
+    }
+  }
+
+
 
   const updateField = (field: keyof Scene, value: string) => {
     setEditedScene(prev => ({ ...prev, [field]: value }))
@@ -1434,6 +1588,27 @@ function ScenesContent({
                       </span>
                     )}
                   </div>
+                )}
+
+                {/* Finalize Controls */}
+                {!isEditing && (
+                  selectedScene.isFinalized ? (
+                    <button
+                      onClick={handleUnfinalize}
+                      className="btn bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:border-amber-300 text-xs flex items-center gap-1"
+                    >
+                      <span>🔓</span> Unlock Scene
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleFinalize}
+                      disabled={!selectedScene.sceneImage || isFinalizing}
+                      title={!selectedScene.sceneImage ? 'Generate an image first' : ''}
+                      className="btn btn-secondary text-xs flex items-center gap-1"
+                    >
+                      <span>🔒</span> {isFinalizing ? 'Finalizing...' : 'Finalize Scene'}
+                    </button>
+                  )
                 )}
 
               </div>

@@ -17,6 +17,7 @@ from app.schemas import (
     CharacterUpdate,
     SceneResponse,
     SceneUpdate,
+    AssetFinalizeRequest,
 )
 from app.services.llm_client import llm_client
 from app.services.prompt_service import prompt_service
@@ -548,6 +549,77 @@ async def update_character(
     return character
 
 
+@router.post("/{project_id}/characters/{character_id}/finalize")
+async def finalize_character(
+    project_id: str,
+    character_id: str,
+    request: AssetFinalizeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """定角：锁定角色并保存快照"""
+    result = await db.execute(
+        select(Character)
+        .options(selectinload(Character.images))
+        .where(Character.id == character_id, Character.project_id == project_id)
+    )
+    character = result.scalar_one_or_none()
+
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    # 创建快照
+    snapshot = {
+        "name": character.name,
+        "age": character.age,
+        "role_type": character.role_type,
+        "gender": character.gender,
+        "appearance": {
+            "hair": character.hair,
+            "face": character.face,
+            "body": character.body,
+            "skin": character.skin,
+            "clothing_style": character.clothing_style,
+        },
+        "personality": character.personality,
+        "base_prompt": character.base_prompt,
+        "selected_image_ids": request.image_ids,
+        "main_image_id": request.main_image_id or (request.image_ids[0] if request.image_ids else None)
+    }
+
+    character.is_finalized = True
+    character.finalized_metadata = snapshot
+    
+    # 更新主图
+    if request.main_image_id:
+        character.main_image_id = request.main_image_id
+    elif request.image_ids:
+        character.main_image_id = request.image_ids[0]
+
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/{project_id}/characters/{character_id}/unfinalize")
+async def unfinalize_character(
+    project_id: str,
+    character_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """解除定角"""
+    result = await db.execute(
+        select(Character).where(Character.id == character_id, Character.project_id == project_id)
+    )
+    character = result.scalar_one_or_none()
+
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    character.is_finalized = False
+    character.finalized_metadata = None
+    await db.commit()
+    return {"success": True}
+
+
 # ============ 分镜管理 ============
 
 @router.get("/{project_id}/scenes", response_model=list[SceneResponse])
@@ -589,6 +661,64 @@ async def update_scene(
     await db.refresh(scene)
 
     return scene
+
+
+@router.post("/{project_id}/scenes/{scene_id}/finalize")
+async def finalize_scene(
+    project_id: str,
+    scene_id: str,
+    request: AssetFinalizeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """定景：锁定场景并保存快照"""
+    result = await db.execute(
+        select(Scene)
+        .options(selectinload(Scene.scene_image))
+        .where(Scene.id == scene_id, Scene.project_id == project_id)
+    )
+    scene = result.scalar_one_or_none()
+
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found")
+
+    # 创建快照
+    snapshot = {
+        "scene_number": scene.scene_number,
+        "location": scene.location,
+        "time_of_day": scene.time_of_day,
+        "atmosphere": scene.atmosphere,
+        "environment_desc": scene.environment_desc,
+        "scene_prompt": scene.scene_prompt,
+        "selected_image_ids": request.image_ids,
+        "main_image_id": request.main_image_id or (request.image_ids[0] if request.image_ids else None)
+    }
+
+    scene.is_finalized = True
+    scene.finalized_metadata = snapshot
+
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/{project_id}/scenes/{scene_id}/unfinalize")
+async def unfinalize_scene(
+    project_id: str,
+    scene_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """解除定景"""
+    result = await db.execute(
+        select(Scene).where(Scene.id == scene_id, Scene.project_id == project_id)
+    )
+    scene = result.scalar_one_or_none()
+
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found")
+
+    scene.is_finalized = False
+    scene.finalized_metadata = None
+    await db.commit()
+    return {"success": True}
 # ============ 图像管理 ============
 
 @router.delete("/{project_id}/characters/images/{image_id}")

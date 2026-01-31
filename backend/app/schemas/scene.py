@@ -48,6 +48,8 @@ class SceneResponse(CamelModel):
     action_prompt: str | None = None
     scene_image: SceneImageResponse | None = None
     video_clip: VideoClipResponse | None = None
+    is_finalized: bool = False
+    finalized_metadata: dict | None = None
 
 
 class SceneUpdate(BaseModel):

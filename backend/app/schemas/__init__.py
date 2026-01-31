@@ -25,6 +25,7 @@ from app.schemas.common import (
     GenerateCharacterLibraryRequest,
     GenerateSceneRequest,
     GenerateBulkRequest,
+    AssetFinalizeRequest,
 )
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "GenerateCharacterLibraryRequest",
     "GenerateSceneRequest",
     "GenerateBulkRequest",
+    "AssetFinalizeRequest",
 ]

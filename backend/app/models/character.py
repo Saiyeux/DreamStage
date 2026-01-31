@@ -36,6 +36,10 @@ class Character(Base):
     # 主参考图 ID
     main_image_id: Mapped[str | None] = mapped_column(String(36))
 
+    # 定角状态
+    is_finalized: Mapped[bool] = mapped_column(Boolean, default=False)
+    finalized_metadata: Mapped[dict | None] = mapped_column(JSON)
+
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="characters")
     images: Mapped[list["CharacterImage"]] = relationship(
