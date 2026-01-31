@@ -249,6 +249,18 @@ class ComfyUIClient:
             response.raise_for_status()
             return response.json()
 
+    async def get_image_content(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
+        """从 ComfyUI 获取图像/视频内容"""
+        params = {
+            "filename": filename,
+            "subfolder": subfolder,
+            "type": folder_type,
+        }
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+            response = await client.get(f"{self.base_url}/view", params=params)
+            response.raise_for_status()
+            return response.content
+
     async def get_system_stats(self) -> dict[str, Any]:
         """获取系统状态"""
         async with httpx.AsyncClient(trust_env=False) as client:

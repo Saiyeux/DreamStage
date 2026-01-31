@@ -8,7 +8,9 @@ import { analysisService } from '@/services/analysisService'
 import { ProjectSidebar } from '@/components/ProjectSidebar'
 import { fileUrl } from '@/api/client'
 
-type Tab = 'characters' | 'scenes'
+import { ActContent } from '@/components/ActContent'
+
+type Tab = 'characters' | 'scenes' | 'act'
 
 export function ScriptAnalysisPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -305,6 +307,15 @@ export function ScriptAnalysisPage() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => handleTabChange('act')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'act'
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <span>🎭</span> Act
+            </button>
           </div>
         </header>
 
@@ -315,6 +326,8 @@ export function ScriptAnalysisPage() {
               characters={characters}
               projectId={projectId}
             />
+          ) : activeTab === 'act' ? (
+            <ActContent projectId={projectId} />
           ) : (
             <ScenesContent
               scenes={scenes}

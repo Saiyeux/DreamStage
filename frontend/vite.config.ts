@@ -20,6 +20,10 @@ export default defineConfig({
         target: 'ws://localhost:8001',
         ws: true,
       },
+      '/files': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
     },
   },
 })

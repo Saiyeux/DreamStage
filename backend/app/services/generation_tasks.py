@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.logging_config import get_logger
+from app.core.config import settings
 from app.db.database import async_session_maker
 from app.models import Character, Scene, CharacterImage, SceneImage, VideoClip
 from app.services.comfyui_client import comfyui_client
@@ -53,6 +54,25 @@ class GenerationTasks:
                 return t
         # 未找到时返回默认
         return {"id": type_id, "label": type_id, "prompt_suffix": type_id}
+
+    async def _save_generated_file(self, filename: str, project_id: str) -> str:
+        """从 ComfyUI 下载并保存文件到项目目录，返回相对路径"""
+        try:
+            content = await comfyui_client.get_image_content(filename)
+            
+            # 确定保存路径: data/projects/{project_id}/{filename}
+            project_dir = settings.DATA_DIR / "projects" / project_id
+            project_dir.mkdir(parents=True, exist_ok=True)
+            
+            save_path = project_dir / filename
+            with open(save_path, "wb") as f:
+                f.write(content)
+                
+            return f"{project_id}/{filename}"
+        except Exception as e:
+            logger.error(f"Failed to save generated file {filename}: {e}")
+            # 如果保存失败，至少返回原文件名，虽然前端可能访问不到
+            return filename
 
     def get_task_status(self, task_id: str) -> dict[str, Any]:
         """获取任务状态"""
@@ -233,6 +253,9 @@ class GenerationTasks:
 
                     logger.info(f"[图片生成成功] task_id={task_id}, path={image_path}")
 
+                    # 保存文件到本地
+                    saved_path = await self._save_generated_file(image_path, character.project_id)
+
                     # 构造保存的 type 字符串
                     saved_image_type = combined_label_str
 
@@ -241,7 +264,7 @@ class GenerationTasks:
                         id=str(uuid.uuid4()),
                         character_id=character.id,
                         image_type=saved_image_type,
-                        image_path=image_path,
+                        image_path=saved_path,
                         prompt_used=prompt,
                         negative_prompt=negative_prompt,
                         is_selected=True, 
@@ -395,6 +418,9 @@ class GenerationTasks:
 
                         logger.info(f"[图片成功] task_id={task_id}, path={image_path}")
 
+                        # 保存文件到本地
+                        saved_path = await self._save_generated_file(image_path, project_id)
+
                         # 构造保存的 type 字符串
                         # 比如: "Full Body, Happy, Running"
                         saved_image_type = ", ".join(combined_labels) if combined_labels else "Generated"
@@ -404,7 +430,7 @@ class GenerationTasks:
                             id=str(uuid.uuid4()),
                             character_id=character.id,
                             image_type=saved_image_type,
-                            image_path=image_path,
+                            image_path=saved_path,
                             prompt_used=prompt,
                             negative_prompt=negative_prompt,
                             is_selected=True, 
@@ -474,10 +500,13 @@ class GenerationTasks:
 
             # 保存到数据库
             async with async_session_maker() as db:
+                # 保存文件到本地
+                saved_path = await self._save_generated_file(image_path, scene.project_id)
+
                 scene_image = SceneImage(
                     id=str(uuid.uuid4()),
                     scene_id=scene.id,
-                    image_path=image_path,
+                    image_path=saved_path,
                     prompt_used=prompt,
                     is_approved=False,
                 )
@@ -546,10 +575,13 @@ class GenerationTasks:
                         # 删除旧图片
                         await db.execute(delete(SceneImage).where(SceneImage.scene_id == scene.id))
                         
+                        # 保存文件到本地
+                        saved_path = await self._save_generated_file(image_path, project_id)
+
                         scene_image = SceneImage(
                             id=str(uuid.uuid4()),
                             scene_id=scene.id,
-                            image_path=image_path,
+                            image_path=saved_path,
                             prompt_used=prompt,
                             is_approved=False,
                         )
@@ -629,10 +661,13 @@ class GenerationTasks:
                 # 删除旧视频
                 await db.execute(delete(VideoClip).where(VideoClip.scene_id == scene.id))
 
+                # 保存文件到本地
+                saved_path = await self._save_generated_file(video_path, scene.project_id)
+
                 video_clip = VideoClip(
                     id=str(uuid.uuid4()),
                     scene_id=scene.id,
-                    video_path=video_path,
+                    video_path=saved_path,
                     duration=video_length / frame_rate,
                     fps=frame_rate,
                     resolution=f"{workflow_params.get('width', 768)}x{workflow_params.get('height', 1344)}",
@@ -702,10 +737,13 @@ class GenerationTasks:
                         )
 
                         # 保存到数据库
+                        # 保存文件到本地
+                        saved_path = await self._save_generated_file(video_path, project_id)
+
                         video_clip = VideoClip(
                             id=str(uuid.uuid4()),
                             scene_id=scene.id,
-                            video_path=video_path,
+                            video_path=saved_path,
                             duration=video_length / frame_rate,
                             fps=frame_rate,
                             resolution=f"{workflow_params.get('width', 768)}x{workflow_params.get('height', 1344)}",
