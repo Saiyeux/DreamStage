@@ -74,6 +74,31 @@ class GenerationTasks:
             # 如果保存失败，至少返回原文件名，虽然前端可能访问不到
             return filename
 
+    async def recover_missing_file(self, relative_path: str, project_id: str) -> bool:
+        """尝试恢复丢失的文件"""
+        try:
+            # 1. 检查文件是否存在
+            project_dir = settings.DATA_DIR / "projects" / project_id
+            save_path = project_dir / Path(relative_path).name
+            
+            if save_path.exists():
+                return True
+                
+            # 2. 从 ComfyUI 下载
+            filename = Path(relative_path).name
+            logger.info(f"Recovering missing file: {filename}")
+            
+            content = await comfyui_client.get_image_content(filename)
+            
+            project_dir.mkdir(parents=True, exist_ok=True)
+            with open(save_path, "wb") as f:
+                f.write(content)
+                
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to recover file {relative_path}: {e}")
+            return False
+
     def get_task_status(self, task_id: str) -> dict[str, Any]:
         """获取任务状态"""
         return self._task_status.get(task_id, {"status": "unknown"})

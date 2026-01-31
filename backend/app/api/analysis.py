@@ -1,6 +1,7 @@
 import uuid
 import json
 import re
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, delete
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db
+from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.db.database import async_session_maker
 from app.models import Project, ProjectStatus, Character, CharacterImage, Scene, SceneImage, VideoClip
@@ -743,13 +745,16 @@ async def delete_character_image(
         raise HTTPException(status_code=404, detail="Image not found")
 
     # 1. 从磁盘删除文件 (可选，建议做)
+    # 1. 从磁盘删除文件
     try:
-        from app.api.files import get_comfyui_output_dir
-        output_dir = get_comfyui_output_dir()
-        file_path = output_dir / image.image_path
+        # 文件存储在 projects/{project_id}/{filename}
+        project_dir = settings.DATA_DIR / "projects" / project_id
+        file_path = project_dir / Path(image.image_path).name
         if file_path.exists():
             file_path.unlink()
             logger.info(f"已删除物理文件: {file_path}")
+        else:
+            logger.warning(f"文件不存在，跳过删除: {file_path}")
     except Exception as e:
         logger.error(f"删除物理文件失败: {str(e)}")
         # 继续删除数据库记录，即使文件删除失败
@@ -781,12 +786,13 @@ async def delete_scene_image(
         raise HTTPException(status_code=404, detail="Image not found")
 
     try:
-        from app.api.files import get_comfyui_output_dir
-        output_dir = get_comfyui_output_dir()
-        file_path = output_dir / image.image_path
+        project_dir = settings.DATA_DIR / "projects" / project_id
+        file_path = project_dir / Path(image.image_path).name
         if file_path.exists():
             file_path.unlink()
             logger.info(f"已删除物理文件: {file_path}")
+        else:
+            logger.warning(f"文件不存在，跳过删除: {file_path}")
     except Exception as e:
         logger.error(f"删除物理文件失败: {str(e)}")
 
@@ -816,12 +822,13 @@ async def delete_video_clip(
         raise HTTPException(status_code=404, detail="Video not found")
 
     try:
-        from app.api.files import get_comfyui_output_dir
-        output_dir = get_comfyui_output_dir()
-        file_path = output_dir / video.video_path
+        project_dir = settings.DATA_DIR / "projects" / project_id
+        file_path = project_dir / Path(video.video_path).name
         if file_path.exists():
             file_path.unlink()
             logger.info(f"已删除物理文件: {file_path}")
+        else:
+            logger.warning(f"文件不存在，跳过删除: {file_path}")
     except Exception as e:
         logger.error(f"删除物理文件失败: {str(e)}")
 

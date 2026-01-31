@@ -25,6 +25,13 @@ async def get_image(filename: str):
     """获取生成的图像文件"""
     output_dir = get_comfyui_output_dir()
     file_path = output_dir / filename
+    
+    # 优先检查 projects 目录 (我们保存的持久化文件)
+    project_file_path = settings.DATA_DIR / "projects" / filename
+    if project_file_path.exists():
+        file_path = project_file_path
+        output_dir = settings.DATA_DIR / "projects"
+
 
     # 尝试查找本地文件
     local_file_exists = False
@@ -78,6 +85,13 @@ async def get_video(filename: str):
     """获取生成的视频文件"""
     output_dir = get_comfyui_output_dir()
     file_path = output_dir / filename
+
+    # 优先检查 projects 目录
+    project_file_path = settings.DATA_DIR / "projects" / filename
+    if project_file_path.exists():
+        file_path = project_file_path
+        output_dir = settings.DATA_DIR / "projects"
+
 
     # 安全检查
     try:

@@ -33,7 +33,7 @@ export function ProjectSidebar({
   const [showSettings, setShowSettings] = useState(false)
   const [settingsType, setSettingsType] = useState<'character' | 'scene' | 'video' | null>(null)
 
-  const { selectedWorkflows, setSelectedWorkflow, workflowParams, setWorkflowParams } = useProjectStore()
+  const { selectedWorkflows, setSelectedWorkflow, workflowParams, setWorkflowParams, reset } = useProjectStore()
 
   const openSettings = (type: 'character' | 'scene' | 'video') => {
     setSettingsType(type)
@@ -173,6 +173,7 @@ export function ProjectSidebar({
 
     try {
       await projectsApi.delete(currentProject.id)
+      reset() // Clear store state
       alert('项目删除成功！')
       await loadProjects()
       onProjectChange?.('')

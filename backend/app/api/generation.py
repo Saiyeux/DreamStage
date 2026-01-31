@@ -253,10 +253,74 @@ async def get_active_tasks(project_id: str):
     return generation_tasks.get_active_tasks_for_project(project_id)
 
 
-@router.post("/tasks/{task_id}/stop")
-async def stop_task(task_id: str):
-    """停止任务"""
     success = await generation_tasks.stop_task(task_id)
     if not success:
         raise HTTPException(status_code=404, detail="Task not found or could not be stopped")
     return {"message": "Task stopped"}
+
+
+@router.post("/{project_id}/sync-images")
+async def sync_project_images(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    同步项目图片：检查本地是否存在，若不存在则尝试从 ComfyUI 下载恢复。
+    用于解决 ComfyUI 重置后，前端无法显示旧图片的问题（前提是 ComfyUI 输出目录中仍有原图）。
+    """
+    logger.info(f"开始同步项目图片: project_id={project_id}")
+    
+    # 1. 获取所有关联的图片记录
+    # 角色图
+    char_images_result = await db.execute(
+        select(CharacterImage)
+        .join(Character)
+        .where(Character.project_id == project_id)
+    )
+    char_images = char_images_result.scalars().all()
+    
+    # 场景图
+    scene_images_result = await db.execute(
+        select(SceneImage)
+        .join(Scene)
+        .where(Scene.project_id == project_id)
+    )
+    scene_images = scene_images_result.scalars().all()
+    
+    # 视频
+    videos_result = await db.execute(
+        select(VideoClip)
+        .join(Scene)
+        .where(Scene.project_id == project_id)
+    )
+    videos = videos_result.scalars().all()
+    
+    stats = {
+        "total": len(char_images) + len(scene_images) + len(videos),
+        "recovered": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
+    
+    async def process_item(item, path_attr):
+        path = getattr(item, path_attr)
+        if not path:
+            return
+            
+        if await generation_tasks.recover_missing_file(path, project_id):
+            stats["recovered"] += 1
+        else:
+            stats["failed"] += 1
+
+    # 简单起见，这里串行处理，数量大时可改为并发
+    for img in char_images:
+        await process_item(img, "image_path")
+        
+    for img in scene_images:
+        await process_item(img, "image_path")
+        
+    for vid in videos:
+        await process_item(vid, "video_path")
+        
+    logger.info(f"同步完成: {stats}")
+    return stats
