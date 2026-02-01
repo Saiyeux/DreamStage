@@ -10,8 +10,9 @@ interface ProjectSidebarProps {
   onProjectChange?: (projectId: string) => void
   onAnalyzeCharacters?: () => void
   onAnalyzeScenes?: () => void
+  onAnalyzeActs?: () => void
   isAnalyzing?: boolean
-  currentAnalyzing?: 'characters' | 'scenes' | null
+  currentAnalyzing?: 'characters' | 'scenes' | 'acts' | null
 }
 
 export function ProjectSidebar({
@@ -19,6 +20,7 @@ export function ProjectSidebar({
   onProjectChange,
   onAnalyzeCharacters,
   onAnalyzeScenes,
+  onAnalyzeActs,
   isAnalyzing,
   currentAnalyzing
 }: ProjectSidebarProps) {
@@ -325,6 +327,23 @@ export function ProjectSidebar({
                 Scene Analysis
               </span>
               {currentAnalyzing === 'scenes' && (
+                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
+              )}
+            </button>
+
+            <button
+              onClick={onAnalyzeActs}
+              disabled={!currentProject || isAnalyzing}
+              className={`w-full btn justify-between group ${currentAnalyzing === 'acts'
+                ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200'
+                : 'btn-secondary text-slate-600'
+                }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-lg">🎭</span>
+                Act Analysis
+              </span>
+              {currentAnalyzing === 'acts' && (
                 <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
               )}
             </button>

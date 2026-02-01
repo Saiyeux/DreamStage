@@ -103,7 +103,7 @@ export function ScriptAnalysisPage() {
     }
   }
 
-  const createAnalysisCallbacks = useCallback((analysisType: 'characters' | 'scenes') => ({
+  const createAnalysisCallbacks = useCallback((analysisType: 'characters' | 'scenes' | 'acts') => ({
     onStart: () => {
       appendTerminalOutput(`[${new Date().toLocaleTimeString()}] LLM Responding...`)
       appendTerminalOutput('')
@@ -175,7 +175,14 @@ export function ScriptAnalysisPage() {
     await refreshProjectStatus()
   }
 
-  const analyzeWithStream = async (analysisType: 'characters' | 'scenes') => {
+  const analyzeWithStream = async (analysisType: 'characters' | 'scenes' | 'acts') => {
+    if (!currentProject?.id || isStreaming) return
+
+    setAnalysisState({
+      isStreaming: true,
+      currentAnalyzing: analysisType,
+      terminalExpanded: true
+    })
     if (!projectId) return
     if (isStreaming || analysisService.isAnalyzing()) return
 
@@ -1262,6 +1269,9 @@ function ScenesContent({
 }) {
   const { setScenes, selectedWorkflows, workflowParams } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
+
+  // Lightbox state
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editedScene, setEditedScene] = useState<Partial<Scene>>({})
   const [isSaving, setIsSaving] = useState(false)
@@ -1620,30 +1630,48 @@ function ScenesContent({
                     </div>
                   </div>
 
-                  {/* Preview Area - 1080p Stage Look */}
-                  <div className="bg-white flex-1 p-8 flex items-center justify-center overflow-hidden">
-
-                    {/* 16:9 1080p Frame */}
-                    {/* H-full w-auto aspect-video max-w-full ensures it fits container without scrolling */}
-                    <div className="h-full w-auto aspect-video max-w-full relative group shadow-2xl bg-slate-100 rounded-lg border-[6px] border-slate-800 overflow-hidden ring-1 ring-slate-900/10 flex items-center justify-center">
+                  {/* Preview Area - Refined Aesthetic Look */}
+                  <div className="bg-slate-50/50 flex-1 p-8 flex items-center justify-center overflow-hidden">
+                    {/* Container for image/video - Adapts to content size, max-full */}
+                    <div className="relative max-w-full max-h-full flex flex-col items-center justify-center">
                       {selectedScene.sceneImage ? (
-                        <div className="relative w-full h-full">
-                          <img
-                            src={fileUrl.image(selectedScene.sceneImage.imagePath)}
-                            className="w-full h-full object-contain"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-6">
-                            <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full backdrop-blur-md border border-white/10">Final Render</span>
-                            <button
-                              onClick={handleDeleteSceneImage}
-                              className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-lg backdrop-blur-md transition-all hover:scale-105 shadow-lg"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
+                        <div
+                          className="relative group cursor-zoom-in"
+                          onClick={() => setLightboxImage(fileUrl.image(selectedScene.sceneImage!.imagePath))}
+                        >
+                          {/* Main Image with Aesthetic Border */}
+                          <div className="relative p-1 bg-white rounded shadow-sm border border-slate-200">
+                            {/* Inner delicate border */}
+                            <div className="relative border-4 border-slate-800/5 rounded-sm overflow-hidden">
+                              <img
+                                src={fileUrl.image(selectedScene.sceneImage.imagePath)}
+                                className="max-w-full max-h-[60vh] object-contain block" // limit height to avoid overflow
+                                alt={`Scene ${selectedScene.sceneNumber}`}
+                              />
+                            </div>
                           </div>
+
+                          {/* Hover Overlay */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 shadow-lg transform scale-95 group-hover:scale-100 transition-all duration-300">
+                              🔍 Click to Zoom
+                            </span>
+                          </div>
+
+                          {/* Delete Button (Corner) */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteSceneImage()
+                            }}
+                            className="absolute -top-3 -right-3 p-2 bg-white text-red-500 rounded-full shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 z-10"
+                            title="Delete Image"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
                         </div>
                       ) : selectedScene.videoClip ? (
-                        <div className="w-full h-full flex items-center justify-center bg-black">
+                        <div className="h-full w-full aspect-video max-h-[60vh] bg-black rounded-lg overflow-hidden shadow-lg border-[6px] border-slate-800">
                           <video
                             src={fileUrl.video(selectedScene.videoClip.videoPath)}
                             controls
@@ -1651,10 +1679,10 @@ function ScenesContent({
                           />
                         </div>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center flex-col text-slate-500 bg-slate-100/50">
-                          <span className="text-6xl mb-4 grayscale opacity-30">📺</span>
-                          <span className="text-lg font-medium text-slate-400">No Preview Available</span>
-                          <span className="text-xs text-slate-400 mt-2">Generate an image to see it here</span>
+                        <div className="w-96 aspect-video flex items-center justify-center flex-col text-slate-400 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200">
+                          <span className="text-4xl mb-3 opacity-30">🖼️</span>
+                          <span className="text-sm font-medium">No Preview</span>
+                          <span className="text-[10px] text-slate-400 mt-1">Generate an image to view</span>
                         </div>
                       )}
                     </div>
@@ -1688,6 +1716,10 @@ function ScenesContent({
           </div>
         )}
       </div>
+      {/* Lightbox */}
+      {lightboxImage && (
+        <Lightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
+      )}
     </div>
   )
 }

@@ -104,6 +104,22 @@ class PromptService:
         prompt = prompt.replace("{{scene_start_num}}", str(scene_start_num))
 
         return prompt
+ 
+     def get_acts_prompt(
+         self,
+         script_text: str,
+         chunk_index: int,
+         total_chunks: int,
+     ) -> str:
+         """获取幕/场面分析提示词"""
+         config = self.get_analysis_prompts().get("acts", {})
+         template = config.get("template", "")
+ 
+         prompt = template.replace("{{script_text}}", script_text)
+         prompt = prompt.replace("{{chunk_index}}", str(chunk_index))
+         prompt = prompt.replace("{{total_chunks}}", str(total_chunks))
+ 
+         return prompt
 
     def update_analysis_prompts(self, data: dict[str, Any]) -> bool:
         """更新分析提示词配置"""

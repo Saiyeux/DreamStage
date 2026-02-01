@@ -117,6 +117,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
     # 收集所有块的结果
     all_characters = []
     all_scenes = []
+    all_beats = []
     summary_data = {}
 
     try:
@@ -143,6 +144,12 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     total_chunks=total_chunks,
                     characters_json=characters_json,
                     scene_start_num=scene_start_num,
+                )
+            elif analysis_type == "acts":
+                prompt = prompt_service.get_acts_prompt(
+                    script_text=script_chunk,
+                    chunk_index=chunk_idx,
+                    total_chunks=total_chunks,
                 )
             else:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Unknown analysis type'})}\n\n"
@@ -177,11 +184,14 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                 # 兼容性处理：提取结果数据
                 new_chars = []
                 new_scenes = []
+                new_beats = []
+                
                 
                 if isinstance(parsed_data, dict):
                     logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，顶级keys: {list(parsed_data.keys())}")
                     new_chars = parsed_data.get("characters", [])
                     new_scenes = parsed_data.get("scenes", [])
+                    new_beats = parsed_data.get("beats", [])
                     # 如果分析类型是summary，直接使用整个字典
                     if analysis_type == "summary":
                         summary_data = parsed_data
@@ -191,6 +201,8 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                         new_chars = parsed_data
                     elif analysis_type == "scenes":
                         new_scenes = parsed_data
+                    elif analysis_type == "acts":
+                        new_beats = parsed_data
                     elif analysis_type == "summary":
                         # 处理摘要为列表的情况
                         if len(parsed_data) > 0:
@@ -213,7 +225,11 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                     scene_numbers = [s.get("scene_number", "?") for s in new_scenes]
                     logger.debug(f"块 {chunk_idx}/{total_chunks} 返回 {len(new_scenes)} 个场景，编号: {scene_numbers}")
                     all_scenes.extend(new_scenes)
+                    all_scenes.extend(new_scenes)
                     yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n"
+                elif analysis_type == "acts":
+                    all_beats.extend(new_beats)
+                    yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_beats), 'total_found': len(all_beats)})}\n\n"
                 elif analysis_type == "summary":
                     if not summary_data and isinstance(parsed_data, dict):
                          summary_data = parsed_data
@@ -234,7 +250,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
 
                 yield f"data: {json.dumps({'type': 'chunk_error', 'chunk': chunk_idx, 'message': str(chunk_error)})}\n\n"
                 # 如果已有部分数据，保存并退出
-                if all_characters or all_scenes or summary_data:
+                if all_characters or all_scenes or all_beats or summary_data:
                     logger.info(f"块 {chunk_idx}/{total_chunks} 出错，但已有部分数据，准备保存")
                     yield f"data: {json.dumps({'type': 'partial_save', 'message': '部分数据将被保存'})}\n\n"
                     break
@@ -324,6 +340,15 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                         project_to_update.summary = summary_data.get("summary", "")
                     await save_db.commit()
                     saved_count = 1
+ 
+                elif analysis_type == "acts":
+                    result = await save_db.execute(select(Project).where(Project.id == project_id))
+                    project_to_update = result.scalar_one_or_none()
+                    if project_to_update:
+                        project_to_update.act_analysis = all_beats
+                    await save_db.commit()
+                    saved_count = len(all_beats)
+
 
             logger.info(f"分析完成 - 类型: {analysis_type}, 保存条目: {saved_count}")
             yield f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n"
@@ -345,7 +370,7 @@ async def analyze_stream(
     db: AsyncSession = Depends(get_db),
 ):
     """流式分析端点 (SSE)"""
-    if analysis_type not in ["summary", "characters", "scenes"]:
+    if analysis_type not in ["summary", "characters", "scenes", "acts"]:
         raise HTTPException(status_code=400, detail="Invalid analysis type")
 
     return StreamingResponse(

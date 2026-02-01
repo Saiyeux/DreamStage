@@ -20,7 +20,7 @@ interface ProjectState {
     terminalOutput: string[]
     isStreaming: boolean
     terminalExpanded: boolean
-    currentAnalyzing: 'characters' | 'scenes' | null
+    currentAnalyzing: 'characters' | 'scenes' | 'acts' | null
   }
 
   // 工作流选择
@@ -66,7 +66,7 @@ const initialAnalysisState = {
   terminalOutput: [],
   isStreaming: false,
   terminalExpanded: false,
-  currentAnalyzing: null as 'characters' | 'scenes' | null,
+  currentAnalyzing: null as 'characters' | 'scenes' | 'acts' | null,
 }
 
 export const useProjectStore = create<ProjectState>()(

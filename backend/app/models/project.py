@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Text, DateTime, Enum as SQLEnum
+from sqlalchemy import String, Text, DateTime, JSON, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -27,6 +27,7 @@ class Project(Base):
     script_path: Mapped[str | None] = mapped_column(String(500))
     script_text: Mapped[str | None] = mapped_column(Text)
     summary: Mapped[str | None] = mapped_column(Text)
+    act_analysis: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(
         SQLEnum(ProjectStatus), default=ProjectStatus.DRAFT
     )

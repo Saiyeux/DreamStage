@@ -165,9 +165,30 @@ export function ActContent({ projectId }: { projectId: string }) {
 
                     {/* Reference Section */}
                     <div className="h-1/2 overflow-y-auto p-4 bg-slate-50">
-                        <div className="text-sm font-semibold mb-2 text-slate-700">reference</div>
-                        <div className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed">
-                            {currentProject?.scriptText || "No script content available."}
+                        <div className="text-sm font-semibold mb-2 text-slate-700 flex justify-between items-center">
+                            <span>Act Analysis</span>
+                            <span className="text-[10px] text-slate-400 font-normal">Editable Reference</span>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                            {currentProject?.actAnalysis && currentProject.actAnalysis.length > 0 ? (
+                                <div className="space-y-2">
+                                    {currentProject.actAnalysis.map((beat, index) => (
+                                        <div key={beat.id || index} className="p-2 bg-white rounded border border-slate-200 text-xs">
+                                            <div className="font-bold text-slate-700 mb-1">Beat {index + 1}</div>
+                                            <div className="text-slate-600 mb-1">{beat.action}</div>
+                                            {beat.dialogue && (
+                                                <div className="pl-2 border-l-2 border-slate-300 text-slate-500 italic">
+                                                    {beat.dialogue}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed p-4">
+                                    {currentProject?.scriptText || "No script content available."}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </aside>
@@ -186,9 +207,10 @@ export function ActContent({ projectId }: { projectId: string }) {
                                 <div className="flex gap-1">
                                     <button
                                         onClick={() => setActiveStageSceneId(null)}
-                                        className="text-[10px] px-2 py-0.5 border border-slate-200 rounded hover:bg-slate-50 text-slate-500"
+                                        className="btn btn-ghost text-xs px-2 py-1 h-7 min-h-0"
+                                        title="Clear Stage"
                                     >
-                                        clear
+                                        Clear
                                     </button>
                                 </div>
                             </div>
@@ -244,7 +266,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                             {/* Header */}
                             <div className="h-10 border-b border-slate-700 flex items-center justify-between px-3 bg-slate-800 shrink-0">
                                 <span className="text-xs font-semibold text-slate-300">VIDEO</span>
-                                <div className="flex gap-1">
+                                <div className="flex gap-2">
                                     <button
                                         onClick={() => {
                                             if (confirm('Clear entire Act?')) {
@@ -252,9 +274,9 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                 setTimelineBeats([])
                                             }
                                         }}
-                                        className="text-[10px] px-2 py-0.5 border border-slate-600 rounded hover:bg-slate-700 text-slate-400"
+                                        className="btn btn-ghost text-slate-300 hover:text-white hover:bg-slate-700 text-xs px-2 py-1 h-7 min-h-0"
                                     >
-                                        reset
+                                        Reset
                                     </button>
                                     <button
                                         onClick={() => {
@@ -262,9 +284,9 @@ export function ActContent({ projectId }: { projectId: string }) {
                                             setTimeout(() => setIsGenerating(false), 3000)
                                         }}
                                         disabled={isGenerating}
-                                        className="text-[10px] px-2 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                        className="btn btn-primary text-xs px-3 py-1 h-7 min-h-0"
                                     >
-                                        {isGenerating ? 'generating...' : 'generate'}
+                                        {isGenerating ? 'Generating...' : 'Generate Channel'}
                                     </button>
                                 </div>
                             </div>
@@ -287,7 +309,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                         className={`h-72 border-t border-slate-300 flex flex-col bg-white shrink-0 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset' : ''}`}
                     >
                         <div className="h-8 border-b border-slate-100 flex items-center px-4 bg-slate-50 shrink-0">
-                            <span className="text-xs font-semibold text-slate-600">LINES / TIMELINE</span>
+                            <span className="text-xs font-semibold text-slate-600">LINES</span>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">

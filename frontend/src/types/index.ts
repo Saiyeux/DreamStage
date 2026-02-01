@@ -8,6 +8,7 @@ export interface Project {
   scriptPath: string
   scriptText: string
   summary: string
+  actAnalysis?: Beat[] // Optional field for act analysis results
   status: ProjectStatus
   createdAt: string
   updatedAt: string

@@ -3,7 +3,7 @@
  * 独立于组件生命周期，防止页面切换时连接中断
  */
 
-type AnalysisType = 'characters' | 'scenes'
+type AnalysisType = 'characters' | 'scenes' | 'acts'
 
 interface AnalysisCallbacks {
   onStart: () => void
