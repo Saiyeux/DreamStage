@@ -27,8 +27,6 @@ export function ScriptAnalysisPage() {
     setAnalysisState,
     appendTerminalOutput,
     updateLastTerminalLine,
-    selectedWorkflows,
-    workflowParams
   } = useProjectStore()
 
   const projectId = urlProjectId || currentProject?.id
@@ -43,7 +41,7 @@ export function ScriptAnalysisPage() {
     }, { replace: true })
   }
   const [loading, setLoading] = useState(false)
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
+
 
   const { terminalOutput, isStreaming, terminalExpanded, currentAnalyzing } = analysisState
   const terminalRef = useRef<HTMLDivElement>(null)
@@ -1452,18 +1450,7 @@ function ScenesContent({
     }
   }
 
-  const handleGenerateVideo = async () => {
-    if (!selectedScene?.id || !selectedScene.sceneImage || generatingSceneId) return
 
-    try {
-      const response = await generationApi.generateSceneVideo(projectId, selectedScene.id, selectedWorkflows.video || undefined, workflowParams.video)
-      startPolling(response.task_id, selectedScene.id)
-    } catch (err) {
-      console.error('Generate video failed:', err)
-      setGeneratingSceneId(null)
-      setGenerateMessage('Failed to start task')
-    }
-  }
 
   const handleDeleteSceneImage = async () => {
     if (!selectedScene?.sceneImage?.id) return
@@ -1478,18 +1465,7 @@ function ScenesContent({
     }
   }
 
-  const handleDeleteVideo = async () => {
-    if (!selectedScene?.videoClip?.id) return
-    if (!confirm('Permanently delete this video clip?')) return
-    try {
-      await analysisApi.deleteVideoClip(projectId, selectedScene.videoClip.id)
-      const updated = await analysisApi.getScenes(projectId)
-      setScenes(updated)
-    } catch (err) {
-      console.error('Delete video failed:', err)
-      alert('Failed to delete video')
-    }
-  }
+
 
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden">
@@ -1586,13 +1562,7 @@ function ScenesContent({
                     >
                       {generatingSceneId === selectedScene.id ? '⏳ Generating...' : '▶ Generate Image'}
                     </button>
-                    <button
-                      onClick={handleGenerateVideo}
-                      disabled={!!generatingSceneId || !selectedScene.sceneImage}
-                      className="btn bg-purple-600 hover:bg-purple-700 text-white border-transparent text-xs px-3 py-1.5 shadow-md shadow-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      🎬 Generate Video
-                    </button>
+
 
                     {/* Status Text (Optional, keeping it minimal) */}
                     {generatingSceneId === selectedScene.id && (
@@ -1627,114 +1597,84 @@ function ScenesContent({
               </div>
             </div>
 
-            {/* Content Grid */}
-            <div className="p-6 max-w-[1600px] w-full mx-auto">
-              <div className="grid grid-cols-12 gap-6 h-full">
+            {/* Content Layout: Vertical Flex */}
+            <div className="p-6 max-w-[1600px] w-full mx-auto flex-1 min-h-0 flex flex-col gap-6">
 
-                {/* Column 1: Script & Info (5 cols) */}
-                <div className="col-span-5 flex flex-col gap-6">
-                  {/* Visual Context Card */}
-                  <div className="card p-5 border-l-4 border-l-blue-500 shadow-sm">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <span className="text-lg">👁️</span> Visual Context
-                    </h3>
-                    <div className="space-y-4">
-                      <Field label="Environment" value={selectedScene.environmentDesc} isEditing={isEditing} editValue={editedScene.environmentDesc} onChange={(v) => updateField('environmentDesc', v)} multiline />
-                      <div className="grid grid-cols-2 gap-4 pt-2">
-                        <Field label="Shot Type" value={selectedScene.shotType} isEditing={isEditing} editValue={editedScene.shotType} onChange={(v) => updateField('shotType', v)} />
-                        <Field label="Camera" value={selectedScene.cameraMovement} isEditing={isEditing} editValue={editedScene.cameraMovement} onChange={(v) => updateField('cameraMovement', v)} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dialogue Card */}
-                  {/* Dialogue Card */}
-                  <div className="card p-5 bg-white border border-slate-200 shadow-sm text-slate-700 flex-1 flex flex-col">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <span className="text-lg">💬</span> Dialogue
-                    </h3>
-                    <div className="font-mono text-sm leading-relaxed whitespace-pre-wrap flex-1 overflow-y-auto custom-scrollbar max-h-[400px]">
-                      {isEditing ? (
-                        <textarea
-                          value={editedScene.dialogue || ''}
-                          onChange={(e) => updateField('dialogue', e.target.value)}
-                          className="w-full bg-slate-50 border-slate-200 border rounded p-3 text-slate-900 focus:ring-primary-500 focus:border-primary-500 h-full min-h-[150px]"
-                        />
-                      ) : (
-                        selectedScene.dialogue || <span className="italic opacity-50 text-slate-400">No dialogue in this scene.</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Media & Generation (7 cols) */}
-                <div className="col-span-7 flex flex-col gap-6">
-                  {/* Image Generation Panel */}
-                  <div className="card p-1 overflow-hidden bg-slate-50 border-slate-200 flex flex-col h-full shadow-sm">
-                    {/* Toolbar */}
-                    <div className="px-4 py-3 bg-white border-b border-slate-100 flex justify-between items-center">
-                      <h3 className="text-sm font-semibold text-slate-700">Scene Generation</h3>
-                      <div className="flex items-center gap-2">
-                        {generatingSceneId === selectedScene.id && (
-                          <div className="flex items-center gap-2 mr-3 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs animate-pulse border border-blue-100">
-                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                            {generateMessage}
-                          </div>
-                        )}
-                        <div className="flex bg-slate-100 p-1 rounded-lg">
-                          <span className="text-xs text-slate-400 px-2">Settings & Preview</span>
+              {/* 1. TOP: Scene Generation (Flex-1, fills available space) */}
+              <div className="flex-1 min-h-0 flex flex-col gap-6">
+                {/* Image Generation Panel */}
+                <div className="card p-1 overflow-hidden bg-slate-50 border-slate-200 flex flex-col h-full shadow-sm">
+                  {/* Toolbar */}
+                  <div className="px-4 py-3 bg-white border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="text-sm font-semibold text-slate-700">Scene Generation</h3>
+                    <div className="flex items-center gap-2">
+                      {generatingSceneId === selectedScene.id && (
+                        <div className="flex items-center gap-2 mr-3 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs animate-pulse border border-blue-100">
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                          {generateMessage}
                         </div>
+                      )}
+                      <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <span className="text-xs text-slate-400 px-2">Settings & Preview</span>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Preview Area */}
-                    <div className="bg-slate-100/50 flex-1 p-4 flex flex-col gap-4 overflow-y-auto">
+                  {/* Preview Area - 1080p Stage Look */}
+                  <div className="bg-white flex-1 p-8 flex items-center justify-center overflow-hidden">
 
-                      {/* Image Result */}
-                      <div className="w-full relative group shadow-sm bg-white rounded-xl border border-slate-200 overflow-hidden">
-                        {selectedScene.sceneImage ? (
-                          <div className="relative aspect-video">
-                            <img
-                              src={fileUrl.image(selectedScene.sceneImage.imagePath)}
-                              className="w-full h-full object-contain bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMWgydjJIMUMxeiIgZmlsbD0iI0VFRUVFRSIgZmlsbC1ydWxlPSJldmVub2RkIi8+PC9zdmc+')] bg-repeat"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
-                              <span className="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded backdrop-blur-md">Final Render</span>
-                              <button
-                                onClick={handleDeleteSceneImage}
-                                className="p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-lg backdrop-blur-md transition-colors shadow-lg"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </div>
+                    {/* 16:9 1080p Frame */}
+                    {/* H-full w-auto aspect-video max-w-full ensures it fits container without scrolling */}
+                    <div className="h-full w-auto aspect-video max-w-full relative group shadow-2xl bg-slate-100 rounded-lg border-[6px] border-slate-800 overflow-hidden ring-1 ring-slate-900/10 flex items-center justify-center">
+                      {selectedScene.sceneImage ? (
+                        <div className="relative w-full h-full">
+                          <img
+                            src={fileUrl.image(selectedScene.sceneImage.imagePath)}
+                            className="w-full h-full object-contain"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-6">
+                            <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full backdrop-blur-md border border-white/10">Final Render</span>
+                            <button
+                              onClick={handleDeleteSceneImage}
+                              className="p-2 bg-red-500/80 hover:bg-red-600 text-white rounded-lg backdrop-blur-md transition-all hover:scale-105 shadow-lg"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
                           </div>
-                        ) : (
-                          <div className="aspect-video flex items-center justify-center flex-col text-slate-300 border-2 border-dashed border-slate-200 rounded-xl m-2">
-                            <span className="text-5xl mb-2 grayscale opacity-50">🖼️</span>
-                            <span className="text-sm font-medium">No Image Generated</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Video Result (if exists) */}
-                      {selectedScene.videoClip && (
-                        <div className="w-full relative group shadow-sm bg-black rounded-xl border border-slate-800 overflow-hidden">
-                          <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-                            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Motion Preview</span>
-                            <button onClick={handleDeleteVideo} className="text-xs text-red-500 hover:text-red-400">Delete</button>
-                          </div>
+                        </div>
+                      ) : selectedScene.videoClip ? (
+                        <div className="w-full h-full flex items-center justify-center bg-black">
                           <video
                             src={fileUrl.video(selectedScene.videoClip.videoPath)}
                             controls
-                            className="w-full aspect-video object-contain"
+                            className="w-full h-full object-contain"
                           />
                         </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center flex-col text-slate-500 bg-slate-100/50">
+                          <span className="text-6xl mb-4 grayscale opacity-30">📺</span>
+                          <span className="text-lg font-medium text-slate-400">No Preview Available</span>
+                          <span className="text-xs text-slate-400 mt-2">Generate an image to see it here</span>
+                        </div>
                       )}
-
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* 2. BOTTOM: Visual Context (Shrink-0) */}
+              <div className="shrink-0 flex flex-col gap-6">
+                {/* Visual Context Card */}
+                <div className="card p-5 border-l-4 border-l-blue-500 shadow-sm">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="text-lg">👁️</span> Visual Context
+                  </h3>
+                  <div className="space-y-4">
+                    <Field label="Environment" value={selectedScene.environmentDesc} isEditing={isEditing} editValue={editedScene.environmentDesc} onChange={(v) => updateField('environmentDesc', v)} multiline />
+                  </div>
+                </div>
+              </div>
+
             </div>
 
           </div>

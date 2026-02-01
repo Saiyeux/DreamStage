@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core'
 import { useProjectStore } from '@/stores/projectStore'
 import { fileUrl } from '@/api/client'
+import { analysisApi } from '@/api'
 
 // ------------------------------------------------------------------
 // Draggable Asset Component
@@ -30,7 +31,7 @@ function DraggableAsset({ id, type, data, children }: { id: string, type: 'chara
 // ------------------------------------------------------------------
 
 export function ActContent({ projectId }: { projectId: string }) {
-    const { characters, scenes, currentProject } = useProjectStore()
+    const { characters, scenes, currentProject, setScenes } = useProjectStore()
 
     // State
     const [activeStageSceneId, setActiveStageSceneId] = useState<string | null>(null)
@@ -79,6 +80,20 @@ export function ActContent({ projectId }: { projectId: string }) {
 
     const currentStageScene = scenes.find(s => s.id === activeStageSceneId)
 
+    const handleUpdateScene = async (field: string, value: string) => {
+        if (!activeStageSceneId || !projectId) return
+
+        // Optimistic update
+        setScenes(scenes.map(s => s.id === activeStageSceneId ? { ...s, [field]: value } : s))
+
+        try {
+            await analysisApi.updateScene(projectId, activeStageSceneId, { [field]: value })
+        } catch (err) {
+            console.error('Failed to update scene:', err)
+            // Revert on error (optional, or just alert)
+        }
+    }
+
     return (
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="flex h-full w-full overflow-hidden bg-white">
@@ -86,50 +101,64 @@ export function ActContent({ projectId }: { projectId: string }) {
                 {/* LEFT COLUMN: Library + Reference */}
                 <aside className="w-64 shrink-0 border-r border-slate-300 flex flex-col">
                     {/* Library Section */}
-                    <div className="h-1/2 border-b border-slate-300 overflow-y-auto p-4">
-                        <div className="text-sm font-semibold mb-4 text-slate-700">library</div>
-
-                        {/* Characters */}
-                        <div className="mb-4">
-                            <div className="text-xs text-slate-500 mb-2">Cast</div>
-                            <div className="space-y-2">
-                                {characters.map(char => (
-                                    <DraggableAsset key={char.id} id={char.id} type="character" data={char}>
-                                        <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 hover:bg-slate-100 cursor-grab">
-                                            <div className="w-8 h-8 rounded bg-slate-200 overflow-hidden shrink-0">
-                                                {char.images?.[0] ? (
-                                                    <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs">
-                                                        {char.gender?.includes('Female') ? '👩' : '👨'}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <span className="text-xs truncate">{char.name}</span>
-                                        </div>
-                                    </DraggableAsset>
-                                ))}
-                            </div>
+                    <div className="h-1/2 border-b border-slate-300 flex flex-col min-h-0 bg-white">
+                        {/* Fixed Header */}
+                        <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Library</span>
                         </div>
 
-                        {/* Scenes */}
-                        <div>
-                            <div className="text-xs text-slate-500 mb-2">Sets</div>
-                            <div className="space-y-2">
-                                {scenes.map(scene => (
-                                    <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene}>
-                                        <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 hover:bg-slate-100 cursor-grab">
-                                            <div className="w-12 h-8 rounded bg-slate-200 overflow-hidden shrink-0">
-                                                {scene.sceneImage ? (
-                                                    <img src={fileUrl.image(scene.sceneImage.imagePath)} alt={scene.location} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs">🎬</div>
-                                                )}
-                                            </div>
-                                            <span className="text-xs truncate">{scene.location}</span>
-                                        </div>
-                                    </DraggableAsset>
-                                ))}
+                        {/* Split Scrollable Content */}
+                        <div className="flex-1 flex flex-col min-h-0">
+                            {/* Characters (Top Half) */}
+                            <div className="flex-1 flex flex-col min-h-0 border-b border-slate-200">
+                                <div className="px-3 py-1 bg-white border-b border-slate-200 shrink-0">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cast</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-3 bg-white">
+                                    <div className="space-y-2">
+                                        {characters.map(char => (
+                                            <DraggableAsset key={char.id} id={char.id} type="character" data={char}>
+                                                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing">
+                                                    <div className="w-8 h-8 rounded bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
+                                                        {char.images?.[0] ? (
+                                                            <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+                                                                {char.gender?.includes('Female') ? '👩' : '👨'}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-medium text-slate-700 truncate">{char.name}</span>
+                                                </div>
+                                            </DraggableAsset>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Scenes (Bottom Half) */}
+                            <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+                                <div className="px-3 py-1 bg-slate-50 border-b border-slate-200 shrink-0">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Sets</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-3">
+                                    <div className="space-y-2">
+                                        {scenes.map(scene => (
+                                            <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene}>
+                                                <div className="flex items-center gap-2 p-2 bg-white rounded border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing">
+                                                    <div className="w-12 h-8 rounded bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
+                                                        {scene.sceneImage ? (
+                                                            <img src={fileUrl.image(scene.sceneImage.imagePath)} alt={scene.location} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">🎬</div>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-medium text-slate-700 truncate">{scene.location}</span>
+                                                </div>
+                                            </DraggableAsset>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -163,6 +192,32 @@ export function ActContent({ projectId }: { projectId: string }) {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Scene Controls Toolbar (Shot & Camera) */}
+                            {currentStageScene && (
+                                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 grid grid-cols-2 gap-2 shrink-0">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Shot Type</label>
+                                        <input
+                                            type="text"
+                                            className="w-full text-xs border border-slate-300 rounded px-2 py-1 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-700 bg-white"
+                                            value={currentStageScene.shotType || ''}
+                                            onChange={(e) => handleUpdateScene('shotType', e.target.value)}
+                                            placeholder="e.g. Medium Shot"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Camera</label>
+                                        <input
+                                            type="text"
+                                            className="w-full text-xs border border-slate-300 rounded px-2 py-1 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-700 bg-white"
+                                            value={currentStageScene.cameraMovement || ''}
+                                            onChange={(e) => handleUpdateScene('cameraMovement', e.target.value)}
+                                            placeholder="e.g. Pan Left"
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Preview */}
                             <div

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { WorkflowConfig } from '@/api/config'
+
 
 interface WorkflowSettingsModalProps {
     visible: boolean

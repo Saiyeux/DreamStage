@@ -64,12 +64,7 @@ export const generationApi = {
       params,
     }),
 
-  generateSceneVideo: (projectId: string, sceneId: string, workflowId?: string, params?: Record<string, any>) =>
-    api.post<TaskResponse>(`/projects/${projectId}/generate/scene-video`, {
-      scene_id: sceneId,
-      workflow_id: workflowId,
-      params,
-    }),
+
 
   generateAllVideos: (projectId: string, workflowId?: string, params?: Record<string, any>) =>
     api.post<TaskResponse>(`/projects/${projectId}/generate/all-videos`, {

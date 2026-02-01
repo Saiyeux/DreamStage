@@ -167,39 +167,7 @@ async def generate_all_scene_images(
 
 # ============ 视频生成 ============
 
-@router.post("/{project_id}/generate/scene-video", response_model=TaskResponse)
-async def generate_scene_video(
-    project_id: str,
-    request: GenerateSceneRequest,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
-):
-    """为指定场景生成视频"""
-    logger.info(f"Received generate_scene_video request: project_id={project_id}, scene_id={request.scene_id}, workflow_id={request.workflow_id}")
-    result = await db.execute(
-        select(Scene)
-        .options(selectinload(Scene.scene_image), selectinload(Scene.video_clip))
-        .where(Scene.id == request.scene_id, Scene.project_id == project_id)
-    )
-    scene = result.scalar_one_or_none()
 
-    if not scene:
-        raise HTTPException(status_code=404, detail="Scene not found")
-
-    if not scene.scene_image:
-        raise HTTPException(status_code=400, detail="Scene image must be generated first")
-
-    task_id = str(uuid.uuid4())
-
-    background_tasks.add_task(
-        generation_tasks.generate_scene_video,
-        task_id=task_id,
-        scene=scene,
-        workflow_id=request.workflow_id,
-        params=request.params,
-    )
-
-    return TaskResponse(task_id=task_id, message="Scene video generation started")
 
 
 @router.post("/{project_id}/generate/all-videos", response_model=TaskResponse)
