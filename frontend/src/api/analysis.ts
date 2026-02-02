@@ -47,4 +47,8 @@ export const analysisApi = {
   // 删除场景视频
   deleteVideoClip: (projectId: string, videoId: string) =>
     api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/scenes/videos/${videoId}`),
+
+  // 获取分析状态
+  getAnalysisStatus: (projectId: string) =>
+    api.get<{ status: string; analysis_type: string | null; progress?: string }>(`/projects/${projectId}/analysis/status`),
 }

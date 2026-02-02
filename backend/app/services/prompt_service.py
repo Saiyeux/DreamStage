@@ -400,6 +400,40 @@ class PromptService:
 
         return chunks if chunks else [script_text]
 
+    def split_script_by_scenes(self, script_text: str) -> list[str]:
+        """
+        按场景标题 (INT./EXT.) 分割剧本
+        """
+        # 匹配场景标题的正则 (多行模式)
+        # 支持: INT., EXT., INT/EXT., I/E.
+        pattern = r"^\s*(?:INT\.|EXT\.|INT/EXT\.|I/E\.).*$"
+        
+        matches = list(re.finditer(pattern, script_text, re.MULTILINE | re.IGNORECASE))
+        
+        if not matches:
+            # 如果没找到场景标题，回退到按章节或大小分割
+            return self.split_script_by_chapters(script_text)
+            
+        chunks = []
+        for i, match in enumerate(matches):
+            start = match.start()
+            # 如果是最后一个匹配，到文本结束
+            if i == len(matches) - 1:
+                end = len(script_text)
+            else:
+                end = matches[i+1].start()
+                
+            chunk = script_text[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+                
+        # 处理第一个场景前的内容（如果有的话，且有意义的内容）
+        preamble = script_text[:matches[0].start()].strip()
+        if preamble and len(preamble) > 50: # 忽略太短的前言
+            chunks.insert(0, preamble)
+            
+        return chunks
+
     def _split_by_size(self, text: str, chunk_size: int) -> list[str]:
         """按字符数分割文本，尽量在段落边界处分割"""
         if len(text) <= chunk_size:

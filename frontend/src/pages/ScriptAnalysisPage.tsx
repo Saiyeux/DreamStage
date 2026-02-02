@@ -53,22 +53,6 @@ export function ScriptAnalysisPage() {
   }, [terminalOutput])
 
   useEffect(() => {
-    if (analysisService.isAnalyzing()) {
-      const analysisType = analysisService.getCurrentAnalysisType()
-      if (analysisType && projectId) {
-        analysisService.updateCallbacks(createAnalysisCallbacks(analysisType))
-      }
-    } else if (isStreaming) {
-      appendTerminalOutput('')
-      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] Connection lost, state reset`)
-      setAnalysisState({
-        isStreaming: false,
-        currentAnalyzing: null
-      })
-    }
-  }, [projectId])
-
-  useEffect(() => {
     if (!projectId) return
 
     const loadData = async () => {
@@ -163,6 +147,43 @@ export function ScriptAnalysisPage() {
       refreshProjectStatus()
     }
   }), [projectId, appendTerminalOutput, updateLastTerminalLine, setAnalysisState, setCharacters, setScenes, refreshProjectStatus])
+
+  useEffect(() => {
+    if (analysisService.isAnalyzing()) {
+      const analysisType = analysisService.getCurrentAnalysisType()
+      if (analysisType && projectId) {
+        analysisService.updateCallbacks(createAnalysisCallbacks(analysisType))
+      }
+    } else if (isStreaming) {
+      appendTerminalOutput('')
+      appendTerminalOutput(`[${new Date().toLocaleTimeString()}] Connection lost, state reset`)
+      setAnalysisState({
+        isStreaming: false,
+        currentAnalyzing: null
+      })
+    }
+
+    // Check for server-side active analysis on mount/project change
+    if (projectId && !isStreaming && !analysisService.isAnalyzing()) {
+      analysisApi.getAnalysisStatus(projectId).then(status => {
+        if (status.status === 'running' && status.analysis_type) {
+          const type = status.analysis_type as 'characters' | 'scenes' | 'acts'
+          console.log(`Resuming detached analysis: ${type}`)
+
+          setAnalysisState({
+            isStreaming: true,
+            currentAnalyzing: type,
+            terminalExpanded: true,
+            terminalOutput: [`> Resuming detached ${type} analysis...`]
+          })
+
+          const callbacks = createAnalysisCallbacks(type)
+          analysisService.start(projectId, type, callbacks)
+        }
+      }).catch(console.error)
+    }
+
+  }, [projectId, isStreaming, createAnalysisCallbacks, setAnalysisState])
 
   const stopStream = async () => {
     analysisService.stop()

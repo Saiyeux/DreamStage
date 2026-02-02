@@ -26,6 +26,7 @@ class Scene(Base):
     # 角色信息 (JSON)
     characters_data: Mapped[list[dict] | None] = mapped_column(JSON, default=list)
     dialogue: Mapped[str | None] = mapped_column(Text)
+    script_content: Mapped[str | None] = mapped_column(Text)
 
     # 定景状态
     is_finalized: Mapped[bool] = mapped_column(Boolean, default=False)

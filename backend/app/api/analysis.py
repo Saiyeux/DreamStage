@@ -68,207 +68,181 @@ def merge_characters(existing: list[dict], new_chars: list[dict]) -> list[dict]:
     return list(char_dict.values())
 
 
-# SSE 流式分析端点
-async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
-    """SSE 事件生成器 - 流式输出并在完成后保存数据，支持多块文本处理"""
-    result = await db.execute(
-        select(Project)
-        .options(selectinload(Project.characters))
-        .where(Project.id == project_id)
-    )
-    project = result.scalar_one_or_none()
+import asyncio
+from typing import Dict, List, Optional
 
-    if not project or not project.script_text:
-        yield f"data: {json.dumps({'type': 'error', 'message': 'Project or script not found'})}\n\n"
-        return
+# ... imports ...
 
-    # 发送开始事件
-    yield f"data: {json.dumps({'type': 'start', 'analysis_type': analysis_type})}\n\n"
 
-    # 分割剧本为多个块（优先使用章节分块，回退到字符数分块）
-    chunk_config = prompt_service.get_chunk_config()
-    chunk_mode = chunk_config.get("chunk_mode", "chapter")
+class AnalysisTask:
+    def __init__(self, project_id: str, analysis_type: str):
+        self.project_id = project_id
+        self.analysis_type = analysis_type
+        self.status = "init"  # init, running, completed, failed
+        self.events: List[str] = []
+        self.new_event_event = asyncio.Event()
+        self.task: Optional[asyncio.Task] = None
+        self.error: Optional[str] = None
+        
+    async def add_event(self, data: str):
+        self.events.append(data)
+        self.new_event_event.set()
+        # Allow subscribers to wake up
+        await asyncio.sleep(0)
+        self.new_event_event.clear()
 
-    if chunk_mode == "chapter":
-        script_chunks = prompt_service.split_script_by_chapters(project.script_text)
-        logger.info(f"项目 {project_id} - 使用章节分块模式")
-    else:
-        chunk_size = get_llm_chunk_size()
-        script_chunks = split_script_into_chunks(project.script_text, chunk_size)
-        logger.info(f"项目 {project_id} - 使用字符数分块模式，分块大小: {chunk_size}")
-
-    total_chunks = len(script_chunks)
-
-    # 调试：记录分块信息
-    logger.info(f"项目 {project_id} - 剧本长度: {len(project.script_text)} 字符，总块数: {total_chunks}")
-    for i, chunk in enumerate(script_chunks, 1):
-        logger.debug(f"块 {i}/{total_chunks} 长度: {len(chunk)} 字符，前80字符: {chunk[:80].replace(chr(10), ' ')}")
-
-    # 通知前端总块数
-    yield f"data: {json.dumps({'type': 'info', 'total_chunks': total_chunks})}\n\n"
-
-    # 角色信息（用于场景分析）
-    characters_info = [
-        {"name": c.name, "role_type": c.role_type}
-        for c in project.characters
-    ]
-    characters_json = json.dumps(characters_info, ensure_ascii=False)
-
-    # 收集所有块的结果
-    all_characters = []
-    all_scenes = []
-    all_beats = []
-    summary_data = {}
-
-    try:
-        for chunk_idx, script_chunk in enumerate(script_chunks, 1):
-            # 通知当前处理的块
-            yield f"data: {json.dumps({'type': 'chunk_start', 'chunk': chunk_idx, 'total': total_chunks})}\n\n"
-
-            # 根据类型选择 prompt（使用配置文件中的提示词模板）
-            if analysis_type == "summary":
-                prompt = prompt_service.get_summary_prompt(script_chunk)
-            elif analysis_type == "characters":
-                existing_names = [c.get("name", "") for c in all_characters]
-                prompt = prompt_service.get_characters_prompt(
-                    script_text=script_chunk,
-                    chunk_index=chunk_idx,
-                    total_chunks=total_chunks,
-                    existing_names=existing_names if existing_names else None,
-                )
-            elif analysis_type == "scenes":
-                scene_start_num = len(all_scenes) + 1
-                prompt = prompt_service.get_scenes_prompt(
-                    script_text=script_chunk,
-                    chunk_index=chunk_idx,
-                    total_chunks=total_chunks,
-                    characters_json=characters_json,
-                    scene_start_num=scene_start_num,
-                )
-            elif analysis_type == "acts":
-                prompt = prompt_service.get_acts_prompt(
-                    script_text=script_chunk,
-                    chunk_index=chunk_idx,
-                    total_chunks=total_chunks,
-                )
-            else:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Unknown analysis type'})}\n\n"
-                return
-
-            # 处理当前块（包含 LLM 调用和解析，单独 try/except）
-            try:
-                # 流式输出 LLM 响应
-                full_response = ""
-                async for chunk in llm_client.chat_stream(prompt):
-                    full_response += chunk
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-
-                # 调试：记录LLM返回的完整内容
-                logger.debug(f"块 {chunk_idx}/{total_chunks} - LLM返回内容长度: {len(full_response)} 字符")
-                logger.debug(f"块 {chunk_idx}/{total_chunks} - LLM返回内容前500字符: {full_response[:500]}")
-
-                # 解析当前块的结果
-                json_match = re.search(r'```json\s*([\s\S]*?)\s*```', full_response)
-                if json_match:
-                    json_str = json_match.group(1)
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} - 从markdown代码块中提取JSON")
-                else:
-                    # 尝试直接查找 JSON 对象 或 数组
-                    json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', full_response)
-                    json_str = json_match.group(1) if json_match else full_response
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} - 直接提取JSON对象/数组，是否找到: {json_match is not None}")
-
-                logger.debug(f"块 {chunk_idx}/{total_chunks} - 提取的JSON字符串前300字符: {json_str[:300]}")
-                parsed_data = json.loads(json_str)
-                
-                # 兼容性处理：提取结果数据
-                new_chars = []
-                new_scenes = []
-                new_beats = []
-                
-                
-                if isinstance(parsed_data, dict):
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，顶级keys: {list(parsed_data.keys())}")
-                    new_chars = parsed_data.get("characters", [])
-                    new_scenes = parsed_data.get("scenes", [])
-                    new_beats = parsed_data.get("beats", [])
-                    # 如果分析类型是summary，直接使用整个字典
-                    if analysis_type == "summary":
-                        summary_data = parsed_data
-                elif isinstance(parsed_data, list):
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，返回为列表")
-                    if analysis_type == "characters":
-                        new_chars = parsed_data
-                    elif analysis_type == "scenes":
-                        new_scenes = parsed_data
-                    elif analysis_type == "acts":
-                        new_beats = parsed_data
-                    elif analysis_type == "summary":
-                        # 处理摘要为列表的情况
-                        if len(parsed_data) > 0:
-                            if isinstance(parsed_data[0], dict):
-                                summary_data = parsed_data[0]
-                            else:
-                                summary_data = {"summary": str(parsed_data[0])}
-                elif isinstance(parsed_data, str):
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} - JSON解析成功，返回为字符串")
-                    if analysis_type == "summary":
-                        summary_data = {"summary": parsed_data}
-                else:
-                    logger.warning(f"块 {chunk_idx}/{total_chunks} - JSON解析成功但格式不符合预期: {type(parsed_data)}")
-
-                if analysis_type == "characters":
-                    all_characters = merge_characters(all_characters, new_chars)
-                    yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_chars), 'total_found': len(all_characters)})}\n\n"
-                elif analysis_type == "scenes":
-                    # 调试：输出每个块返回的场景信息
-                    scene_numbers = [s.get("scene_number", "?") for s in new_scenes]
-                    logger.debug(f"块 {chunk_idx}/{total_chunks} 返回 {len(new_scenes)} 个场景，编号: {scene_numbers}")
-                    all_scenes.extend(new_scenes)
-                    all_scenes.extend(new_scenes)
-                    yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n"
-                elif analysis_type == "acts":
-                    all_beats.extend(new_beats)
-                    yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_beats), 'total_found': len(all_beats)})}\n\n"
-                elif analysis_type == "summary":
-                    if not summary_data and isinstance(parsed_data, dict):
-                         summary_data = parsed_data
-                    yield f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx})}\n\n"
-                    break  # 摘要只需要第一块
-
-            except Exception as chunk_error:
-                # 捕获 LLM 调用或 JSON 解析错误，但继续处理下一块
-                logger.error(f"块 {chunk_idx}/{total_chunks} 处理失败: {str(chunk_error)}", exc_info=True)
-                logger.error(f"块 {chunk_idx}/{total_chunks} 错误类型: {type(chunk_error).__name__}")
-
-                # 尝试记录LLM响应内容（如果有）
-                try:
-                    if 'full_response' in locals():
-                        logger.error(f"块 {chunk_idx}/{total_chunks} - 出错时的LLM响应内容: {full_response[:1000]}")
-                except:
-                    pass
-
-                yield f"data: {json.dumps({'type': 'chunk_error', 'chunk': chunk_idx, 'message': str(chunk_error)})}\n\n"
-                # 如果已有部分数据，保存并退出
-                if all_characters or all_scenes or all_beats or summary_data:
-                    logger.info(f"块 {chunk_idx}/{total_chunks} 出错，但已有部分数据，准备保存")
-                    yield f"data: {json.dumps({'type': 'partial_save', 'message': '部分数据将被保存'})}\n\n"
-                    break
-                logger.warning(f"块 {chunk_idx}/{total_chunks} 出错且无部分数据，继续下一块")
-                continue
-
-        # 保存所有数据到数据库
-        saved_count = 0
+    async def run(self):
+        self.status = "running"
         try:
-            async with async_session_maker() as save_db:
-                if analysis_type == "characters":
-                    await save_db.execute(
-                        delete(Character).where(Character.project_id == project_id)
-                    )
+            # Use a fresh session for the entire background task
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(Project)
+                    .options(selectinload(Project.characters))
+                    .where(Project.id == self.project_id)
+                )
+                project = result.scalar_one_or_none()
+
+                if not project or not project.script_text:
+                    await self.add_event(f"data: {json.dumps({'type': 'error', 'message': 'Project or script not found'})}\n\n")
+                    self.status = "failed"
+                    return
+
+                # Send start event
+                await self.add_event(f"data: {json.dumps({'type': 'start', 'analysis_type': self.analysis_type})}\n\n")
+
+                # Split script
+                if self.analysis_type == "scenes":
+                    script_chunks = prompt_service.split_script_by_scenes(project.script_text)
+                    logger.info(f"Project {self.project_id} - Scene Analysis: Using scene header split")
+                else:
+                    chunk_config = prompt_service.get_chunk_config()
+                    chunk_mode = chunk_config.get("chunk_mode", "chapter")
+                    if chunk_mode == "chapter":
+                        script_chunks = prompt_service.split_script_by_chapters(project.script_text)
+                    else:
+                        chunk_size = get_llm_chunk_size()
+                        script_chunks = split_script_into_chunks(project.script_text, chunk_size)
+
+                total_chunks = len(script_chunks)
+                await self.add_event(f"data: {json.dumps({'type': 'info', 'total_chunks': total_chunks})}\n\n")
+
+                # Character info for scene analysis
+                characters_info = [
+                    {"name": c.name, "role_type": c.role_type}
+                    for c in project.characters
+                ]
+                characters_json = json.dumps(characters_info, ensure_ascii=False)
+
+                all_characters = []
+                all_scenes = []
+                all_beats = []
+                summary_data = {}
+
+                for chunk_idx, script_chunk in enumerate(script_chunks, 1):
+                    await self.add_event(f"data: {json.dumps({'type': 'chunk_start', 'chunk': chunk_idx, 'total': total_chunks})}\n\n")
+
+                    # Select prompt
+                    if self.analysis_type == "summary":
+                        prompt = prompt_service.get_summary_prompt(script_chunk)
+                    elif self.analysis_type == "characters":
+                        existing_names = [c.get("name", "") for c in all_characters]
+                        prompt = prompt_service.get_characters_prompt(
+                            script_text=script_chunk,
+                            chunk_index=chunk_idx,
+                            total_chunks=total_chunks,
+                            existing_names=existing_names if existing_names else None,
+                        )
+                    elif self.analysis_type == "scenes":
+                        scene_start_num = len(all_scenes) + 1
+                        prompt = prompt_service.get_scenes_prompt(
+                            script_text=script_chunk,
+                            chunk_index=chunk_idx,
+                            total_chunks=total_chunks,
+                            characters_json=characters_json,
+                            scene_start_num=scene_start_num,
+                        )
+                    elif self.analysis_type == "acts":
+                         prompt = prompt_service.get_acts_prompt(
+                            script_text=script_chunk,
+                            chunk_index=chunk_idx,
+                            total_chunks=total_chunks,
+                        )
+                    else:
+                        return
+
+                    # LLM Call
+                    try:
+                        full_response = ""
+                        async for chunk in llm_client.chat_stream(prompt):
+                            full_response += chunk
+                            await self.add_event(f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n")
+                        
+                        # Parse
+                        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', full_response)
+                        if json_match:
+                            json_str = json_match.group(1)
+                        else:
+                            json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', full_response)
+                            json_str = json_match.group(1) if json_match else full_response
+                        
+                        parsed_data = json.loads(json_str)
+                        
+                        new_chars = []
+                        new_scenes = []
+                        new_beats = []
+
+                        if isinstance(parsed_data, dict):
+                            new_chars = parsed_data.get("characters", [])
+                            new_scenes = parsed_data.get("scenes", [])
+                            new_beats = parsed_data.get("beats", [])
+                            if self.analysis_type == "summary":
+                                summary_data = parsed_data
+                        elif isinstance(parsed_data, list):
+                            if self.analysis_type == "characters": new_chars = parsed_data
+                            elif self.analysis_type == "scenes": new_scenes = parsed_data
+                            elif self.analysis_type == "acts": new_beats = parsed_data
+                            elif self.analysis_type == "summary":
+                                if len(parsed_data) > 0:
+                                    summary_data = parsed_data[0] if isinstance(parsed_data[0], dict) else {"summary": str(parsed_data[0])}
+                        elif isinstance(parsed_data, str) and self.analysis_type == "summary":
+                            summary_data = {"summary": parsed_data}
+
+                        # Process results
+                        if self.analysis_type == "characters":
+                            all_characters = merge_characters(all_characters, new_chars)
+                            await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_chars), 'total_found': len(all_characters)})}\n\n")
+                        elif self.analysis_type == "scenes":
+                            if new_scenes:
+                                new_scenes[0]["script_content"] = script_chunk
+                            all_scenes.extend(new_scenes)
+                            await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n")
+                        elif self.analysis_type == "acts":
+                            all_beats.extend(new_beats)
+                            await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_beats), 'total_found': len(all_beats)})}\n\n")
+                        elif self.analysis_type == "summary":
+                             if not summary_data and isinstance(parsed_data, dict):
+                                 summary_data = parsed_data
+                             await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx})}\n\n")
+                             break
+
+                    except Exception as chunk_error:
+                        logger.error(f"Chunk error: {chunk_error}", exc_info=True)
+                        await self.add_event(f"data: {json.dumps({'type': 'chunk_error', 'chunk': chunk_idx, 'message': str(chunk_error)})}\n\n")
+                        # Continue to next chunk...
+
+                # Save ALL data
+                saved_count = 0
+                
+                # NOTE: using 'db' from the outer 'async with' creates transaction conflicts if we reused calls? 
+                # Actually, we are in a single session here.
+                
+                if self.analysis_type == "characters":
+                    await db.execute(delete(Character).where(Character.project_id == self.project_id))
                     for char_data in all_characters:
                         character = Character(
                             id=str(uuid.uuid4()),
-                            project_id=project_id,
+                            project_id=self.project_id,
                             name=char_data.get("name", ""),
                             gender=char_data.get("gender"),
                             age=char_data.get("age"),
@@ -281,37 +255,21 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                             clothing_style=char_data.get("clothing_style"),
                             scene_numbers=[],
                         )
-                        save_db.add(character)
+                        db.add(character)
                         saved_count += 1
-                    await save_db.commit()
-
-                elif analysis_type == "scenes":
-                    # 检查是否有场景数据
+                    await db.commit()
+                
+                elif self.analysis_type == "scenes":
                     if not all_scenes:
-                        logger.warning(f"项目 {project_id} 未识别到任何场景")
-                        yield f"data: {json.dumps({'type': 'error', 'message': '未识别到任何场景，请检查剧本格式或重新分析'})}\n\n"
-                        return
+                         await self.add_event(f"data: {json.dumps({'type': 'error', 'message': 'No scenes found'})}\n\n")
+                         return
 
-                    # 调试：输出所有场景的原始编号
-                    original_numbers = [s.get("scene_number", "?") for s in all_scenes]
-                    logger.info(f"项目 {project_id} - 合并后共 {len(all_scenes)} 个场景")
-                    logger.debug(f"原始编号列表: {original_numbers}")
-
-                    await save_db.execute(
-                        delete(Scene).where(Scene.project_id == project_id)
-                    )
-
-                    logger.info(f"开始保存 {len(all_scenes)} 个场景到数据库...")
+                    await db.execute(delete(Scene).where(Scene.project_id == self.project_id))
                     for idx, scene_data in enumerate(all_scenes, 1):
-                        # 调试：输出每个场景的编号映射
-                        original_num = scene_data.get("scene_number", "?")
-                        location = scene_data.get('location', 'N/A')
-                        logger.debug(f"保存场景 {idx}/{len(all_scenes)}: 原编号 {original_num} -> 新编号 {idx}, 地点: {location}")
-
                         scene = Scene(
                             id=str(uuid.uuid4()),
-                            project_id=project_id,
-                            scene_number=idx,  # 重新编号确保连续
+                            project_id=self.project_id,
+                            scene_number=idx,
                             location=scene_data.get("location"),
                             time_of_day=scene_data.get("time_of_day"),
                             atmosphere=scene_data.get("atmosphere"),
@@ -321,46 +279,70 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
                             shot_type=scene_data.get("camera", {}).get("shot_type"),
                             camera_movement=scene_data.get("camera", {}).get("movement"),
                             duration_seconds=scene_data.get("duration_seconds"),
+                            script_content=scene_data.get("script_content"),
                         )
-                        save_db.add(scene)
+                        db.add(scene)
                         saved_count += 1
+                    
+                    # Update project status
+                    proj_update = await db.execute(select(Project).where(Project.id == self.project_id))
+                    if p := proj_update.scalar_one_or_none():
+                        p.status = ProjectStatus.ANALYZING # Wait, should be ANALYZED?
+                        p.status = ProjectStatus.ANALYZED
+                    await db.commit()
 
-                    # 只有在成功保存场景后才更新项目状态
-                    result = await save_db.execute(select(Project).where(Project.id == project_id))
-                    project_to_update = result.scalar_one_or_none()
-                    if project_to_update:
-                        project_to_update.status = ProjectStatus.ANALYZED
-                    await save_db.commit()
-                    logger.info(f"项目 {project_id} - 成功保存 {saved_count} 个场景，状态已更新为 ANALYZED")
-
-                elif analysis_type == "summary":
-                    result = await save_db.execute(select(Project).where(Project.id == project_id))
-                    project_to_update = result.scalar_one_or_none()
-                    if project_to_update:
-                        project_to_update.summary = summary_data.get("summary", "")
-                    await save_db.commit()
-                    saved_count = 1
- 
-                elif analysis_type == "acts":
-                    result = await save_db.execute(select(Project).where(Project.id == project_id))
-                    project_to_update = result.scalar_one_or_none()
-                    if project_to_update:
-                        project_to_update.act_analysis = all_beats
-                    await save_db.commit()
+                elif self.analysis_type == "acts":
+                    proj_update = await db.execute(select(Project).where(Project.id == self.project_id))
+                    if p := proj_update.scalar_one_or_none():
+                        p.act_analysis = all_beats
+                    await db.commit()
                     saved_count = len(all_beats)
 
+                await self.add_event(f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n")
+                await self.add_event(f"data: {json.dumps({'type': 'done', 'saved_count': saved_count})}\n\n")
+                self.status = "completed"
 
-            logger.info(f"分析完成 - 类型: {analysis_type}, 保存条目: {saved_count}")
-            yield f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n"
+        except Exception as e:
+            logger.error(f"Task failed: {e}", exc_info=True)
+            self.error = str(e)
+            self.status = "failed"
+            await self.add_event(f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n")
 
-        except (json.JSONDecodeError, Exception) as parse_error:
-            logger.error(f"解析错误: {str(parse_error)}", exc_info=True)
-            yield f"data: {json.dumps({'type': 'parse_error', 'message': str(parse_error)})}\n\n"
+ANALYSIS_TASKS: Dict[str, AnalysisTask] = {}
 
-        yield f"data: {json.dumps({'type': 'done', 'saved_count': saved_count})}\n\n"
-    except Exception as e:
-        logger.error(f"分析过程出错: {str(e)}", exc_info=True)
-        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
+    task_key = f"{project_id}_{analysis_type}"
+    
+    # Check for existing task
+    if task_key not in ANALYSIS_TASKS or ANALYSIS_TASKS[task_key].status in ["completed", "failed"]:
+        # Start new task
+        task = AnalysisTask(project_id, analysis_type)
+        ANALYSIS_TASKS[task_key] = task
+        # Run in background
+        asyncio.create_task(task.run())
+    
+    task = ANALYSIS_TASKS[task_key]
+    
+    # Send history first
+    for event in task.events:
+        yield event
+        
+    # Stream new events
+    last_event_index = len(task.events)
+    
+    while task.status == "running" or last_event_index < len(task.events):
+        if last_event_index < len(task.events):
+            yield task.events[last_event_index]
+            last_event_index += 1
+        else:
+            try:
+                await asyncio.wait_for(task.new_event_event.wait(), timeout=1.0)
+                task.new_event_event.clear()
+            except asyncio.TimeoutError:
+                yield ": keep-alive\n\n"
+
+    # Cleanup if done? Maybe keep for a bit?
+    # For now keep it so user can see 'done' message if they come late.
 
 
 @router.get("/{project_id}/analyze/{analysis_type}/stream")
@@ -369,7 +351,7 @@ async def analyze_stream(
     analysis_type: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """流式分析端点 (SSE)"""
+    """流式分析 (持久化任务版)"""
     if analysis_type not in ["summary", "characters", "scenes", "acts"]:
         raise HTTPException(status_code=400, detail="Invalid analysis type")
 
@@ -379,8 +361,24 @@ async def analyze_stream(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no", # Nginx no buffering
         },
     )
+
+
+@router.get("/{project_id}/analysis/status")
+async def get_analysis_status(project_id: str):
+    """获取当前项目的分析状态"""
+    # Check memory for active tasks
+    for key, task in ANALYSIS_TASKS.items():
+        if task.project_id == project_id and task.status in ["init", "running"]:
+             return {
+                 "status": "running",
+                 "analysis_type": task.analysis_type,
+                 "progress": f"{len(task.events)} events" 
+             }
+    
+    return {"status": "idle", "analysis_type": None}
 
 
 @router.post("/{project_id}/analyze/summary", response_model=AnalysisResponse)

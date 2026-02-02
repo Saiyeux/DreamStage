@@ -345,69 +345,93 @@ export function ActContent({ projectId }: { projectId: string }) {
 
                     </div>
 
-                    {/* BOTTOM SECTION: Lines */}
-                    <div
-                        ref={setLinesRef}
-                        className={`card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[300px] transition-all duration-300 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset shadow-indigo-100' : ''}`}
-                    >
-                        <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0">
-                            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <span>💬</span> Dialogue Lines
-                            </span>
-                            <span className="ml-auto text-xs text-slate-400">
-                                {timelineBeats.length} lines
-                            </span>
+                    {/* BOTTOM SECTION: Script & Lines */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[400px]">
+
+                        {/* LEFT: Script Preview */}
+                        <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+                            <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0 justify-between">
+                                <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <span>📄</span> Script Preview
+                                </span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 font-mono text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                                {currentStageScene?.scriptContent ? (
+                                    currentStageScene.scriptContent
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-2">
+                                        <span className="text-4xl opacity-20">📝</span>
+                                        <span className="text-xs">No script content available for this scene.</span>
+                                        <span className="text-[10px] text-slate-400 max-w-[200px] text-center">Try re-analyzing scenes with the latest version.</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50/30">
-                            {timelineBeats.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
-                                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
-                                        <span className="text-2xl opacity-50">🗣️</span>
-                                    </div>
-                                    <span className="text-sm">Drag characters here to add dialogue lines</span>
-                                </div>
-                            ) : (
-                                timelineBeats.map((beat) => {
-                                    const char = characters.find(c => c.id === beat.characterId)
-                                    return (
-                                        <div key={beat.id} className="group flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all">
-                                            <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-sm">
-                                                {char?.images?.[0] ? (
-                                                    <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs">
-                                                        {char?.gender?.includes('Female') ? '👩' : '👨'}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between mb-1.5">
-                                                    <div className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full inline-block">
-                                                        {char?.name || 'Unknown'}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setTimelineBeats(prev => prev.filter(b => b.id !== beat.id))}
-                                                        className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all"
-                                                        title="Remove line"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                                <textarea
-                                                    className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white leading-relaxed"
-                                                    rows={2}
-                                                    placeholder="Type dialogue..."
-                                                    value={beat.text}
-                                                    onChange={(e) => {
-                                                        setTimelineBeats(prev => prev.map(b => b.id === beat.id ? { ...b, text: e.target.value } : b))
-                                                    }}
-                                                />
-                                            </div>
+                        {/* RIGHT: Dialogue Lines */}
+                        <div
+                            ref={setLinesRef}
+                            className={`card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col transition-all duration-300 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset shadow-indigo-100' : ''}`}
+                        >
+                            <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0">
+                                <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <span>💬</span> Dialogue Lines
+                                </span>
+                                <span className="ml-auto text-xs text-slate-400">
+                                    {timelineBeats.length} lines
+                                </span>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50/30">
+                                {timelineBeats.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
+                                        <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                            <span className="text-2xl opacity-50">🗣️</span>
                                         </div>
-                                    )
-                                })
-                            )}
+                                        <span className="text-sm">Drag characters here to add dialogue lines</span>
+                                    </div>
+                                ) : (
+                                    timelineBeats.map((beat) => {
+                                        const char = characters.find(c => c.id === beat.characterId)
+                                        return (
+                                            <div key={beat.id} className="group flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all">
+                                                <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-sm">
+                                                    {char?.images?.[0] ? (
+                                                        <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-xs">
+                                                            {char?.gender?.includes('Female') ? '👩' : '👨'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <div className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full inline-block">
+                                                            {char?.name || 'Unknown'}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setTimelineBeats(prev => prev.filter(b => b.id !== beat.id))}
+                                                            className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all"
+                                                            title="Remove line"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                    <textarea
+                                                        className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white leading-relaxed"
+                                                        rows={2}
+                                                        placeholder="Type dialogue..."
+                                                        value={beat.text}
+                                                        onChange={(e) => {
+                                                            setTimelineBeats(prev => prev.map(b => b.id === beat.id ? { ...b, text: e.target.value } : b))
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    })
+                                )}
+                            </div>
                         </div>
                     </div>
 

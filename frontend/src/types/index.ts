@@ -60,8 +60,9 @@ export interface Scene {
   characters: SceneCharacter[]
   dialogue: string
   shotType: string
-  cameraMovement: string
-  durationSeconds: number
+  cameraMovement?: string
+  durationSeconds?: number
+  scriptContent?: string
   scenePrompt: string
   actionPrompt: string
   negativePrompt: string
