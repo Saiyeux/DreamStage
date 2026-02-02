@@ -142,7 +142,39 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db)):
         import shutil
         shutil.rmtree(project_dir)
 
-    await db.delete(project)
-    await db.commit()
+    try:
+        from sqlalchemy import delete
+        from app.models import Character, Scene, CharacterImage, SceneImage, VideoClip
+
+        # 1. 获取依赖项 ID
+        c_res = await db.execute(select(Character.id).where(Character.project_id == project_id))
+        char_ids = c_res.scalars().all()
+
+        s_res = await db.execute(select(Scene.id).where(Scene.project_id == project_id))
+        scene_ids = s_res.scalars().all()
+
+        # 2. 删除底层资产 (Images, Clips)
+        if char_ids:
+            await db.execute(delete(CharacterImage).where(CharacterImage.character_id.in_(char_ids)))
+        
+        if scene_ids:
+            await db.execute(delete(SceneImage).where(SceneImage.scene_id.in_(scene_ids)))
+            await db.execute(delete(VideoClip).where(VideoClip.scene_id.in_(scene_ids)))
+
+        # 3. 删除中间层 (Characters, Scenes)
+        # 注意：先删除 Characters 和 Scenes，它们可能有外键指向 Project
+        # 使用 delete() 语句比 session.delete() 更直接且不易出错
+        await db.execute(delete(Character).where(Character.project_id == project_id))
+        await db.execute(delete(Scene).where(Scene.project_id == project_id))
+
+        # 4. 删除项目
+        await db.execute(delete(Project).where(Project.id == project_id))
+        await db.commit()
+
+    except Exception as e:
+        await db.rollback()
+        import logging
+        logging.error(f"Error deleting project {project_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
 
     return {"message": "Project deleted"}

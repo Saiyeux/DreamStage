@@ -8,18 +8,23 @@ import { analysisApi } from '@/api'
 // Draggable Asset Component
 // ------------------------------------------------------------------
 
-function DraggableAsset({ id, type, data, children }: { id: string, type: 'character' | 'scene', data: any, children: React.ReactNode }) {
+function DraggableAsset({ id, type, data, disabled, children }: { id: string, type: 'character' | 'scene', data: any, disabled?: boolean, children: React.ReactNode }) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `${type}-${id}`,
-        data: { type, item: data }
+        data: { type, item: data },
+        disabled
     })
+
+    if (disabled) {
+        return <div className="opacity-50 grayscale cursor-not-allowed">{children}</div>
+    }
 
     return (
         <div
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className={`cursor-move transition-opacity ${isDragging ? 'opacity-50' : 'opacity-100'}`}
+            className={`cursor-move transition-all ${isDragging ? 'opacity-50 scale-95' : 'opacity-100 hover:scale-105'}`}
         >
             {children}
         </div>
@@ -115,24 +120,37 @@ export function ActContent({ projectId }: { projectId: string }) {
                                 <span className="text-[10px] bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full shadow-sm">{characters.length}</span>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 grid grid-cols-3 gap-2 content-start">
-                                {characters.map(char => (
-                                    <DraggableAsset key={char.id} id={char.id} type="character" data={char}>
-                                        <div className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100 cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-indigo-400 hover:border-transparent transition-all">
-                                            {char.images?.[0] ? (
-                                                <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-2xl text-slate-300">
-                                                    {char.gender?.includes('Female') ? '👩' : '👨'}
+                                {characters.map(char => {
+                                    // Determine image to show: mainImageId > first finalized image > first image
+                                    const mainImage = char.images?.find(img => img.id === char.mainImageId) || char.images?.[0]
+
+                                    return (
+                                        <DraggableAsset key={char.id} id={char.id} type="character" data={char} disabled={!char.isFinalized}>
+                                            <div className={`group relative aspect-square rounded-lg overflow-hidden border ${char.isFinalized ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50'}`}>
+                                                {mainImage ? (
+                                                    <img src={fileUrl.image(mainImage.imagePath)} alt={char.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-1">
+                                                        <span className="text-2xl">{char.gender?.includes('Female') ? '👩' : '👨'}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Finalized Indicator */}
+                                                {!char.isFinalized && (
+                                                    <div className="absolute inset-0 bg-slate-100/50 flex items-center justify-center">
+                                                        <span className="text-[10px] font-bold text-slate-500 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200">Draft</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5">
+                                                    <span className="text-[10px] font-bold text-white truncate block text-center text-shadow-sm leading-tight">{char.name}</span>
                                                 </div>
-                                            )}
-                                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2">
-                                                <span className="text-[10px] font-bold text-white truncate block text-center text-shadow-sm">{char.name}</span>
                                             </div>
-                                        </div>
-                                    </DraggableAsset>
-                                ))}
+                                        </DraggableAsset>
+                                    )
+                                })}
                                 {characters.length === 0 && (
-                                    <div className="col-span-2 text-center py-6 text-slate-400 text-xs italic">
+                                    <div className="col-span-3 text-center py-6 text-slate-400 text-xs italic">
                                         No characters found.
                                     </div>
                                 )}
@@ -147,9 +165,9 @@ export function ActContent({ projectId }: { projectId: string }) {
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
                                 {scenes.map(scene => (
-                                    <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene}>
-                                        <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing">
-                                            <div className="w-12 h-8 rounded bg-slate-100 overflow-hidden shrink-0 border border-slate-100/50">
+                                    <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene} disabled={!scene.isFinalized}>
+                                        <div className={`flex items-center gap-3 p-2 rounded-lg border transition-all ${scene.isFinalized ? 'bg-white border-slate-200 hover:border-indigo-400' : 'bg-slate-50 border-dashed border-slate-200 opacity-70'}`}>
+                                            <div className="w-12 h-8 rounded bg-slate-100 overflow-hidden shrink-0 border border-slate-100/50 relative">
                                                 {scene.sceneImage ? (
                                                     <img src={fileUrl.image(scene.sceneImage.imagePath)} alt={scene.location} className="w-full h-full object-cover" />
                                                 ) : (
@@ -157,7 +175,10 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-xs font-semibold text-slate-700 truncate">{scene.location}</div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-xs font-semibold text-slate-700 truncate">{scene.location}</div>
+                                                    {!scene.isFinalized && <span className="text-[8px] px-1 bg-slate-200 text-slate-500 rounded">Draft</span>}
+                                                </div>
                                                 <div className="text-[10px] text-slate-400 truncate">{scene.timeOfDay} • {scene.atmosphere}</div>
                                             </div>
                                         </div>

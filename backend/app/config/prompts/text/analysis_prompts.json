@@ -9,11 +9,11 @@
     "existing_hint_template": "\n\n## 已识别的角色（请勿重复）\n{{existing_names}}"
   },
   "scenes": {
-    "system": "你是一位专业的分镜设计师。",
-    "template": "请根据以下剧本片段和角色信息，设计详细的分镜方案。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 角色列表\n{{characters_json}}\n\n## 输出要求\n请以JSON格式输出本片段的所有场景（场景序号从{{scene_start_num}}开始）：\n```json\n{\n  \"scenes\": [\n    {\n      \"scene_number\": {{scene_start_num}},\n      \"location\": \"场景地点\",\n      \"time_of_day\": \"时间（白天/黄昏/夜晚等）\",\n      \"atmosphere\": \"氛围关键词（如：紧张、温馨、阴郁）\",\n      \"environment\": {\n        \"description\": \"环境详细描述（光影、色调、陈设）\"\n      },\n      \"characters\": [\n        {\n          \"character_name\": \"角色名\",\n          \"position\": \"位置\",\n          \"action\": \"动作\",\n          \"expression\": \"表情\"\n        }\n      ],\n      \"dialogue\": \"对白内容摘要\",\n      \"camera\": {\n        \"shot_type\": \"镜头类型（特写/中景/全景/大远景）\",\n        \"movement\": \"镜头运动（推/拉/摇/移/跟）\",\n        \"angle\": \"拍摄角度（平视/仰视/俯视）\"\n      },\n      \"duration_seconds\": \"预估时长秒数\"\n    }\n  ]\n}\n```"
+    "system": "你是电影美术指导（Production Designer）和环境概念艺术家。",
+    "template": "请仔细分析以下剧本片段，为每一个场景设计详细的视觉环境方案（Set Design）。\n忽略人物的具体动作和走位，专注于构建场景的空间感、氛围、光影和美术风格。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 角色列表\n{{characters_json}}\n\n## 输出要求\n请以JSON格式输出本片段的所有场景环境设计（场景序号从{{scene_start_num}}开始）：\n```json\n{\n  \"scenes\": [\n    {\n      \"scene_number\": {{scene_start_num}},\n      \"location\": \"场景地点（作为标题）\",\n      \"time_of_day\": \"时间（具体光照条件）\",\n      \"atmosphere\": \"核心氛围关键词（如：赛博朋克、衰败、温馨、压抑）\",\n      \"environment\": {\n        \"description\": \"详细的环境视觉描述，包含：\\n1. 建筑风格与空间结构\\n2. 主要色调与光影设计\\n3. 关键道具与陈设细节\\n4. 材质与纹理质感\",\n        \"visual_style\": \"美术风格参考（如：Wes Anderson风格、黑色电影风格等）\"\n      },\n      \"characters\": [], \n      \"dialogue\": \"\",\n      \"camera\": {},\n      \"duration_seconds\": 0\n    }\n  ]\n}\n```\n注意：`characters`, `dialogue`, `camera`, `duration_seconds` 字段保留为空或默认值，因为这些将在 Act Analysis 阶段处理。"
   },
   "acts": {
-    "system": "你是一位专业的剧本分析师。",
-    "template": "请仔细阅读以下剧本片段，进行幕/场面分析（Act Analysis）。请将其拆解为一系列关键的“节拍”（Beats）。每个节拍代表剧情的一个微小进展或动作。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 输出要求\n请以JSON格式输出：\n```json\n{\n  \"beats\": [\n    {\n      \"action\": \"动作描述（发生了什么，尽量简练）\",\n      \"dialogue\": \"关键对白（可选，如有则提供）\",\n      \"characterName\": \"主要相关角色名（可选）\"\n    }\n  ]\n}\n```"
+    "system": "你是专业的导演和分镜师。",
+    "template": "请仔细阅读以下剧本片段，进行导演分镜拆解（Director's Breakdown）。即将剧本转化为具体的拍摄方案。\n每一幕（Beat）应代表一个具体的镜头或动作单元。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 输出要求\n请以JSON格式输出：\n```json\n{\n  \"beats\": [\n    {\n      \"type\": \"action/dialogue\",\n      \"characterName\": \"相关角色名（如有）\",\n      \"action\": \"具体的表演指导或动作描述（Blocking）\",\n      \"dialogue\": \"对应的对白（如有）\",\n      \"camera\": {\n         \"shot_type\": \"景别（特写/中景/全景）\",\n         \"angle\": \"角度（平视/俯视/仰视/过肩）\",\n         \"movement\": \"运镜（固定/推/拉/摇/跟）\"\n      }\n    }\n  ]\n}\n```"
   }
 }

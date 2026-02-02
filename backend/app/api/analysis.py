@@ -512,7 +512,12 @@ async def analyze_scenes(project_id: str, db: AsyncSession = Depends(get_db)):
             location=scene_data.get("location"),
             time_of_day=scene_data.get("time_of_day"),
             atmosphere=scene_data.get("atmosphere"),
-            environment_desc=scene_data.get("environment", {}).get("description"),
+            # Merge visual style into description if present
+            environment_desc=(
+                f"{scene_data.get('environment', {}).get('description', '')}\n\n[Visual Style]: {scene_data.get('environment', {}).get('visual_style', '')}"
+                if scene_data.get("environment", {}).get("visual_style")
+                else scene_data.get("environment", {}).get("description")
+            ),
             characters_data=scene_data.get("characters", []),
             dialogue=scene_data.get("dialogue"),
             shot_type=scene_data.get("camera", {}).get("shot_type"),

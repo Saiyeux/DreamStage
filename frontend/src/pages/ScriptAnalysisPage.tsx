@@ -41,6 +41,41 @@ export function ScriptAnalysisPage() {
     }, { replace: true })
   }
   const [loading, setLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const validTypes = ['.txt', '.pdf']
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+    if (!validTypes.includes(fileExtension)) {
+      alert('Only .txt or .pdf files are supported')
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const projectName = file.name.replace(/\.[^/.]+$/, '')
+      const response = await projectsApi.create(projectName, file)
+      alert('Upload successful!')
+      if (response.id) {
+        setSearchParams({ project: response.id })
+        // Force reload sidebar list if needed, though Sidebar handles its own state. 
+        // Ideally we'd trigger a global refresh or context update here.
+        window.location.reload()
+      }
+    } catch (err) {
+      console.error('Upload failed:', err)
+      alert('Upload failed, please try again')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
 
 
   const { terminalOutput, isStreaming, terminalExpanded, currentAnalyzing } = analysisState
@@ -246,7 +281,32 @@ export function ScriptAnalysisPage() {
               <span className="text-3xl">👋</span>
             </div>
             <h2 className="text-lg font-semibold text-slate-900 mb-2">Welcome to Studio</h2>
-            <p className="text-sm text-slate-500">Select or create a project to get started with script analysis</p>
+            <p className="text-sm text-slate-500 mb-8">Select a project from the sidebar or upload a new script to get started.</p>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="btn btn-primary px-6 py-2.5 shadow-lg shadow-primary-500/20"
+            >
+              {isUploading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">📁</span>
+                  Upload Script
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -795,16 +855,16 @@ function CharactersContent({
       </div>
 
       {/* Main Detail Content - Removed padding from container */}
-      <div className="flex-1 bg-slate-50 overflow-y-auto">
-        {characters.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8">
-            <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
-              <span className="text-3xl opacity-20">👤</span>
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">No Characters Found</h3>
-            <p className="text-sm text-slate-500">Run character analysis to populate this list.</p>
+      {characters.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-300">
+          <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
+            <span className="text-3xl opacity-20">👤</span>
           </div>
-        ) : (
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">No Characters Found</h3>
+          <p className="text-sm text-slate-500">Run character analysis to populate this list.</p>
+        </div>
+      ) : (
+        <div className="flex-1 bg-slate-50 overflow-y-auto">
           <div className="h-full flex flex-col">
             {/* Header / Actions - Sticky & Styled like Scenes */}
             <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
@@ -1196,19 +1256,17 @@ function CharactersContent({
               </div>
             </div>
           </div>
-        )}
-
-
-        {/* Lightbox Overlay */}
-        {
-          lightboxImage && (
-            <Lightbox
-              imageUrl={lightboxImage}
-              onClose={() => setLightboxImage(null)}
-            />
-          )
-        }
-      </div>
+        </div>
+      )}
+      {/* Lightbox Overlay */}
+      {
+        lightboxImage && (
+          <Lightbox
+            imageUrl={lightboxImage}
+            onClose={() => setLightboxImage(null)}
+          />
+        )
+      }
     </div>
   )
 }
@@ -1555,8 +1613,8 @@ function ScenesContent({
       </div>
 
       {/* RIGHT PANEL: Detailed View */}
-      <div className="flex-1 overflow-y-auto">
-        {scenes.length > 0 ? (
+      {scenes.length > 0 ? (
+        <div className="flex-1 overflow-y-auto">
           <div className="h-full flex flex-col">
             {/* Header Toolbar */}
             <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center sticky top-0 z-10 shadow-sm">
@@ -1758,16 +1816,16 @@ function ScenesContent({
             </div>
 
           </div>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-300">
-            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-4xl opacity-50">🎬</span>
-            </div>
-            <p className="text-lg font-medium text-slate-400">No scenes available</p>
-            <p className="text-sm text-slate-400 mt-2">Analyze a script to generate scenes</p>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
+          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+            <span className="text-4xl opacity-50">🎬</span>
           </div>
-        )}
-      </div>
+          <p className="text-lg font-medium text-slate-400">No scenes available</p>
+          <p className="text-sm text-slate-400 mt-2">Analyze a script to generate scenes</p>
+        </div>
+      )}
       {/* Lightbox */}
       {lightboxImage && (
         <Lightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
