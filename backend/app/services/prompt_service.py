@@ -105,7 +105,7 @@ class PromptService:
 
         return prompt
  
-     def get_acts_prompt(
+    def get_acts_prompt(
          self,
          script_text: str,
          chunk_index: int,
