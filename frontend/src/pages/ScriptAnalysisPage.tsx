@@ -104,6 +104,9 @@ export function ScriptAnalysisPage() {
         setScenes(scenesData)
       } catch (err) {
         console.error('Load project failed:', err)
+        // If project doesn't exist (e.g. deleted), clear the URL param to show Welcome screen
+        setSearchParams({}, { replace: true })
+        setCurrentProject(null)
       } finally {
         setLoading(false)
       }
@@ -1564,7 +1567,7 @@ function ScenesContent({
 
 
   return (
-    <div className="flex h-full bg-slate-50 overflow-hidden">
+    <div className="flex-1 flex h-full bg-slate-50 overflow-hidden">
       {/* LEFT SIDEBAR: Scene List */}
       <div className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -1818,12 +1821,12 @@ function ScenesContent({
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
-          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-            <span className="text-4xl opacity-50">🎬</span>
+        <div className="flex-1 w-full h-full flex flex-col items-center justify-center text-center p-8 text-slate-300">
+          <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
+            <span className="text-3xl opacity-20">🎬</span>
           </div>
-          <p className="text-lg font-medium text-slate-400">No scenes available</p>
-          <p className="text-sm text-slate-400 mt-2">Analyze a script to generate scenes</p>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">No Scenes Available</h3>
+          <p className="text-sm text-slate-500">Analyze a script to generate scenes.</p>
         </div>
       )}
       {/* Lightbox */}
