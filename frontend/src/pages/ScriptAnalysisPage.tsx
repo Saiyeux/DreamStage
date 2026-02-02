@@ -772,10 +772,10 @@ function CharactersContent({
         </div>
       </div>
 
-      {/* Main Detail Content */}
-      <div className="flex-1 bg-slate-50 overflow-y-auto p-6 lg:p-8">
+      {/* Main Detail Content - Removed padding from container */}
+      <div className="flex-1 bg-slate-50 overflow-y-auto">
         {characters.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center">
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
             <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
               <span className="text-3xl opacity-20">👤</span>
             </div>
@@ -783,20 +783,20 @@ function CharactersContent({
             <p className="text-sm text-slate-500">Run character analysis to populate this list.</p>
           </div>
         ) : (
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header / Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="h-full flex flex-col">
+            {/* Header / Actions - Sticky & Styled like Scenes */}
+            <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
               <div>
                 {isEditing ? (
                   <input
                     type="text"
                     value={editedCharacter.name || ''}
                     onChange={(e) => updateField('name', e.target.value)}
-                    className="input text-2xl font-bold px-3 py-1.5 w-full sm:w-64"
+                    className="input text-xl font-bold px-2 py-1 w-full sm:w-64"
                     placeholder="Character Name"
                   />
                 ) : (
-                  <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                  <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                     {selectedCharacter?.name}
                     <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${selectedCharacter.gender?.includes('Female') || selectedCharacter.gender?.includes('女')
                       ? 'bg-pink-50 text-pink-600 border-pink-100'
@@ -806,9 +806,10 @@ function CharactersContent({
                     </span>
                   </h2>
                 )}
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className="badge badge-neutral bg-white border border-slate-200">{selectedCharacter.roleType || 'Role'}</span>
-                  <span className="badge badge-neutral bg-white border border-slate-200">{selectedCharacter.age || 'Age'}</span>
+                <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                  <span className="px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">{selectedCharacter.roleType || 'Role'}</span>
+                  <span className="w-px h-3 bg-slate-300"></span>
+                  <span className="px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">{selectedCharacter.age || 'Age'}</span>
                 </div>
               </div>
 
@@ -817,14 +818,15 @@ function CharactersContent({
                   <>
                     <button
                       onClick={handleEdit}
-                      className="btn btn-secondary text-xs"
+                      className="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-2"
                     >
-                      ✏️ Edit Profile
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      Edit Profile
                     </button>
                     <button
                       onClick={handleGenerate}
                       disabled={!!generatingCharId}
-                      className="btn btn-primary text-xs shadow-md shadow-primary-500/20"
+                      className="btn btn-primary text-xs px-3 py-1.5 shadow-md shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {generatingCharId === selectedCharacter.id ? '⏳ Generating...' : '▶ Generate Selected'}
                     </button>
@@ -834,13 +836,13 @@ function CharactersContent({
                     <button
                       onClick={handleSave}
                       disabled={isSaving}
-                      className="btn btn-primary text-xs"
+                      className="btn btn-primary px-4"
                     >
                       Save Changes
                     </button>
                     <button
                       onClick={handleCancel}
-                      className="btn btn-secondary text-xs"
+                      className="btn btn-ghost px-4"
                     >
                       Cancel
                     </button>
@@ -877,292 +879,296 @@ function CharactersContent({
               </div>
             </div>
 
-            {/* Simple Status Message (Scoped to active character) */}
-            {generatingCharId === selectedCharacter.id && generateMessage && (
-              <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg shadow-sm animate-fade-in flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full flex-shrink-0" />
-                  <span className="text-sm font-medium text-primary-700">
-                    {generateMessage}
-                  </span>
-                </div>
-                <button
-                  onClick={handleStop}
-                  className="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
-                >
-                  🛑 Stop
-                </button>
-              </div>
-            )}
+            {/* Content Container - Added padding here instead */}
+            <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
 
-            {/* Split Grid - 50/50 Ratio */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              {/* Left Column: Details & Settings */}
-              <div className="space-y-6">
-                {/* Basic Info */}
-                <div className="card p-6">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                    <span>📄</span> Character Profile
-                  </h3>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                    <Field label="Role Type" value={selectedCharacter.roleType} isEditing={isEditing} editValue={editedCharacter.roleType} onChange={(v) => updateField('roleType', v)} />
-                    <Field label="Gender" value={selectedCharacter.gender} isEditing={isEditing} editValue={editedCharacter.gender} onChange={(v) => updateField('gender', v)} />
-                    <Field label="Age" value={selectedCharacter.age} isEditing={isEditing} editValue={editedCharacter.age} onChange={(v) => updateField('age', v)} />
-                  </div>
-                  <div className="mt-4 space-y-4">
-                    <Field label="Personality" value={selectedCharacter.personality} isEditing={isEditing} editValue={editedCharacter.personality} onChange={(v) => updateField('personality', v)} multiline />
-                    <Field label="Clothing Style" value={selectedCharacter.clothingStyle} isEditing={isEditing} editValue={editedCharacter.clothingStyle} onChange={(v) => updateField('clothingStyle', v)} multiline />
-                    <div className="border-t border-slate-100 pt-4 mt-4">
-                      <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Appearance Details</h4>
-                      <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                        <Field label="Hair" value={selectedCharacter.hair} isEditing={isEditing} editValue={editedCharacter.hair} onChange={(v) => updateField('hair', v)} />
-                        <Field label="Face" value={selectedCharacter.face} isEditing={isEditing} editValue={editedCharacter.face} onChange={(v) => updateField('face', v)} />
-                        <Field label="Body" value={selectedCharacter.body} isEditing={isEditing} editValue={editedCharacter.body} onChange={(v) => updateField('body', v)} />
-                        <Field label="Skin" value={selectedCharacter.skin} isEditing={isEditing} editValue={editedCharacter.skin} onChange={(v) => updateField('skin', v)} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Settings Panel */}
-                <div className="card p-6">
-                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                    <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                      <span>⚙️</span> Image Generation Settings
-                    </h3>
-                    <div className="flex bg-slate-100 p-1 rounded-lg items-center">
-                      <button
-                        onClick={() => setIsManagingTags(!isManagingTags)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${isManagingTags ? 'bg-white shadow-sm text-slate-900' : 'hover:bg-white hover:shadow-sm text-slate-500'}`}
-                      >
-                        {isManagingTags ? '✓ Done' : '🏷️ Tags'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {isManagingTags && templates ? (
-                    <TagManager
-                      templates={templates}
-                      onUpdate={async (newTemplates) => {
-                        await configApi.updateCharacterImageTemplates(newTemplates)
-                        setTemplates(newTemplates)
-                      }}
-                    />
-                  ) : templates ? (
-                    <div className="space-y-6">
-                      {/* View Row */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">1. 视图 (View)</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {(templates.templates['三视图'] || []).map(type => (
-                            <button
-                              key={type.id}
-                              onClick={() => updateSelection('view', type.id)}
-                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.view === type.id
-                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                                }`}
-                            >
-                              {selections.view === type.id && '● '} {type.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Expression Row */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">2. 表情 (Expression)</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {(templates.templates['表情系列'] || []).map(type => (
-                            <button
-                              key={type.id}
-                              onClick={() => updateSelection('expression', type.id)}
-                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.expression === type.id
-                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                                }`}
-                            >
-                              {selections.expression === type.id && '● '} {type.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Action Row */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">3. 动作 (Action)</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {(templates.templates['动作系列'] || []).map(type => (
-                            <button
-                              key={type.id}
-                              onClick={() => updateSelection('action', type.id)}
-                              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.action === type.id
-                                ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                                }`}
-                            >
-                              {selections.action === type.id && '● '} {type.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-xs text-slate-400">Current selection:</span>
-                        <div className="flex gap-1">
-                          {Object.values(selections).filter(Boolean).map(s => (
-                            <span key={s} className="px-1.5 py-0.5 bg-slate-100 text-[10px] rounded text-slate-500">{s}</span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-slate-400 text-sm italic">Loading settings...</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column: Gallery */}
-              <div className="h-full">
-                <div className="card p-6 h-full min-h-[500px] flex flex-col">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span>🖼️</span> Generated Gallery
+              {/* Simple Status Message (Scoped to active character) */}
+              {generatingCharId === selectedCharacter.id && generateMessage && (
+                <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg shadow-sm animate-fade-in flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full flex-shrink-0" />
+                    <span className="text-sm font-medium text-primary-700">
+                      {generateMessage}
                     </span>
-                    <div className="flex items-center gap-3">
-                      {!selectedCharacter.isFinalized && (
-                        <button
-                          onClick={() => {
-                            setIsManagingGallery(!isManagingGallery)
-                            if (isManagingGallery) setSelectedImageIds([]) // Clear selection on exit
-                          }}
-                          className={`text-xs px-2 py-1 rounded-md transition-colors ${isManagingGallery
-                            ? 'bg-primary-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                        >
-                          {isManagingGallery ? 'Cancel Selection' : '⚙️ Manage / Anchor'}
-                        </button>
-                      )}
-                      <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
-                        {selectedCharacter.images?.length || 0} images
-                      </span>
-                    </div>
-                  </h3>
+                  </div>
+                  <button
+                    onClick={handleStop}
+                    className="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
+                  >
+                    🛑 Stop
+                  </button>
+                </div>
+              )}
 
-                  <div className="flex-1 overflow-y-auto pr-1">
-                    {selectedCharacter.images && selectedCharacter.images.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {selectedCharacter.images.map((img, index) => (
-                          <div
-                            key={img.id}
-                            className={`relative group rounded-xl overflow-hidden border transition-all aspect-[3/4] shadow-sm 
+              {/* Split Grid - 50/50 Ratio */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                {/* Left Column: Details & Settings */}
+                <div className="space-y-6">
+                  {/* Basic Info */}
+                  <div className="card p-6">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                      <span>📄</span> Character Profile
+                    </h3>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                      <Field label="Role Type" value={selectedCharacter.roleType} isEditing={isEditing} editValue={editedCharacter.roleType} onChange={(v) => updateField('roleType', v)} />
+                      <Field label="Gender" value={selectedCharacter.gender} isEditing={isEditing} editValue={editedCharacter.gender} onChange={(v) => updateField('gender', v)} />
+                      <Field label="Age" value={selectedCharacter.age} isEditing={isEditing} editValue={editedCharacter.age} onChange={(v) => updateField('age', v)} />
+                    </div>
+                    <div className="mt-4 space-y-4">
+                      <Field label="Personality" value={selectedCharacter.personality} isEditing={isEditing} editValue={editedCharacter.personality} onChange={(v) => updateField('personality', v)} multiline />
+                      <Field label="Clothing Style" value={selectedCharacter.clothingStyle} isEditing={isEditing} editValue={editedCharacter.clothingStyle} onChange={(v) => updateField('clothingStyle', v)} multiline />
+                      <div className="border-t border-slate-100 pt-4 mt-4">
+                        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Appearance Details</h4>
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                          <Field label="Hair" value={selectedCharacter.hair} isEditing={isEditing} editValue={editedCharacter.hair} onChange={(v) => updateField('hair', v)} />
+                          <Field label="Face" value={selectedCharacter.face} isEditing={isEditing} editValue={editedCharacter.face} onChange={(v) => updateField('face', v)} />
+                          <Field label="Body" value={selectedCharacter.body} isEditing={isEditing} editValue={editedCharacter.body} onChange={(v) => updateField('body', v)} />
+                          <Field label="Skin" value={selectedCharacter.skin} isEditing={isEditing} editValue={editedCharacter.skin} onChange={(v) => updateField('skin', v)} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Settings Panel */}
+                  <div className="card p-6">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                      <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <span>⚙️</span> Image Generation Settings
+                      </h3>
+                      <div className="flex bg-slate-100 p-1 rounded-lg items-center">
+                        <button
+                          onClick={() => setIsManagingTags(!isManagingTags)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${isManagingTags ? 'bg-white shadow-sm text-slate-900' : 'hover:bg-white hover:shadow-sm text-slate-500'}`}
+                        >
+                          {isManagingTags ? '✓ Done' : '🏷️ Tags'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isManagingTags && templates ? (
+                      <TagManager
+                        templates={templates}
+                        onUpdate={async (newTemplates) => {
+                          await configApi.updateCharacterImageTemplates(newTemplates)
+                          setTemplates(newTemplates)
+                        }}
+                      />
+                    ) : templates ? (
+                      <div className="space-y-6">
+                        {/* View Row */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">1. 视图 (View)</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {(templates.templates['三视图'] || []).map(type => (
+                              <button
+                                key={type.id}
+                                onClick={() => updateSelection('view', type.id)}
+                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.view === type.id
+                                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                  }`}
+                              >
+                                {selections.view === type.id && '● '} {type.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Expression Row */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">2. 表情 (Expression)</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {(templates.templates['表情系列'] || []).map(type => (
+                              <button
+                                key={type.id}
+                                onClick={() => updateSelection('expression', type.id)}
+                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.expression === type.id
+                                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                  }`}
+                              >
+                                {selections.expression === type.id && '● '} {type.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action Row */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">3. 动作 (Action)</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {(templates.templates['动作系列'] || []).map(type => (
+                              <button
+                                key={type.id}
+                                onClick={() => updateSelection('action', type.id)}
+                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.action === type.id
+                                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                  }`}
+                              >
+                                {selections.action === type.id && '● '} {type.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-xs text-slate-400">Current selection:</span>
+                          <div className="flex gap-1">
+                            {Object.values(selections).filter(Boolean).map(s => (
+                              <span key={s} className="px-1.5 py-0.5 bg-slate-100 text-[10px] rounded text-slate-500">{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-slate-400 text-sm italic">Loading settings...</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column: Gallery */}
+                <div className="h-full">
+                  <div className="card p-6 h-full min-h-[500px] flex flex-col">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span>🖼️</span> Generated Gallery
+                      </span>
+                      <div className="flex items-center gap-3">
+                        {!selectedCharacter.isFinalized && (
+                          <button
+                            onClick={() => {
+                              setIsManagingGallery(!isManagingGallery)
+                              if (isManagingGallery) setSelectedImageIds([]) // Clear selection on exit
+                            }}
+                            className={`text-xs px-2 py-1 rounded-md transition-colors ${isManagingGallery
+                              ? 'bg-primary-600 text-white shadow-sm'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                          >
+                            {isManagingGallery ? 'Cancel Selection' : '⚙️ Manage / Anchor'}
+                          </button>
+                        )}
+                        <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
+                          {selectedCharacter.images?.length || 0} images
+                        </span>
+                      </div>
+                    </h3>
+
+                    <div className="flex-1 overflow-y-auto pr-1">
+                      {selectedCharacter.images && selectedCharacter.images.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {selectedCharacter.images.map((img, index) => (
+                            <div
+                              key={img.id}
+                              className={`relative group rounded-xl overflow-hidden border transition-all aspect-[3/4] shadow-sm 
                               ${img.isLoading ? 'cursor-wait bg-slate-50 border-slate-200' : 'cursor-pointer'}
                               ${selectedImageIds.includes(img.id) ? 'ring-4 ring-primary-500 border-primary-500 shadow-xl scale-95' : 'border-slate-200 hover:shadow-md'}
                               ${selectedCharacter.isFinalized && !selectedCharacter.finalizedMetadata?.selected_image_ids?.includes(img.id) ? 'opacity-40 grayscale' : ''}
                           `}
-                            onClick={() => {
-                              if (img.isLoading) return
-                              if (isManagingGallery && !selectedCharacter.isFinalized) {
-                                toggleImageSelection(img.id)
-                              } else {
-                                setLightboxImage(fileUrl.image(img.imagePath))
-                              }
-                            }}
-                          >
-                            {img.isLoading ? (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-500">
-                                <span className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mb-2" />
-                                <span className="text-xs font-medium animate-pulse">Generating...</span>
-                                <span className="text-[10px] text-slate-400 mt-1">{img.imageType}</span>
-                              </div>
-                            ) : (
-                              <img
-                                src={fileUrl.image(img.imagePath)}
-                                alt={img.imageType}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              />
-                            )}
-
-                            {/* Hover info box - shows to the left or right depending on grid position */}
-                            {!img.isLoading && (
-                              <div className={`absolute top-0 w-64 p-3 bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] hidden lg:block
-                                ${(index + 1) % 3 === 0 ? 'right-full mr-3' : 'left-full ml-3'}`}>
-                                <div className="text-[10px] font-bold text-primary-600 mb-1.5 uppercase tracking-widest border-b border-slate-100 pb-1">Prompt Details</div>
-                                <div className="space-y-2">
-                                  <div className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                                    {img.promptUsed || 'No prompt information available.'}
-                                  </div>
-                                  {img.seed && (
-                                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50">
-                                      <span className="text-[10px] text-slate-400 font-bold uppercase">Seed:</span>
-                                      <span className="text-[10px] text-slate-500 font-mono">{img.seed}</span>
-                                    </div>
-                                  )}
+                              onClick={() => {
+                                if (img.isLoading) return
+                                if (isManagingGallery && !selectedCharacter.isFinalized) {
+                                  toggleImageSelection(img.id)
+                                } else {
+                                  setLightboxImage(fileUrl.image(img.imagePath))
+                                }
+                              }}
+                            >
+                              {img.isLoading ? (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-500">
+                                  <span className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mb-2" />
+                                  <span className="text-xs font-medium animate-pulse">Generating...</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">{img.imageType}</span>
                                 </div>
-                              </div>
-                            )}
+                              ) : (
+                                <img
+                                  src={fileUrl.image(img.imagePath)}
+                                  alt={img.imageType}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              )}
 
-                            {/* Overlay with single download button */}
-                            {!img.isLoading && (
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[10px] text-white/90 font-medium capitalize truncate pl-1">{img.imageType}</span>
-                                  <div className="flex gap-1">
-                                    {isManagingGallery ? (
-                                      selectedCharacter.isFinalized ? null : (
-                                        <div className="flex gap-2 w-full justify-between items-center">
-                                          {/* Selection Indicator */}
-                                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center
-                                                ${selectedImageIds.includes(img.id) ? 'bg-primary-500 border-primary-500' : 'border-white bg-black/20'}`}>
-                                            {selectedImageIds.includes(img.id) && <span className="text-white text-[10px]">✓</span>}
-                                          </div>
-
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleDeleteImage(img.id)
-                                            }}
-                                            className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
-                                            title="Delete Image"
-                                          >
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                          </button>
-                                        </div>
-                                      )
-                                    ) : (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDownload(fileUrl.image(img.imagePath), `char_${selectedCharacter.name}_${img.imageType}_${img.id.slice(0, 4)}.png`)
-                                        }}
-                                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors"
-                                        title="Download Image"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                      </button>
+                              {/* Hover info box - shows to the left or right depending on grid position */}
+                              {!img.isLoading && (
+                                <div className={`absolute top-0 w-64 p-3 bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] hidden lg:block
+                                ${(index + 1) % 3 === 0 ? 'right-full mr-3' : 'left-full ml-3'}`}>
+                                  <div className="text-[10px] font-bold text-primary-600 mb-1.5 uppercase tracking-widest border-b border-slate-100 pb-1">Prompt Details</div>
+                                  <div className="space-y-2">
+                                    <div className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                                      {img.promptUsed || 'No prompt information available.'}
+                                    </div>
+                                    {img.seed && (
+                                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase">Seed:</span>
+                                        <span className="text-[10px] text-slate-500 font-mono">{img.seed}</span>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center py-10 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50">
-                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-100">
-                          <span className="text-3xl opacity-30">🖼️</span>
+                              {/* Overlay with single download button */}
+                              {!img.isLoading && (
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] text-white/90 font-medium capitalize truncate pl-1">{img.imageType}</span>
+                                    <div className="flex gap-1">
+                                      {isManagingGallery ? (
+                                        selectedCharacter.isFinalized ? null : (
+                                          <div className="flex gap-2 w-full justify-between items-center">
+                                            {/* Selection Indicator */}
+                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center
+                                                ${selectedImageIds.includes(img.id) ? 'bg-primary-500 border-primary-500' : 'border-white bg-black/20'}`}>
+                                              {selectedImageIds.includes(img.id) && <span className="text-white text-[10px]">✓</span>}
+                                            </div>
+
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDeleteImage(img.id)
+                                              }}
+                                              className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-white shadow-lg transition-colors"
+                                              title="Delete Image"
+                                            >
+                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                          </div>
+                                        )
+                                      ) : (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleDownload(fileUrl.image(img.imagePath), `char_${selectedCharacter.name}_${img.imageType}_${img.id.slice(0, 4)}.png`)
+                                          }}
+                                          className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white backdrop-blur-sm transition-colors"
+                                          title="Download Image"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                            </div>
+                          ))}
                         </div>
-                        <h4 className="text-slate-900 font-medium mb-1">No Images Yet</h4>
-                        <p className="text-xs text-slate-500 max-w-[200px]">
-                          Select image types on the left settings panel and click Generate to start.
-                        </p>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center py-10 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50">
+                          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-100">
+                            <span className="text-3xl opacity-30">🖼️</span>
+                          </div>
+                          <h4 className="text-slate-900 font-medium mb-1">No Images Yet</h4>
+                          <p className="text-xs text-slate-500 max-w-[200px]">
+                            Select image types on the left settings panel and click Generate to start.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
