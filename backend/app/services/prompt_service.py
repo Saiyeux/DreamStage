@@ -65,9 +65,17 @@ class PromptService:
         chunk_index: int,
         total_chunks: int,
         existing_names: list[str] | None = None,
+        mode: str = "deep",
     ) -> str:
-        """获取角色分析提示词"""
-        config = self.get_analysis_prompts().get("characters", {})
+        """获取角色分析提示词
+        
+        Args:
+            mode: 'quick' for fast shallow analysis, 'deep' for detailed analysis
+        """
+        # Select template based on mode
+        template_key = "characters_quick" if mode == "quick" else "characters"
+        prompts = self.get_analysis_prompts()
+        config = prompts.get(template_key, prompts.get("characters", {}))
         template = config.get("template", "")
 
         # 构建已识别角色提示

@@ -58,13 +58,59 @@ def split_script_into_chunks(script_text: str, chunk_size: int) -> list[str]:
     return chunks
 
 
-def merge_characters(existing: list[dict], new_chars: list[dict]) -> list[dict]:
-    """合并角色列表，根据名字去重"""
+def merge_characters(existing: list[dict], new_chars: list[dict], mode: str = "quick") -> list[dict]:
+    """合并角色列表，根据名字去重
+    
+    Quick mode: 只填充未知字段，保留已有信息
+    Deep mode: 每次找到角色都更新所有字段
+    """
     char_dict = {c.get("name", ""): c for c in existing}
+    
+    def is_unknown(value):
+        """判断值是否为未知/空"""
+        if value is None:
+            return True
+        if isinstance(value, str):
+            return value.strip() in ("", "未知", "Unknown", "unknown")
+        if isinstance(value, dict):
+            return all(is_unknown(v) for v in value.values())
+        return False
+    
+    def merge_dict_quick(old: dict, new: dict) -> dict:
+        """Quick模式：只用新值填充旧的未知值"""
+        result = old.copy()
+        for key, new_val in new.items():
+            old_val = result.get(key)
+            if isinstance(old_val, dict) and isinstance(new_val, dict):
+                result[key] = merge_dict_quick(old_val, new_val)
+            elif is_unknown(old_val) and not is_unknown(new_val):
+                result[key] = new_val
+        return result
+    
+    def merge_dict_deep(old: dict, new: dict) -> dict:
+        """Deep模式：用新值覆盖所有非未知的旧值"""
+        result = old.copy()
+        for key, new_val in new.items():
+            if isinstance(new_val, dict) and isinstance(result.get(key), dict):
+                result[key] = merge_dict_deep(result[key], new_val)
+            elif not is_unknown(new_val):
+                result[key] = new_val
+        return result
+    
     for char in new_chars:
         name = char.get("name", "")
-        if name and name not in char_dict:
+        if not name:
+            continue
+        if name in char_dict:
+            if mode == "quick":
+                # Quick: only fill unknown fields
+                char_dict[name] = merge_dict_quick(char_dict[name], char)
+            else:
+                # Deep: update all fields with new values
+                char_dict[name] = merge_dict_deep(char_dict[name], char)
+        else:
             char_dict[name] = char
+    
     return list(char_dict.values())
 
 
@@ -75,9 +121,10 @@ from typing import Dict, List, Optional
 
 
 class AnalysisTask:
-    def __init__(self, project_id: str, analysis_type: str):
+    def __init__(self, project_id: str, analysis_type: str, mode: str = "deep"):
         self.project_id = project_id
         self.analysis_type = analysis_type
+        self.mode = mode  # "quick" or "deep"
         self.status = "init"  # init, running, completed, failed
         self.events: List[str] = []
         self.new_event_event = asyncio.Event()
@@ -173,6 +220,7 @@ class AnalysisTask:
                             chunk_index=chunk_idx,
                             total_chunks=total_chunks,
                             existing_names=existing_names if existing_names else None,
+                            mode=self.mode,
                         )
                     elif self.analysis_type == "scenes":
                         scene_start_num = len(all_scenes) + 1
@@ -215,7 +263,7 @@ class AnalysisTask:
                                     if "name" in item:
                                         # Emit item event
                                         await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item_with_id})}\n\n")
-                                        all_characters = merge_characters(all_characters, [item]) # Keep raw for final save logic
+                                        all_characters = merge_characters(all_characters, [item], mode=self.mode)
                                 
                                 elif self.analysis_type == "scenes":
                                     if "location" in item:
@@ -371,13 +419,13 @@ class AnalysisTask:
 
 ANALYSIS_TASKS: Dict[str, AnalysisTask] = {}
 
-async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
-    task_key = f"{project_id}_{analysis_type}"
+async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession, mode: str = "deep"):
+    task_key = f"{project_id}_{analysis_type}_{mode}"
     
     # Check for existing task
     if task_key not in ANALYSIS_TASKS or ANALYSIS_TASKS[task_key].status in ["completed", "failed", "cancelled"]:
         # Start new task
-        task = AnalysisTask(project_id, analysis_type)
+        task = AnalysisTask(project_id, analysis_type, mode=mode)
         ANALYSIS_TASKS[task_key] = task
         # Run in background
         asyncio.create_task(task.run())
@@ -410,14 +458,21 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
 async def analyze_stream(
     project_id: str,
     analysis_type: str,
+    mode: str = "deep",
     db: AsyncSession = Depends(get_db),
 ):
-    """流式分析 (持久化任务版)"""
+    """流式分析 (持久化任务版)
+    
+    Args:
+        mode: 'quick' for fast shallow analysis, 'deep' for detailed analysis
+    """
     if analysis_type not in ["summary", "characters", "scenes", "acts"]:
         raise HTTPException(status_code=400, detail="Invalid analysis type")
+    if mode not in ["quick", "deep"]:
+        mode = "deep"
 
     return StreamingResponse(
-        sse_generator(project_id, analysis_type, db),
+        sse_generator(project_id, analysis_type, db, mode=mode),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -8,6 +8,11 @@
     "template": "请从以下剧本片段中提取所有角色的详细信息。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}{{existing_hint}}\n\n## 输出要求\n请按以下格式输出：\n\n### 1. 首先，列出本片段中发现的新角色名单\n例如：本片段发现3个新角色：张三、李四、王五\n\n### 2. 然后，为每个角色单独输出一个完整的JSON对象\n每个角色用 ```json 代码块包裹，一个角色输出完毕后再输出下一个角色：\n\n```json\n{\n  \"name\": \"角色姓名\",\n  \"gender\": \"男/女\",\n  \"age\": \"具体年龄或年龄段\",\n  \"role_type\": \"主角/配角/龙套\",\n  \"appearance\": {\n    \"hair\": \"发型和发色描述\",\n    \"face\": \"脸型和五官特征\",\n    \"body\": \"身材特征\",\n    \"skin\": \"肤色\"\n  },\n  \"personality\": \"性格特点\",\n  \"clothing_style\": \"服装风格\"\n}\n```\n\n如果本片段没有新角色，请说明\"本片段无新角色\"。",
     "existing_hint_template": "\n\n## 已识别的角色（请勿重复）\n{{existing_names}}"
   },
+  "characters_quick": {
+    "system": "直接提取角色名单，不做分析。",
+    "template": "从剧本中直接提取角色名单。只提取角色名、性别、年龄，不需要推理或分析。\n\n剧本（第{{chunk_index}}/{{total_chunks}}部分）：\n{{script_text}}{{existing_hint}}\n\n直接输出JSON（只写你看到的，不要推断）：\n```json\n{\"characters\":[{\"name\":\"名字\",\"gender\":\"男/女/未知\",\"age\":\"年龄/未知\",\"role_type\":\"主角/配角/龙套\",\"appearance\":{\"hair\":\"未知\",\"face\":\"未知\",\"body\":\"未知\",\"skin\":\"未知\"},\"personality\":\"未知\",\"clothing_style\":\"未知\"}]}\n```",
+    "existing_hint_template": "\n已有：{{existing_names}}"
+  },
   "scenes": {
     "system": "你是电影美术指导（Production Designer）和环境概念艺术家。",
     "template": "请仔细分析以下剧本片段，为每一个场景设计详细的视觉环境方案（Set Design）。\n忽略人物的具体动作和走位，专注于构建场景的空间感、氛围、光影和美术风格。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 角色列表\n{{characters_json}}\n\n## 输出要求\n请以JSON格式输出本片段的所有场景环境设计（场景序号从{{scene_start_num}}开始）：\n```json\n{\n  \"scenes\": [\n    {\n      \"scene_number\": {{scene_start_num}},\n      \"location\": \"场景地点（作为标题）\",\n      \"time_of_day\": \"时间（具体光照条件）\",\n      \"atmosphere\": \"核心氛围关键词（如：赛博朋克、衰败、温馨、压抑）\",\n      \"environment\": {\n        \"description\": \"详细的环境视觉描述，包含：\\n1. 建筑风格与空间结构\\n2. 主要色调与光影设计\\n3. 关键道具与陈设细节\\n4. 材质与纹理质感\",\n        \"visual_style\": \"美术风格参考（如：Wes Anderson风格、黑色电影风格等）\"\n      },\n      \"characters\": [], \n      \"dialogue\": \"\",\n      \"camera\": {},\n      \"duration_seconds\": 0\n    }\n  ]\n}\n```\n注意：`characters`, `dialogue`, `camera`, `duration_seconds` 字段保留为空或默认值，因为这些将在 Act Analysis 阶段处理。"

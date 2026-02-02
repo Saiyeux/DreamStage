@@ -298,7 +298,7 @@ export function ScriptAnalysisPage() {
     await refreshProjectStatus()
   }
 
-  const analyzeWithStream = async (analysisType: 'characters' | 'scenes' | 'acts') => {
+  const analyzeWithStream = async (analysisType: 'characters' | 'scenes' | 'acts', mode: 'quick' | 'deep' = 'deep') => {
     if (!currentProject?.id || isStreaming) return
 
     setAnalysisState({
@@ -315,17 +315,18 @@ export function ScriptAnalysisPage() {
       currentAnalyzing: analysisType,
     })
 
-    const typeName = analysisType === 'characters' ? 'Characters' : 'Scenes'
+    const modeLabel = mode === 'quick' ? '(Quick)' : '(Deep)'
+    const typeName = analysisType === 'characters' ? 'Characters' : analysisType === 'scenes' ? 'Scenes' : 'Acts'
     setAnalysisState({
       terminalOutput: [
-        `> Starting analysis for ${typeName}...`,
+        `> Starting ${modeLabel} analysis for ${typeName}...`,
         `[${new Date().toLocaleTimeString()}] Connecting to LLM Service...`,
         '',
       ],
     })
 
     const callbacks = createAnalysisCallbacks(analysisType)
-    analysisService.start(projectId, analysisType, callbacks)
+    analysisService.start(projectId, analysisType, callbacks, mode)
   }
 
   const handleProjectChange = (newProjectId: string) => {
@@ -403,7 +404,7 @@ export function ScriptAnalysisPage() {
       <ProjectSidebar
         currentProject={currentProject}
         onProjectChange={handleProjectChange}
-        onAnalyzeCharacters={() => analyzeWithStream('characters')}
+        onAnalyzeCharacters={(mode) => analyzeWithStream('characters', mode)}
         onAnalyzeScenes={() => analyzeWithStream('scenes')}
         onAnalyzeActs={() => analyzeWithStream('acts')}
         onStopAnalysis={stopStream}
