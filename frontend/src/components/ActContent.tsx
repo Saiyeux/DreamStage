@@ -96,12 +96,12 @@ export function ActContent({ projectId }: { projectId: string }) {
 
     return (
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex h-full w-full overflow-hidden bg-white">
+            <div className="flex h-full w-full overflow-hidden bg-slate-50">
 
                 {/* LEFT COLUMN: Library + Reference */}
-                <aside className="w-64 shrink-0 border-r border-slate-300 flex flex-col">
+                <aside className="w-64 shrink-0 border-r border-slate-200 flex flex-col">
                     {/* Library Section */}
-                    <div className="h-1/2 border-b border-slate-300 flex flex-col min-h-0 bg-white">
+                    <div className="h-1/2 border-b border-slate-200 flex flex-col min-h-0 bg-white">
                         {/* Fixed Header */}
                         <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
                             <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Library</span>
@@ -200,9 +200,9 @@ export function ActContent({ projectId }: { projectId: string }) {
                     <div className="flex-1 flex flex-row min-h-0">
 
                         {/* STAGE AREA (Left Half) */}
-                        <div className="flex-1 flex flex-col border-r border-slate-300">
+                        <div className="flex-1 flex flex-col border-r border-slate-200">
                             {/* Header */}
-                            <div className="h-10 border-b border-slate-300 flex items-center justify-between px-3 bg-white shrink-0">
+                            <div className="h-10 border-b border-slate-200 flex items-center justify-between px-3 bg-white shrink-0">
                                 <span className="text-xs font-semibold text-slate-600">STAGE</span>
                                 <div className="flex gap-1">
                                     <button
@@ -306,7 +306,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                     {/* BOTTOM SECTION: Lines */}
                     <div
                         ref={setLinesRef}
-                        className={`h-72 border-t border-slate-300 flex flex-col bg-white shrink-0 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset' : ''}`}
+                        className={`h-72 border-t border-slate-200 flex flex-col bg-white shrink-0 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset' : ''}`}
                     >
                         <div className="h-8 border-b border-slate-100 flex items-center px-4 bg-slate-50 shrink-0">
                             <span className="text-xs font-semibold text-slate-600">LINES</span>

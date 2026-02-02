@@ -1607,102 +1607,126 @@ function ScenesContent({
               </div>
             </div>
 
-            {/* Content Layout: Vertical Flex */}
-            <div className="p-6 max-w-[1600px] w-full mx-auto flex-1 min-h-0 flex flex-col gap-6">
+            {/* Content Layout: Split Grid */}
+            <div className="p-6 max-w-[1600px] w-full mx-auto flex-1 min-h-0">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
 
-              {/* 1. TOP: Scene Generation (Flex-1, fills available space) */}
-              <div className="flex-1 min-h-0 flex flex-col gap-6">
-                {/* Image Generation Panel */}
-                <div className="card p-1 overflow-hidden bg-slate-50 border-slate-200 flex flex-col h-full shadow-sm">
-                  {/* Toolbar */}
-                  <div className="px-4 py-3 bg-white border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="text-sm font-semibold text-slate-700">Scene Generation</h3>
-                    <div className="flex items-center gap-2">
-                      {generatingSceneId === selectedScene.id && (
-                        <div className="flex items-center gap-2 mr-3 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs animate-pulse border border-blue-100">
-                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                          {generateMessage}
-                        </div>
-                      )}
-                      <div className="flex bg-slate-100 p-1 rounded-lg">
-                        <span className="text-xs text-slate-400 px-2">Settings & Preview</span>
+                {/* LEFT: Details & Context */}
+                <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+
+                  {/* 1. Scene Details */}
+                  <div className="card p-6">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                      <span>📄</span> Scene Details
+                    </h3>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                      <Field label="Location" value={selectedScene.location} isEditing={isEditing} editValue={editedScene.location} onChange={(v) => updateField('location', v)} />
+                      <Field label="Time" value={selectedScene.timeOfDay} isEditing={isEditing} editValue={editedScene.timeOfDay} onChange={(v) => updateField('timeOfDay', v)} />
+                      <Field label="Atmosphere" value={selectedScene.atmosphere} isEditing={isEditing} editValue={editedScene.atmosphere} onChange={(v) => updateField('atmosphere', v)} />
+                      <Field label="Duration" value={selectedScene.durationSeconds ? selectedScene.durationSeconds + "s" : ""} isEditing={false} onChange={() => { }} />
+                    </div>
+                  </div>
+
+                  {/* 2. Visual Context */}
+                  <div className="card p-6 border-l-4 border-l-blue-500 shadow-sm">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                      <span>👁️</span> Visual Context
+                    </h3>
+                    <div className="space-y-4">
+                      <Field label="Environment Description" value={selectedScene.environmentDesc} isEditing={isEditing} editValue={editedScene.environmentDesc} onChange={(v) => updateField('environmentDesc', v)} multiline />
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+                        <Field label="Shot Type" value={selectedScene.shotType} isEditing={isEditing} editValue={editedScene.shotType} onChange={(v) => updateField('shotType', v)} />
+                        <Field label="Camera Movement" value={selectedScene.cameraMovement} isEditing={isEditing} editValue={editedScene.cameraMovement} onChange={(v) => updateField('cameraMovement', v)} />
                       </div>
                     </div>
                   </div>
 
-                  {/* Preview Area - Refined Aesthetic Look */}
-                  <div className="bg-slate-50/50 flex-1 p-8 flex items-center justify-center overflow-hidden">
-                    {/* Container for image/video - Adapts to content size, max-full */}
-                    <div className="relative max-w-full max-h-full flex flex-col items-center justify-center">
-                      {selectedScene.sceneImage ? (
-                        <div
-                          className="relative group cursor-zoom-in"
-                          onClick={() => setLightboxImage(fileUrl.image(selectedScene.sceneImage!.imagePath))}
-                        >
-                          {/* Main Image with Aesthetic Border */}
-                          <div className="relative p-1 bg-white rounded shadow-sm border border-slate-200">
-                            {/* Inner delicate border */}
-                            <div className="relative border-4 border-slate-800/5 rounded-sm overflow-hidden">
-                              <img
-                                src={fileUrl.image(selectedScene.sceneImage.imagePath)}
-                                className="max-w-full max-h-[60vh] object-contain block" // limit height to avoid overflow
-                                alt={`Scene ${selectedScene.sceneNumber}`}
-                              />
-                            </div>
-                          </div>
+                  {/* 3. Dialogue Preview */}
+                  {selectedScene.dialogue && (
+                    <div className="card p-6">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                        <span>💬</span> Dialogue Preview
+                      </h3>
+                      <div className="text-sm text-slate-600 whitespace-pre-line leading-relaxed italic border-l-2 border-slate-200 pl-4 py-1">
+                        {selectedScene.dialogue}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-                          {/* Hover Overlay */}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 shadow-lg transform scale-95 group-hover:scale-100 transition-all duration-300">
-                              🔍 Click to Zoom
-                            </span>
+                {/* RIGHT: Image Generation (Sticky/Fixed) */}
+                <div className="h-full flex flex-col min-h-0">
+                  <div className="card p-1 overflow-hidden bg-slate-50 border-slate-200 flex flex-col h-full shadow-sm">
+                    {/* Toolbar */}
+                    <div className="px-4 py-3 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+                      <h3 className="text-sm font-semibold text-slate-700">Scene Visualization</h3>
+                      <div className="flex items-center gap-2">
+                        {generatingSceneId === selectedScene.id && (
+                          <div className="flex items-center gap-2 mr-3 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs animate-pulse border border-blue-100">
+                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                            {generateMessage}
                           </div>
+                        )}
+                        <div className="flex bg-slate-100 p-1 rounded-lg">
+                          <span className="text-xs text-slate-400 px-2">Settings & Preview</span>
+                        </div>
+                      </div>
+                    </div>
 
-                          {/* Delete Button (Corner) */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteSceneImage()
-                            }}
-                            className="absolute -top-3 -right-3 p-2 bg-white text-red-500 rounded-full shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 z-10"
-                            title="Delete Image"
+                    {/* Preview Area */}
+                    <div className="bg-slate-50/50 flex-1 p-8 flex items-center justify-center overflow-hidden">
+                      <div className="relative max-w-full max-h-full flex flex-col items-center justify-center">
+                        {selectedScene.sceneImage ? (
+                          <div
+                            className="relative group cursor-zoom-in"
+                            onClick={() => setLightboxImage(fileUrl.image(selectedScene.sceneImage!.imagePath))}
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      ) : selectedScene.videoClip ? (
-                        <div className="h-full w-full aspect-video max-h-[60vh] bg-black rounded-lg overflow-hidden shadow-lg border-[6px] border-slate-800">
-                          <video
-                            src={fileUrl.video(selectedScene.videoClip.videoPath)}
-                            controls
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-96 aspect-video flex items-center justify-center flex-col text-slate-400 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200">
-                          <span className="text-4xl mb-3 opacity-30">🖼️</span>
-                          <span className="text-sm font-medium">No Preview</span>
-                          <span className="text-[10px] text-slate-400 mt-1">Generate an image to view</span>
-                        </div>
-                      )}
+                            <div className="relative p-1 bg-white rounded shadow-sm border border-slate-200">
+                              <div className="relative border-4 border-slate-800/5 rounded-sm overflow-hidden">
+                                <img
+                                  src={fileUrl.image(selectedScene.sceneImage.imagePath)}
+                                  className="max-w-full max-h-[60vh] object-contain block" // limit height to avoid overflow
+                                  alt={`Scene ${selectedScene.sceneNumber}`}
+                                />
+                              </div>
+                            </div>
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 shadow-lg transform scale-95 group-hover:scale-100 transition-all duration-300">
+                                🔍 Click to Zoom
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteSceneImage()
+                              }}
+                              className="absolute -top-3 -right-3 p-2 bg-white text-red-500 rounded-full shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 z-10"
+                              title="Delete Image"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        ) : selectedScene.videoClip ? (
+                          <div className="h-full w-full aspect-video max-h-[60vh] bg-black rounded-lg overflow-hidden shadow-lg border-[6px] border-slate-800">
+                            <video
+                              src={fileUrl.video(selectedScene.videoClip.videoPath)}
+                              controls
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-96 aspect-video flex items-center justify-center flex-col text-slate-400 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200">
+                            <span className="text-4xl mb-3 opacity-30">🖼️</span>
+                            <span className="text-sm font-medium">No Preview</span>
+                            <span className="text-[10px] text-slate-400 mt-1">Generate an image to view</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 2. BOTTOM: Visual Context (Shrink-0) */}
-              <div className="shrink-0 flex flex-col gap-6">
-                {/* Visual Context Card */}
-                <div className="card p-5 border-l-4 border-l-blue-500 shadow-sm">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <span className="text-lg">👁️</span> Visual Context
-                  </h3>
-                  <div className="space-y-4">
-                    <Field label="Environment" value={selectedScene.environmentDesc} isEditing={isEditing} editValue={editedScene.environmentDesc} onChange={(v) => updateField('environmentDesc', v)} multiline />
-                  </div>
-                </div>
               </div>
-
             </div>
 
           </div>
