@@ -28,8 +28,22 @@ class PromptService:
 
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+            # Pre-process templates: join lists into strings
+            self._process_templates_in_data(data)
             self._cache[cache_key] = data
             return data
+
+    def _process_templates_in_data(self, data: Any) -> None:
+        """Recursively join 'template' lists into strings"""
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key == "template" and isinstance(value, list):
+                    data[key] = "\n".join(value)
+                else:
+                    self._process_templates_in_data(value)
+        elif isinstance(data, list):
+            for item in data:
+                self._process_templates_in_data(item)
 
     def _save_json(self, relative_path: str, data: dict[str, Any]) -> bool:
         """保存 JSON 配置文件"""
