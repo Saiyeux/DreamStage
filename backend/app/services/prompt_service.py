@@ -179,8 +179,7 @@ class PromptService:
             parts.append(f"{skin} skin")
         if clothing_style:
             parts.append(clothing_style)
-        if personality:
-            parts.append(f"personality: {personality}")
+        # Note: personality is intentionally NOT included - it's non-visual
 
         base = ", ".join(parts) if parts else "a person"
 

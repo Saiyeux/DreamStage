@@ -714,8 +714,17 @@ function CharactersContent({
             setGenerateMessage('Done!')
 
             try {
+              // Retrieve fresh data
               const updatedCharacters = await analysisApi.getCharacters(projectId)
+
+              // Force update state
               setCharacters(updatedCharacters)
+
+              // Also check specifically for the generating character to ensure image is there
+              const updatedChar = updatedCharacters.find(c => c.id === targetId)
+              if (updatedChar && updatedChar.images) {
+                // console.log('Updated character images:', updatedChar.images)
+              }
             } catch (err) {
               console.error('Failed to reload characters:', err)
             }
@@ -1592,6 +1601,7 @@ function ScenesContent({
           pollingRef.current = null
           setGenerateMessage('Done!')
 
+          // Force reload and update state
           const updatedScenes = await analysisApi.getScenes(projectId)
           setScenes(updatedScenes)
 

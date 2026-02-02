@@ -15,7 +15,6 @@
   },
   "scenes": {
     "system": "你是电影美术指导（Production Designer）和环境概念艺术家。",
-    "template": "请仔细分析以下剧本片段，为每一个场景设计详细的视觉环境方案（Set Design）。\n忽略人物的具体动作和走位，专注于构建场景的空间感、氛围、光影和美术风格。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}\n\n## 角色列表\n{{characters_json}}\n\n## 输出要求\n请以JSON格式输出本片段的所有场景环境设计（场景序号从{{scene_start_num}}开始）：\n```json\n{\n  \"scenes\": [\n    {\n      \"scene_number\": {{scene_start_num}},\n      \"location\": \"场景地点（作为标题）\",\n      \"time_of_day\": \"时间（具体光照条件）\",\n      \"atmosphere\": \"核心氛围关键词（如：赛博朋克、衰败、温馨、压抑）\",\n      \"environment\": {\n        \"description\": \"详细的环境视觉描述，包含：\\n1. 建筑风格与空间结构\\n2. 主要色调与光影设计\\n3. 关键道具与陈设细节\\n4. 材质与纹理质感\",\n        \"visual_style\": \"美术风格参考（如：Wes Anderson风格、黑色电影风格等）\"\n      },\n      \"characters\": [], \n      \"dialogue\": \"\",\n      \"camera\": {},\n      \"duration_seconds\": 0\n    }\n  ]\n}\n```\n注意：`characters`, `dialogue`, `camera`, `duration_seconds` 字段保留为空或默认值，因为这些将在 Act Analysis 阶段处理。"
   },
   "acts": {
     "system": "你是专业的导演和分镜师。",
