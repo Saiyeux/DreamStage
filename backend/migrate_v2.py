@@ -2,7 +2,7 @@
 import sqlite3
 from pathlib import Path
 
-db_path = Path(r"e:\Github\ScriptConverter\backend\data\database.sqlite")
+db_path = Path(__file__).parent / "data" / "database.sqlite"
 
 if not db_path.exists():
     print(f"Database not found at {db_path}")
