@@ -111,6 +111,23 @@ export interface WorkflowConfig {
   description?: Record<string, string>
 }
 
+// 清除缓存
+export interface ClearCacheRequest {
+  clearPromptCache?: boolean
+  clearOutputFiles?: boolean
+  clearAnalysisTasks?: boolean
+}
+
+export interface ClearCacheResponse {
+  success: boolean
+  message: string
+  clearedItems: {
+    prompt_cache: number
+    output_files: number
+    analysis_tasks: number
+  }
+}
+
 export const configApi = {
   getCharacterImageTemplates: () =>
     api.get<CharacterImageTemplates>('/config/character-image-templates'),
@@ -123,6 +140,10 @@ export const configApi = {
 
   updateLLMConfig: (config: Partial<LLMConfig>) =>
     api.put<LLMConfig>('/config/llm', config),
+
+  // 清除 LLM 缓存
+  clearLlmCache: (options?: ClearCacheRequest) =>
+    api.post<ClearCacheResponse>('/config/llm/clear-cache', options || {}),
 
   // 分析提示词
   getAnalysisPrompts: () =>

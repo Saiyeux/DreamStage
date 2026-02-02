@@ -219,28 +219,35 @@ class ComfyUIClient:
     async def queue_prompt(self, workflow: dict[str, Any]) -> str:
         """提交 workflow 到 ComfyUI 队列"""
         # 显式禁用代理，避免 Clash 等系统代理干扰 localhost 请求
-        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
-            response = await client.post(
-                f"{self.base_url}/prompt",
-                json={
-                    "prompt": workflow,
-                    "client_id": self.client_id,
-                },
-            )
-            
-            if response.status_code != 200:
-                error_msg = response.text
-                try:
-                    if response.content.strip():
-                        error_data = response.json()
-                        error_msg = json.dumps(error_data, indent=2)
-                except Exception:
-                    pass
-                logger.error(f"ComfyUI API Error ( {response.status_code} ): {error_msg}")
-            
-            response.raise_for_status()
-            data = response.json()
-            return data.get("prompt_id", "")
+        try:
+            async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+                response = await client.post(
+                    f"{self.base_url}/prompt",
+                    json={
+                        "prompt": workflow,
+                        "client_id": self.client_id,
+                    },
+                )
+                
+                if response.status_code != 200:
+                    error_msg = response.text
+                    try:
+                        if response.content.strip():
+                            error_data = response.json()
+                            error_msg = json.dumps(error_data, indent=2)
+                    except Exception:
+                        pass
+                    logger.error(f"ComfyUI API Error ( {response.status_code} ): {error_msg}")
+                
+                response.raise_for_status()
+                data = response.json()
+                return data.get("prompt_id", "")
+        except httpx.ConnectError:
+            logger.error(f"Failed to connect to ComfyUI at {self.base_url}")
+            raise RuntimeError(f"Could not connect to ComfyUI at {self.base_url}. Please ensure ComfyUI is running.")
+        except httpx.TimeoutException:
+            logger.error(f"Connection to ComfyUI timed out at {self.base_url}")
+            raise RuntimeError(f"Connection to ComfyUI at {self.base_url} timed out.")
 
     async def get_history(self, prompt_id: str) -> dict[str, Any]:
         """获取任务历史"""
@@ -257,9 +264,16 @@ class ComfyUIClient:
             "type": folder_type,
         }
         async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
-            response = await client.get(f"{self.base_url}/view", params=params)
-            response.raise_for_status()
-            return response.content
+            try:
+                response = await client.get(f"{self.base_url}/view", params=params)
+                response.raise_for_status()
+                return response.content
+            except httpx.ConnectError:
+                logger.error(f"Failed to connect to ComfyUI at {self.base_url}")
+                raise RuntimeError(f"Could not connect to ComfyUI at {self.base_url}. Please ensure ComfyUI is running.")
+            except httpx.TimeoutException:
+                logger.error(f"Connection to ComfyUI timed out at {self.base_url}")
+                raise RuntimeError(f"Connection to ComfyUI at {self.base_url} timed out.")
 
     async def get_system_stats(self) -> dict[str, Any]:
         """获取系统状态"""

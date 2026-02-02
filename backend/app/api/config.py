@@ -62,6 +62,73 @@ async def update_llm_config(config: LLMConfigUpdate):
     )
 
 
+class ClearCacheRequest(CamelModel):
+    clear_prompt_cache: bool = True
+    clear_output_files: bool = False
+    clear_analysis_tasks: bool = True
+
+
+class ClearCacheResponse(CamelModel):
+    success: bool
+    message: str
+    cleared_items: dict[str, int]
+
+
+@router.post("/llm/clear-cache", response_model=ClearCacheResponse)
+async def clear_llm_cache(request: ClearCacheRequest | None = None):
+    """
+    清除 LLM 相关缓存
+    
+    - clear_prompt_cache: 清除提示词配置缓存
+    - clear_output_files: 清除 ComfyUI output 目录中的生成文件
+    - clear_analysis_tasks: 清除内存中的分析任务记录
+    """
+    if request is None:
+        request = ClearCacheRequest()
+    
+    cleared = {
+        "prompt_cache": 0,
+        "output_files": 0,
+        "analysis_tasks": 0,
+    }
+    
+    # 1. 清除提示词配置缓存
+    if request.clear_prompt_cache:
+        cache_size = len(prompt_service._cache)
+        prompt_service.clear_cache()
+        cleared["prompt_cache"] = cache_size
+    
+    # 2. 清除 output 文件
+    if request.clear_output_files:
+        output_dir = settings.DATA_DIR / "output"
+        if output_dir.exists():
+            import shutil
+            file_count = sum(1 for f in output_dir.iterdir() if f.is_file())
+            # 只删除文件，保留目录结构
+            for f in output_dir.iterdir():
+                if f.is_file():
+                    f.unlink()
+            cleared["output_files"] = file_count
+    
+    # 3. 清除分析任务记录
+    if request.clear_analysis_tasks:
+        from app.api.analysis import ANALYSIS_TASKS
+        task_count = len(ANALYSIS_TASKS)
+        # 取消所有进行中的任务
+        for task in ANALYSIS_TASKS.values():
+            if task.status in ["init", "running"]:
+                task.cancel()
+        ANALYSIS_TASKS.clear()
+        cleared["analysis_tasks"] = task_count
+    
+    total_cleared = sum(cleared.values())
+    return ClearCacheResponse(
+        success=True,
+        message=f"已清除 {total_cleared} 项缓存",
+        cleared_items=cleared,
+    )
+
+
 @router.get("/character-image-templates")
 async def get_character_image_templates():
     """获取角色图类型模板配置"""

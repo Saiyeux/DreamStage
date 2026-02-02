@@ -307,8 +307,6 @@ class PromptService:
         """更新视频动作提示词配置"""
         return self._save_json("video/action_prompts.json", data)
 
-    # ============ 分块配置 ============
-
     def get_chunk_config(self) -> dict[str, Any]:
         """获取分块配置"""
         return self._load_json("text/chunk_config.json")
@@ -316,6 +314,118 @@ class PromptService:
     def update_chunk_config(self, data: dict[str, Any]) -> bool:
         """更新分块配置"""
         return self._save_json("text/chunk_config.json", data)
+
+    # ============ 剧幕配置 ============
+
+    def get_act_config(self) -> dict[str, Any]:
+        """获取剧幕检测配置"""
+        return self._load_json("text/act_config.json")
+
+    def update_act_config(self, data: dict[str, Any]) -> bool:
+        """更新剧幕检测配置"""
+        return self._save_json("text/act_config.json", data)
+
+    def split_script_by_acts(self, script_text: str) -> list[dict[str, Any]]:
+        """
+        按剧幕关键词分割剧本文本
+        
+        Returns:
+            包含 act_number, script_content, start_line, end_line 的字典列表
+        """
+        config = self.get_act_config()
+        keywords = config.get("detection_keywords", ["ACT", "CHAPTER", "第.{1,3}幕"])
+        min_length = config.get("min_act_length", 500)
+        max_acts = config.get("max_acts", 50)
+
+        # 构建正则表达式模式
+        patterns = []
+        for kw in keywords:
+            try:
+                re.compile(kw)
+                patterns.append(kw)
+            except re.error:
+                patterns.append(re.escape(kw))
+
+        if not patterns:
+            # 无关键词，整个剧本作为一幕
+            return [{
+                "act_number": 1,
+                "script_content": script_text,
+                "start_line": 1,
+                "end_line": script_text.count("\n") + 1
+            }]
+
+        combined_pattern = "|".join(f"({p})" for p in patterns)
+        
+        try:
+            # 匹配行首的关键词
+            full_pattern = rf"^.*(?:{combined_pattern}).*$"
+            matches = list(re.finditer(full_pattern, script_text, re.MULTILINE | re.IGNORECASE))
+        except re.error:
+            return [{
+                "act_number": 1,
+                "script_content": script_text,
+                "start_line": 1,
+                "end_line": script_text.count("\n") + 1
+            }]
+
+        if not matches:
+            # 没有找到关键词，整个剧本作为一幕
+            return [{
+                "act_number": 1,
+                "script_content": script_text,
+                "start_line": 1,
+                "end_line": script_text.count("\n") + 1
+            }]
+
+        acts = []
+        lines = script_text.split("\n")
+        
+        for i, match in enumerate(matches[:max_acts]):
+            start_pos = match.start()
+            if i == len(matches) - 1:
+                end_pos = len(script_text)
+            else:
+                end_pos = matches[i + 1].start()
+
+            act_content = script_text[start_pos:end_pos].strip()
+            
+            # 计算行号
+            start_line = script_text[:start_pos].count("\n") + 1
+            end_line = script_text[:end_pos].count("\n") + 1
+
+            # 如果内容太短且不是第一幕，合并到前一幕
+            if len(act_content) < min_length and acts:
+                acts[-1]["script_content"] += "\n\n" + act_content
+                acts[-1]["end_line"] = end_line
+            else:
+                acts.append({
+                    "act_number": len(acts) + 1,
+                    "script_content": act_content,
+                    "start_line": start_line,
+                    "end_line": end_line
+                })
+
+        # 处理第一个关键词前的内容（序幕）
+        preamble = script_text[:matches[0].start()].strip()
+        if preamble and len(preamble) >= min_length:
+            preamble_act = {
+                "act_number": 0,
+                "script_content": preamble,
+                "start_line": 1,
+                "end_line": script_text[:matches[0].start()].count("\n") + 1
+            }
+            acts.insert(0, preamble_act)
+            # 重新编号
+            for idx, act in enumerate(acts):
+                act["act_number"] = idx + 1
+
+        return acts if acts else [{
+            "act_number": 1,
+            "script_content": script_text,
+            "start_line": 1,
+            "end_line": script_text.count("\n") + 1
+        }]
 
     def split_script_by_chapters(self, script_text: str) -> list[str]:
         """

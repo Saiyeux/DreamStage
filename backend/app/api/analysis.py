@@ -122,6 +122,13 @@ class AnalysisTask:
                 if self.analysis_type == "scenes":
                     script_chunks = prompt_service.split_script_by_scenes(project.script_text)
                     logger.info(f"Project {self.project_id} - Scene Analysis: Using scene header split")
+                elif self.analysis_type == "acts":
+                    # For acts analysis, use act-based splitting
+                    act_data = prompt_service.split_script_by_acts(project.script_text)
+                    script_chunks = [act["script_content"] for act in act_data]
+                    # Store act metadata for later use
+                    self._act_metadata = act_data
+                    logger.info(f"Project {self.project_id} - Act Analysis: Found {len(act_data)} acts")
                 else:
                     chunk_config = prompt_service.get_chunk_config()
                     chunk_mode = chunk_config.get("chunk_mode", "chapter")
@@ -225,6 +232,8 @@ class AnalysisTask:
 
                                 elif self.analysis_type == "acts":
                                     if "action" in item:
+                                         # Track which chunk/act this beat belongs to
+                                         item["_chunk_idx"] = chunk_idx
                                          await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item_with_id})}\n\n")
                                          all_beats.append(item)
                                          
@@ -306,11 +315,49 @@ class AnalysisTask:
                     await db.commit()
 
                 elif self.analysis_type == "acts":
+                    # Merge beat analysis with act metadata
+                    structured_acts = []
+                    act_metadata = getattr(self, "_act_metadata", [])
+                    
+                    for idx, act_meta in enumerate(act_metadata):
+                        # Find beats that belong to this act (by chunk index)
+                        act_beats = [b for b in all_beats if b.get("_chunk_idx") == idx + 1]
+                        
+                        structured_act = {
+                            "act_number": act_meta.get("act_number", idx + 1),
+                            "title": "",  # Will be filled from LLM analysis
+                            "summary": "",  # Will be filled from LLM analysis
+                            "script_content": act_meta.get("script_content", ""),
+                            "start_line": act_meta.get("start_line", 0),
+                            "end_line": act_meta.get("end_line", 0),
+                            "beats": act_beats
+                        }
+                        
+                        # Extract title/summary from first beat if available
+                        if act_beats:
+                            first_beat = act_beats[0]
+                            if "title" in first_beat:
+                                structured_act["title"] = first_beat["title"]
+                            if "summary" in first_beat:
+                                structured_act["summary"] = first_beat["summary"]
+                        
+                        structured_acts.append(structured_act)
+                    
+                    # Fallback: if no metadata, just use beats directly
+                    if not structured_acts and all_beats:
+                        structured_acts = [{
+                            "act_number": 1,
+                            "title": "主幕",
+                            "summary": "",
+                            "script_content": project.script_text,
+                            "beats": all_beats
+                        }]
+                    
                     proj_update = await db.execute(select(Project).where(Project.id == self.project_id))
                     if p := proj_update.scalar_one_or_none():
-                        p.act_analysis = all_beats
+                        p.act_analysis = structured_acts
                     await db.commit()
-                    saved_count = len(all_beats)
+                    saved_count = len(structured_acts)
 
                 await self.add_event(f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n")
                 await self.add_event(f"data: {json.dumps({'type': 'done', 'saved_count': saved_count})}\n\n")

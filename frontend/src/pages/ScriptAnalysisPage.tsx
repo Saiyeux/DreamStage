@@ -508,6 +508,9 @@ export function ScriptAnalysisPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
+              <ClearCacheButton
+                onClear={() => setAnalysisState({ terminalOutput: ['> Console cleared.'] })}
+              />
               <svg
                 className={`w-4 h-4 transition-transform duration-300 ${terminalExpanded ? '' : 'rotate-180'}`}
                 fill="none"
@@ -2100,3 +2103,43 @@ function TagManager({
     </div>
   )
 }
+
+// Clear Cache Button Component
+function ClearCacheButton({ onClear }: { onClear?: () => void }) {
+  const [clearing, setClearing] = useState(false)
+
+  const handleClear = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent terminal toggle
+    setClearing(true)
+    try {
+      const result = await configApi.clearLlmCache({
+        clearPromptCache: true,
+        clearAnalysisTasks: true,
+        clearOutputFiles: false,
+      })
+      onClear?.()
+      console.log('Cache cleared:', result.message)
+    } catch (err) {
+      console.error('Clear cache failed:', err)
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClear}
+      disabled={clearing}
+      className="text-[10px] text-slate-400 hover:text-red-400 font-medium transition-colors px-2 py-0.5 rounded hover:bg-red-500/10 flex items-center gap-1"
+      title="清除 LLM 缓存和分析任务"
+    >
+      {clearing ? (
+        <span className="w-2.5 h-2.5 border border-slate-500 border-t-red-400 rounded-full animate-spin" />
+      ) : (
+        <span>🗑️</span>
+      )}
+      <span>{clearing ? '清除中...' : '清除缓存'}</span>
+    </button>
+  )
+}
+
