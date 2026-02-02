@@ -87,6 +87,7 @@ export interface SceneImage {
   promptUsed: string
   seed: number
   isApproved: boolean
+  isLoading?: boolean
 }
 
 export interface VideoClip {

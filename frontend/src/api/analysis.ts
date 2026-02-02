@@ -51,4 +51,8 @@ export const analysisApi = {
   // 获取分析状态
   getAnalysisStatus: (projectId: string) =>
     api.get<{ status: string; analysis_type: string | null; progress?: string }>(`/projects/${projectId}/analysis/status`),
+
+  // 停止分析 (Add this)
+  stopAnalysis: (projectId: string) =>
+    api.post<{ message: string }>(`/projects/${projectId}/analysis/stop`),
 }

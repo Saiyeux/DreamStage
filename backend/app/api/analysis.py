@@ -83,7 +83,14 @@ class AnalysisTask:
         self.new_event_event = asyncio.Event()
         self.task: Optional[asyncio.Task] = None
         self.error: Optional[str] = None
+        self.cancelled = False
         
+    def cancel(self):
+        self.cancelled = True
+        self.status = "cancelled"
+        # Wake up subscribers so they can finish
+        self.new_event_event.set()
+
     async def add_event(self, data: str):
         self.events.append(data)
         self.new_event_event.set()
@@ -139,7 +146,14 @@ class AnalysisTask:
                 all_beats = []
                 summary_data = {}
 
+                from app.utils.streaming_parser import StreamingJSONParser
+
                 for chunk_idx, script_chunk in enumerate(script_chunks, 1):
+                    if self.cancelled:
+                        logger.info(f"Task {self.project_id} cancelled")
+                        await self.add_event(f"data: {json.dumps({'type': 'error', 'message': 'Analysis cancelled by user'})}\n\n")
+                        return
+
                     await self.add_event(f"data: {json.dumps({'type': 'chunk_start', 'chunk': chunk_idx, 'total': total_chunks})}\n\n")
 
                     # Select prompt
@@ -171,71 +185,72 @@ class AnalysisTask:
                     else:
                         return
 
-                    # LLM Call
+                    # LLM Call with Streaming Parser
+                    parser = StreamingJSONParser()
+                    
                     try:
-                        full_response = ""
                         async for chunk in llm_client.chat_stream(prompt):
-                            full_response += chunk
+                            if self.cancelled:
+                                break
+
+                            # Echo raw chunk if needed for debugging or terminal
                             await self.add_event(f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n")
-                        
-                        # Parse
-                        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', full_response)
-                        if json_match:
-                            json_str = json_match.group(1)
-                        else:
-                            json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', full_response)
-                            json_str = json_match.group(1) if json_match else full_response
-                        
-                        parsed_data = json.loads(json_str)
-                        
-                        new_chars = []
-                        new_scenes = []
-                        new_beats = []
+                            
+                            # Feed parser
+                            for item in parser.feed(chunk):
+                                # Process individual item
+                                item_with_id = item.copy()
+                                item_with_id["id"] = str(uuid.uuid4()) # Generate ID early for frontend
+                                
+                                # Add type-specific handling
+                                if self.analysis_type == "characters":
+                                    # Basic validation/enrichment
+                                    if "name" in item:
+                                        # Emit item event
+                                        await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item_with_id})}\n\n")
+                                        all_characters = merge_characters(all_characters, [item]) # Keep raw for final save logic
+                                
+                                elif self.analysis_type == "scenes":
+                                    if "location" in item:
+                                        # Enrich with script content if it's the first scene of chunk?
+                                        # Or just pass it. For now simple.
+                                        item["script_content"] = script_chunk # Attach chunk text to scenes found in it
+                                        
+                                        # Update scene number globally
+                                        item["scene_number"] = len(all_scenes) + 1
+                                        item_with_id["scene_number"] = item["scene_number"]
+                                        
+                                        await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item_with_id})}\n\n")
+                                        all_scenes.append(item)
 
-                        if isinstance(parsed_data, dict):
-                            new_chars = parsed_data.get("characters", [])
-                            new_scenes = parsed_data.get("scenes", [])
-                            new_beats = parsed_data.get("beats", [])
-                            if self.analysis_type == "summary":
-                                summary_data = parsed_data
-                        elif isinstance(parsed_data, list):
-                            if self.analysis_type == "characters": new_chars = parsed_data
-                            elif self.analysis_type == "scenes": new_scenes = parsed_data
-                            elif self.analysis_type == "acts": new_beats = parsed_data
-                            elif self.analysis_type == "summary":
-                                if len(parsed_data) > 0:
-                                    summary_data = parsed_data[0] if isinstance(parsed_data[0], dict) else {"summary": str(parsed_data[0])}
-                        elif isinstance(parsed_data, str) and self.analysis_type == "summary":
-                            summary_data = {"summary": parsed_data}
+                                elif self.analysis_type == "acts":
+                                    if "action" in item:
+                                         await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item_with_id})}\n\n")
+                                         all_beats.append(item)
+                                         
+                                elif self.analysis_type == "summary":
+                                    # Summary usually returns one object, or string?
+                                    # Parser expects objects. If it's a string, parser might fail unless we adjust prompt to return JSON.
+                                    # Assuming JSON based on parser logic.
+                                    summary_data = item
+                                    await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item})}\n\n")
 
-                        # Process results
-                        if self.analysis_type == "characters":
-                            all_characters = merge_characters(all_characters, new_chars)
-                            await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_chars), 'total_found': len(all_characters)})}\n\n")
-                        elif self.analysis_type == "scenes":
-                            if new_scenes:
-                                new_scenes[0]["script_content"] = script_chunk
-                            all_scenes.extend(new_scenes)
-                            await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_scenes), 'total_found': len(all_scenes)})}\n\n")
-                        elif self.analysis_type == "acts":
-                            all_beats.extend(new_beats)
-                            await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'found': len(new_beats), 'total_found': len(all_beats)})}\n\n")
-                        elif self.analysis_type == "summary":
-                             if not summary_data and isinstance(parsed_data, dict):
-                                 summary_data = parsed_data
-                             await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx})}\n\n")
-                             break
+                        # End of stream for this chunk
+                        
+                        # Send chunk done event
+                        count = 0
+                        if self.analysis_type == "characters": count = len(all_characters)
+                        elif self.analysis_type == "scenes": count = len(all_scenes)
+                        elif self.analysis_type == "acts": count = len(all_beats)
+                        
+                        await self.add_event(f"data: {json.dumps({'type': 'chunk_done', 'chunk': chunk_idx, 'total_found': count})}\n\n")
 
                     except Exception as chunk_error:
                         logger.error(f"Chunk error: {chunk_error}", exc_info=True)
                         await self.add_event(f"data: {json.dumps({'type': 'chunk_error', 'chunk': chunk_idx, 'message': str(chunk_error)})}\n\n")
-                        # Continue to next chunk...
 
-                # Save ALL data
+                # Save ALL data (Final Persistence)
                 saved_count = 0
-                
-                # NOTE: using 'db' from the outer 'async with' creates transaction conflicts if we reused calls? 
-                # Actually, we are in a single session here.
                 
                 if self.analysis_type == "characters":
                     await db.execute(delete(Character).where(Character.project_id == self.project_id))
@@ -287,7 +302,6 @@ class AnalysisTask:
                     # Update project status
                     proj_update = await db.execute(select(Project).where(Project.id == self.project_id))
                     if p := proj_update.scalar_one_or_none():
-                        p.status = ProjectStatus.ANALYZING # Wait, should be ANALYZED?
                         p.status = ProjectStatus.ANALYZED
                     await db.commit()
 
@@ -314,7 +328,7 @@ async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession):
     task_key = f"{project_id}_{analysis_type}"
     
     # Check for existing task
-    if task_key not in ANALYSIS_TASKS or ANALYSIS_TASKS[task_key].status in ["completed", "failed"]:
+    if task_key not in ANALYSIS_TASKS or ANALYSIS_TASKS[task_key].status in ["completed", "failed", "cancelled"]:
         # Start new task
         task = AnalysisTask(project_id, analysis_type)
         ANALYSIS_TASKS[task_key] = task
@@ -379,6 +393,22 @@ async def get_analysis_status(project_id: str):
              }
     
     return {"status": "idle", "analysis_type": None}
+
+
+@router.post("/{project_id}/analysis/stop")
+async def stop_analysis(project_id: str):
+    """停止项目的当前分析任务"""
+    stopped_any = False
+    for key, task in ANALYSIS_TASKS.items():
+        if task.project_id == project_id and task.status in ["init", "running"]:
+            logger.info(f"Stopping analysis task for project {project_id}")
+            task.cancel()
+            stopped_any = True
+            
+    if not stopped_any:
+        return {"message": "No active analysis task found"}
+        
+    return {"message": "Analysis stopped"}
 
 
 @router.post("/{project_id}/analyze/summary", response_model=AnalysisResponse)

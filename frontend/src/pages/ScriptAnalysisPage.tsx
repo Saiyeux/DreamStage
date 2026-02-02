@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { Character, Scene, CharacterImage } from '@/types'
+import type { Character, Scene, CharacterImage, SceneImage } from '@/types'
 import { projectsApi, analysisApi, charactersApi, generationApi, configApi } from '@/api'
 import type { ImageType, CharacterImageTemplates } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
@@ -132,6 +132,70 @@ export function ScriptAnalysisPage() {
     },
     onChunk: (content: string) => {
       updateLastTerminalLine(content)
+    },
+    onItemGenerated: (item: any) => {
+      if (analysisType === 'characters') {
+        const char = item as any
+        // Map raw LLM response to Character type
+        const newChar: Character = {
+          id: char.id || `temp-${Date.now()}`,
+          name: char.name,
+          gender: char.gender || 'Unknown',
+          age: char.age || 'Unknown',
+          roleType: char.role_type || 'Supporting',
+          personality: char.personality || '',
+          clothingStyle: char.clothing_style || '',
+          hair: char.appearance?.hair || '',
+          face: char.appearance?.face || '',
+          body: char.appearance?.body || '',
+          skin: char.appearance?.skin || '',
+          basePrompt: '',
+          images: [],
+          sceneNumbers: [],
+          projectId: projectId || '',
+          isFinalized: false
+        }
+
+        // Use functional update if supported, or functional logic with current state
+        // Since we can't be sure if the store supports functional updates from the error,
+        // and we want to avoid stale closures, let's try accessing the store state directly if possible
+        // or just rely on the fact that we are in a callback. 
+        // NOTE: The error said setCharacters expects Character[], not a function.
+        // So we must pass the array.
+        // We can get the current list from the store hook if we use useProjectStore.getState()
+        // But here we are inside the component.
+
+        const currentChars = useProjectStore.getState().characters
+        if (!currentChars.some(c => c.name === newChar.name)) {
+          setCharacters([...currentChars, newChar])
+          appendTerminalOutput(`[INFO] Found character: ${newChar.name}`)
+        }
+      }
+      else if (analysisType === 'scenes') {
+        const scene = item as any
+        const newScene: Scene = {
+          id: scene.id || `temp-${Date.now()}`,
+          sceneNumber: scene.scene_number,
+          location: scene.location,
+          timeOfDay: scene.time_of_day,
+          atmosphere: scene.atmosphere,
+          environmentDesc: scene.environment?.description || scene.environment_desc,
+          characters: scene.characters || [],
+          dialogue: scene.dialogue,
+          shotType: scene.camera?.shot_type || scene.shot_type || 'Wide Shot',
+          scenePrompt: '',
+          actionPrompt: '',
+          negativePrompt: '',
+          projectId: projectId || '',
+          isFinalized: false
+        }
+
+        const currentScenes = useProjectStore.getState().scenes
+        if (!currentScenes.some(s => s.sceneNumber === newScene.sceneNumber)) {
+          setScenes([...currentScenes, newScene])
+          appendTerminalOutput(`[INFO] Found scene ${newScene.sceneNumber}: ${newScene.location}`)
+        }
+      }
     },
     onSaved: (count: number) => {
       appendTerminalOutput('')
@@ -342,6 +406,7 @@ export function ScriptAnalysisPage() {
         onAnalyzeCharacters={() => analyzeWithStream('characters')}
         onAnalyzeScenes={() => analyzeWithStream('scenes')}
         onAnalyzeActs={() => analyzeWithStream('acts')}
+        onStopAnalysis={stopStream}
         isAnalyzing={isStreaming}
         currentAnalyzing={currentAnalyzing}
       />
@@ -443,14 +508,6 @@ export function ScriptAnalysisPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {isStreaming && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); stopStream(); }}
-                  className="px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] rounded hover:bg-red-500/20 transition-colors"
-                >
-                  Stop Process
-                </button>
-              )}
               <svg
                 className={`w-4 h-4 transition-transform duration-200 ${terminalExpanded ? '' : 'rotate-180'}`}
                 fill="none"
@@ -495,7 +552,7 @@ function CharactersContent({
   characters: Character[]
   projectId: string
 }) {
-  const { setCharacters, selectedWorkflows, workflowParams } = useProjectStore()
+  const { setCharacters, selectedWorkflows, workflowParams, healthStatus } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
@@ -686,12 +743,44 @@ function CharactersContent({
     generationApi.getActiveTasks(projectId).then(tasks => {
       Object.entries(tasks).forEach(([taskId, status]) => {
         if (status.target_id && status.target_id !== 'library' && !status.target_id.startsWith('all_')) {
+          const charId = status.target_id
+
+          // Inject placeholder using fresh state
+          const currentChars = useProjectStore.getState().characters
+          const charIndex = currentChars.findIndex(c => c.id === charId)
+
+          if (charIndex !== -1) {
+            const char = currentChars[charIndex]
+            const hasLoading = char.images?.some(img => img.isLoading)
+
+            if (!hasLoading) {
+              const newImage: CharacterImage = {
+                id: `temp_recover_${Date.now()}`,
+                characterId: charId,
+                imageType: 'Recovering...',
+                imagePath: '',
+                promptUsed: '',
+                negativePrompt: '',
+                seed: 0,
+                isSelected: false,
+                isLoading: true
+              }
+
+              const newChars = [...currentChars]
+              newChars[charIndex] = {
+                ...char,
+                images: [...(char.images || []), newImage]
+              }
+              setCharacters(newChars)
+            }
+          }
+
           // If it's a character task, resume polling
-          startPolling(taskId, status.target_id)
+          startPolling(taskId, charId)
         }
       })
     }).catch(err => console.error('Failed to recover active tasks:', err))
-  }, [projectId, startPolling])
+  }, [projectId, startPolling, setCharacters])
 
   const handleStop = async () => {
     if (!currentTaskId) return
@@ -910,10 +999,11 @@ function CharactersContent({
                     </button>
                     <button
                       onClick={handleGenerate}
-                      disabled={!!generatingCharId}
+                      disabled={!!generatingCharId || !healthStatus?.comfyui?.connected}
+                      title={!healthStatus?.comfyui?.connected ? 'ComfyUI Service Offline' : ''}
                       className="btn btn-primary text-xs px-3 py-1.5 shadow-md shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {generatingCharId === selectedCharacter.id ? '⏳ Generating...' : '▶ Generate Selected'}
+                      {generatingCharId === selectedCharacter.id ? '⏳ Generating...' : '▶ Generate'}
                     </button>
                   </>
                 ) : (
@@ -1356,7 +1446,7 @@ function ScenesContent({
   scenes: Scene[]
   projectId: string
 }) {
-  const { setScenes, selectedWorkflows, workflowParams } = useProjectStore()
+  const { setScenes, selectedWorkflows, workflowParams, healthStatus } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   // Lightbox state
@@ -1525,16 +1615,39 @@ function ScenesContent({
     generationApi.getActiveTasks(projectId).then(tasks => {
       Object.entries(tasks).forEach(([taskId, status]) => {
         if (status.target_id && !status.target_id.startsWith('all_') && status.target_id !== 'library') {
-          // If it's a scene task (and we are in ScenesContent), resume
-          // Note: In ScenesContent we check if the ID refers to a scene.
-          // For simplicity, we assume any task with target_id that isn't 'all_...' or 'library' is a scene if we're here.
-          // (CharactersContent does the same, but they share the same project_id space)
-          // To be safer, we could check if target_id exists in 'scenes' array.
-          startPolling(taskId, status.target_id)
+          const sceneId = status.target_id
+
+          // Inject placeholder if needed
+          const currentScenes = useProjectStore.getState().scenes
+          const sceneIndex = currentScenes.findIndex(s => s.id === sceneId)
+
+          if (sceneIndex !== -1) {
+            const scene = currentScenes[sceneIndex]
+            if (!scene.sceneImage) {
+              const newImage: SceneImage = {
+                id: `temp_recover_${Date.now()}`,
+                sceneId: sceneId,
+                imagePath: '',
+                promptUsed: 'Recovering...',
+                seed: 0,
+                isApproved: false,
+                isLoading: true
+              }
+
+              const newScenes = [...currentScenes]
+              newScenes[sceneIndex] = {
+                ...scene,
+                sceneImage: newImage
+              }
+              setScenes(newScenes)
+            }
+          }
+
+          startPolling(taskId, sceneId)
         }
       })
     }).catch(err => console.error('Failed to recover active scenes tasks:', err))
-  }, [projectId, startPolling])
+  }, [projectId, startPolling, setScenes])
 
   const handleGenerateImage = async () => {
     if (!selectedScene?.id || generatingSceneId) return
@@ -1656,10 +1769,11 @@ function ScenesContent({
 
                     <button
                       onClick={handleGenerateImage}
-                      disabled={!!generatingSceneId}
+                      disabled={!!generatingSceneId || !healthStatus?.comfyui?.connected}
+                      title={!healthStatus?.comfyui?.connected ? 'ComfyUI Service Offline' : ''}
                       className="btn btn-primary text-xs px-3 py-1.5 shadow-md shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {generatingSceneId === selectedScene.id ? '⏳ Generating...' : '▶ Generate Image'}
+                      {generatingSceneId === selectedScene.id ? '⏳ Generating...' : '▶ Generate'}
                     </button>
 
 
@@ -1766,35 +1880,42 @@ function ScenesContent({
                     <div className="bg-slate-50/50 flex-1 p-8 flex items-center justify-center overflow-hidden">
                       <div className="relative max-w-full max-h-full flex flex-col items-center justify-center">
                         {selectedScene.sceneImage ? (
-                          <div
-                            className="relative group cursor-zoom-in"
-                            onClick={() => setLightboxImage(fileUrl.image(selectedScene.sceneImage!.imagePath))}
-                          >
-                            <div className="relative p-1 bg-white rounded shadow-sm border border-slate-200">
-                              <div className="relative border-4 border-slate-800/5 rounded-sm overflow-hidden">
-                                <img
-                                  src={fileUrl.image(selectedScene.sceneImage.imagePath)}
-                                  className="max-w-full max-h-[60vh] object-contain block" // limit height to avoid overflow
-                                  alt={`Scene ${selectedScene.sceneNumber}`}
-                                />
-                              </div>
+                          selectedScene.sceneImage.isLoading ? (
+                            <div className="flex flex-col items-center justify-center text-primary-500">
+                              <span className="animate-spin w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full mb-3" />
+                              <span className="text-sm font-medium animate-pulse">Generating Scene Image...</span>
                             </div>
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100">
-                              <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 shadow-lg transform scale-95 group-hover:scale-100 transition-all duration-300">
-                                🔍 Click to Zoom
-                              </span>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteSceneImage()
-                              }}
-                              className="absolute -top-3 -right-3 p-2 bg-white text-red-500 rounded-full shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 z-10"
-                              title="Delete Image"
+                          ) : (
+                            <div
+                              className="relative group cursor-zoom-in"
+                              onClick={() => setLightboxImage(fileUrl.image(selectedScene.sceneImage!.imagePath))}
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
+                              <div className="relative p-1 bg-white rounded shadow-sm border border-slate-200">
+                                <div className="relative border-4 border-slate-800/5 rounded-sm overflow-hidden">
+                                  <img
+                                    src={fileUrl.image(selectedScene.sceneImage.imagePath)}
+                                    className="max-w-full max-h-[60vh] object-contain block" // limit height to avoid overflow
+                                    alt={`Scene ${selectedScene.sceneNumber}`}
+                                  />
+                                </div>
+                              </div>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 shadow-lg transform scale-95 group-hover:scale-100 transition-all duration-300">
+                                  🔍 Click to Zoom
+                                </span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteSceneImage()
+                                }}
+                                className="absolute -top-3 -right-3 p-2 bg-white text-red-500 rounded-full shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 z-10"
+                                title="Delete Image"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          )
                         ) : selectedScene.videoClip ? (
                           <div className="h-full w-full aspect-video max-h-[60vh] bg-black rounded-lg overflow-hidden shadow-lg border-[6px] border-slate-800">
                             <video

@@ -36,7 +36,7 @@ function DraggableAsset({ id, type, data, disabled, children }: { id: string, ty
 // ------------------------------------------------------------------
 
 export function ActContent({ projectId }: { projectId: string }) {
-    const { characters, scenes, currentProject, setScenes } = useProjectStore()
+    const { characters, scenes, currentProject, setScenes, healthStatus } = useProjectStore()
 
     // State
     const [activeStageSceneId, setActiveStageSceneId] = useState<string | null>(null)
@@ -335,10 +335,11 @@ export function ActContent({ projectId }: { projectId: string }) {
                                             setIsGenerating(true)
                                             setTimeout(() => setIsGenerating(false), 3000)
                                         }}
-                                        disabled={isGenerating}
-                                        className="btn btn-primary text-xs px-3 py-1.5 shadow-lg shadow-indigo-500/20"
+                                        disabled={isGenerating || !healthStatus?.comfyui?.connected}
+                                        title={!healthStatus?.comfyui?.connected ? 'ComfyUI Service Offline' : ''}
+                                        className="btn btn-primary text-xs px-3 py-1.5 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        {isGenerating ? 'Generating...' : '▶ Generate Channel'}
+                                        {isGenerating ? 'Generating...' : '▶ Generate'}
                                     </button>
                                 </div>
                             </div>

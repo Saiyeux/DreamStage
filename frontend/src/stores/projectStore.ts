@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Project, Character, Scene, Beat } from '@/types'
+import type { Project, Character, Scene, Beat, ServiceStatus } from '@/types'
 
 
 
@@ -11,6 +11,7 @@ interface ProjectState {
   scenes: Scene[]
   beats: Beat[]
   activeStageSceneId: string | null
+  healthStatus: ServiceStatus | null
 
   // 项目列表
   projects: Project[]
@@ -57,6 +58,7 @@ interface ProjectState {
   removeBeat: (id: string) => void
   reorderBeats: (beats: Beat[]) => void
   setActiveStageSceneId: (sceneId: string | null) => void
+  setHealthStatus: (status: ServiceStatus | null) => void
 
   reset: () => void
 
@@ -77,6 +79,7 @@ export const useProjectStore = create<ProjectState>()(
       scenes: [],
       beats: [],
       activeStageSceneId: null,
+      healthStatus: null,
       projects: [],
       analysisState: { ...initialAnalysisState },
 
@@ -164,6 +167,8 @@ export const useProjectStore = create<ProjectState>()(
       reorderBeats: (beats) => set({ beats }),
 
       setActiveStageSceneId: (sceneId) => set({ activeStageSceneId: sceneId }),
+
+      setHealthStatus: (status) => set({ healthStatus: status }),
 
 
       reset: () =>

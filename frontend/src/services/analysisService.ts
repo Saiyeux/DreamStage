@@ -3,11 +3,14 @@
  * 独立于组件生命周期，防止页面切换时连接中断
  */
 
+import { analysisApi } from '@/api/analysis'
+
 type AnalysisType = 'characters' | 'scenes' | 'acts'
 
 interface AnalysisCallbacks {
   onStart: () => void
   onChunk: (content: string) => void
+  onItemGenerated?: (item: any) => void
   onSaved: (count: number) => void
   onParseError: (message: string) => void
   onDone: (savedCount: number) => Promise<void>
@@ -71,6 +74,8 @@ class AnalysisService {
           this.callbacks?.onStart()
         } else if (data.type === 'chunk') {
           this.callbacks?.onChunk(data.content)
+        } else if (data.type === 'item_generated') {
+          this.callbacks?.onItemGenerated?.(data.item)
         } else if (data.type === 'saved') {
           this.callbacks?.onSaved(data.count)
         } else if (data.type === 'parse_error') {
@@ -98,7 +103,15 @@ class AnalysisService {
   /**
    * 停止分析
    */
-  stop(): void {
+  async stop(): Promise<void> {
+    if (this.currentProjectId) {
+      try {
+        await analysisApi.stopAnalysis(this.currentProjectId)
+      } catch (e) {
+        console.error('Stop analysis API failed:', e)
+      }
+    }
+
     if (this.eventSource) {
       this.eventSource.close()
     }

@@ -11,6 +11,7 @@ interface ProjectSidebarProps {
   onAnalyzeCharacters?: () => void
   onAnalyzeScenes?: () => void
   onAnalyzeActs?: () => void
+  onStopAnalysis?: () => void
   isAnalyzing?: boolean
   currentAnalyzing?: 'characters' | 'scenes' | 'acts' | null
 }
@@ -21,6 +22,7 @@ export function ProjectSidebar({
   onAnalyzeCharacters,
   onAnalyzeScenes,
   onAnalyzeActs,
+  onStopAnalysis,
   isAnalyzing,
   currentAnalyzing
 }: ProjectSidebarProps) {
@@ -35,7 +37,7 @@ export function ProjectSidebar({
   const [showSettings, setShowSettings] = useState(false)
   const [settingsType, setSettingsType] = useState<'character' | 'scene' | 'video' | null>(null)
 
-  const { selectedWorkflows, setSelectedWorkflow, workflowParams, setWorkflowParams, reset } = useProjectStore()
+  const { selectedWorkflows, setSelectedWorkflow, workflowParams, setWorkflowParams, reset, setHealthStatus: setGlobalHealthStatus } = useProjectStore()
 
   const openSettings = (type: 'character' | 'scene' | 'video') => {
     setSettingsType(type)
@@ -114,6 +116,7 @@ export function ProjectSidebar({
     try {
       const response = await healthApi.check()
       setHealthStatus(response.services)
+      setGlobalHealthStatus(response.services)
     } catch (err) {
       console.error('Load health status failed:', err)
     }
@@ -293,9 +296,20 @@ export function ProjectSidebar({
 
         {/* Analysis Tools */}
         <section>
-          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-3">
-            Analysis Tools
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Analysis Tools
+            </label>
+            {isAnalyzing && (
+              <button
+                onClick={onStopAnalysis}
+                className="flex items-center gap-1.5 px-2 py-0.5 bg-red-50 text-red-600 rounded border border-red-200 text-[10px] font-medium hover:bg-red-100 transition-colors animate-fade-in"
+              >
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-sm animate-pulse" />
+                STOP
+              </button>
+            )}
+          </div>
           <div className="space-y-2.5">
             <button
               onClick={onAnalyzeCharacters}
