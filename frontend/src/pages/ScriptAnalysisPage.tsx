@@ -337,7 +337,7 @@ export function ScriptAnalysisPage() {
   // Empty state
   if (!projectId) {
     return (
-      <div className="flex h-screen bg-slate-50">
+      <div className="flex h-screen bg-transparent/50">
         <ProjectSidebar
           currentProject={null}
           onProjectChange={handleProjectChange}
@@ -382,7 +382,7 @@ export function ScriptAnalysisPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-slate-50">
+      <div className="flex h-screen bg-transparent/50">
         <ProjectSidebar
           currentProject={currentProject}
           onProjectChange={handleProjectChange}
@@ -398,7 +398,7 @@ export function ScriptAnalysisPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-transparent">
       {/* Sidebar */}
       <ProjectSidebar
         currentProject={currentProject}
@@ -414,10 +414,10 @@ export function ScriptAnalysisPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10 basis-16 shrink-0">
+        <header className="bg-white/70 backdrop-blur-md border-b border-white/20 px-6 py-4 flex items-center justify-between shadow-sm z-10 basis-16 shrink-0 relative">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <span className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center text-lg shadow-sm border border-indigo-100">
+              <span className="w-8 h-8 bg-indigo-50/80 text-indigo-600 rounded-lg flex items-center justify-center text-lg shadow-sm border border-indigo-100/50">
                 📝
               </span>
               <h1 className="text-lg font-bold text-slate-900 tracking-tight truncate max-w-md">
@@ -426,56 +426,56 @@ export function ScriptAnalysisPage() {
             </div>
 
             {isStreaming && (
-              <span className="badge badge-accent animate-pulse-soft">
+              <span className="badge badge-accent animate-pulse-soft shadow-[0_0_10px_rgba(249,115,22,0.4)]">
                 Processing
               </span>
             )}
           </div>
 
           {/* View Toggle */}
-          <div className="flex bg-slate-100 p-1 rounded-lg">
+          <div className="flex bg-slate-100/50 p-1 rounded-xl border border-slate-200/50 backdrop-blur-sm shadow-inner">
             <button
               onClick={() => handleTabChange('characters')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'characters'
-                ? 'bg-white text-primary-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'characters'
+                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'
                 }`}
             >
-              <span>👤</span> Characters
+              <span className={activeTab === 'characters' ? 'scale-110 transition-transform' : ''}>👤</span> Characters
               {characters.length > 0 && (
-                <span className={`text-xs ${activeTab === 'characters' ? 'opacity-100' : 'opacity-60'} bg-slate-200 px-1.5 rounded-full`}>
+                <span className={`text-[10px] ${activeTab === 'characters' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'bg-slate-200 text-slate-500'} px-1.5 py-0.5 rounded-full transition-colors`}>
                   {characters.length}
                 </span>
               )}
             </button>
             <button
               onClick={() => handleTabChange('scenes')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'scenes'
-                ? 'bg-white text-primary-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'scenes'
+                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'
                 }`}
             >
-              <span>🎬</span> Scenes
+              <span className={activeTab === 'scenes' ? 'scale-110 transition-transform' : ''}>🎬</span> Scenes
               {scenes.length > 0 && (
-                <span className={`text-xs ${activeTab === 'scenes' ? 'opacity-100' : 'opacity-60'} bg-slate-200 px-1.5 rounded-full`}>
+                <span className={`text-[10px] ${activeTab === 'scenes' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'bg-slate-200 text-slate-500'} px-1.5 py-0.5 rounded-full transition-colors`}>
                   {scenes.length}
                 </span>
               )}
             </button>
             <button
               onClick={() => handleTabChange('act')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'act'
-                ? 'bg-white text-primary-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'act'
+                ? 'bg-white text-primary-700 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'
                 }`}
             >
-              <span>🎭</span> Act
+              <span className={activeTab === 'act' ? 'scale-110 transition-transform' : ''}>🎭</span> Act
             </button>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden flex relative">
+        <div className="flex-1 overflow-hidden flex relative z-0">
           {activeTab === 'characters' ? (
             <CharactersContent
               characters={characters}
@@ -492,24 +492,24 @@ export function ScriptAnalysisPage() {
         </div>
 
         {/* Terminal */}
-        <div className="border-t border-slate-200 bg-slate-900 text-slate-400 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] shrink-0">
+        <div className="border-t border-slate-800/50 bg-slate-900/95 backdrop-blur-md text-slate-400 z-20 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] shrink-0">
           <div
-            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-white/5 transition-colors"
+            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-white/5 transition-colors group"
             onClick={() => setAnalysisState({ terminalExpanded: !terminalExpanded })}
           >
             <div className="flex items-center gap-2">
-              <span className="text-green-400 text-xs font-mono">➜</span>
-              <span className="text-xs font-mono font-medium">Console Output</span>
+              <span className="text-green-400 text-xs font-mono group-hover:translate-x-1 transition-transform">➜</span>
+              <span className="text-xs font-mono font-medium text-slate-300 group-hover:text-white transition-colors">Console Output</span>
               {isStreaming && (
-                <span className="flex items-center gap-1.5 ml-2 px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400 text-[10px] font-medium border border-primary-500/20">
-                  <span className="w-1 h-1 bg-primary-400 rounded-full animate-pulse" />
+                <span className="flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-medium border border-indigo-500/20 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
                   Streaming
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3">
               <svg
-                className={`w-4 h-4 transition-transform duration-200 ${terminalExpanded ? '' : 'rotate-180'}`}
+                className={`w-4 h-4 transition-transform duration-300 ${terminalExpanded ? '' : 'rotate-180'}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -522,20 +522,20 @@ export function ScriptAnalysisPage() {
           {terminalExpanded && (
             <div
               ref={terminalRef}
-              className="px-4 py-3 font-mono text-xs overflow-y-auto bg-black/20"
+              className="px-4 py-3 font-mono text-xs overflow-y-auto bg-black/40 custom-scrollbar"
               style={{ maxHeight: '200px', height: '160px' }}
             >
               {terminalOutput.length === 0 ? (
-                <p className="opacity-50 italic">Ready for tasks...</p>
+                <p className="opacity-30 italic px-2">Ready for tasks...</p>
               ) : (
                 terminalOutput.map((line, i) => (
-                  <div key={i} className="whitespace-pre-wrap break-all leading-tight py-0.5">
+                  <div key={i} className="whitespace-pre-wrap break-all leading-relaxed py-0.5 pl-2 border-l-2 border-transparent hover:border-slate-700 hover:bg-white/5 transition-colors">
                     {line || '\u00A0'}
                   </div>
                 ))
               )}
               {isStreaming && (
-                <span className="inline-block w-2 h-4 bg-primary-500 animate-pulse align-middle ml-1" />
+                <span className="inline-block w-2 h-4 bg-indigo-500 animate-pulse align-middle ml-3 mt-1 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
               )}
             </div>
           )}
