@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "qwen2.5:14b"
     LLM_CHUNK_SIZE: int = 4000  # 文本分块长度（字符数）- 减小以避免输出截断
     LLM_CONTEXT_LENGTH: int = 32000  # 上下文长度（字符数）
+    LLM_TIMEOUT: float = 600.0  # LLM 请求超时时间（秒）
 
     # ComfyUI 配置
     COMFYUI_URL: str = "http://localhost:8000"

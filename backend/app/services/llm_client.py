@@ -82,8 +82,8 @@ class LLMClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        # 使用较长的超时：连接 30 秒，读取 300 秒（5分钟，LLM 响应可能很慢）
-        timeout = httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+        # 使用较长的超时：连接 30 秒，读取由配置决定（LLM 响应可能很慢）
+        timeout = httpx.Timeout(connect=30.0, read=settings.LLM_TIMEOUT, write=30.0, pool=30.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             if self.llm_type == "ollama":
                 async with client.stream(
