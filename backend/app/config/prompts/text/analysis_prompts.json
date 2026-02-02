@@ -4,8 +4,8 @@
     "template": "请阅读以下剧本内容，生成一段简洁的剧情简介。\n\n## 剧本内容\n{{script_text}}\n\n## 输出要求\n请以JSON格式输出：\n```json\n{\n  \"summary\": \"100-200字的剧情简介，包含主要人物和核心冲突\",\n  \"main_conflict\": \"主要冲突点（一句话）\",\n  \"tone\": \"故事基调（如：甜宠、虐恋、悬疑、喜剧等）\",\n  \"estimated_duration_minutes\": \"预估时长（分钟，数字）\"\n}\n```"
   },
   "characters": {
-    "system": "你是一位专业的剧本分析师和角色设计师。",
-    "template": "请从以下剧本片段中提取所有角色的详细信息。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}{{existing_hint}}\n\n## 输出要求\n请以JSON格式输出本片段中出现的所有角色（不要重复已识别的角色）：\n```json\n{\n  \"characters\": [\n    {\n      \"name\": \"角色姓名\",\n      \"gender\": \"男/女\",\n      \"age\": \"具体年龄或年龄段\",\n      \"role_type\": \"主角/配角/龙套\",\n      \"appearance\": {\n        \"hair\": \"发型和发色描述\",\n        \"face\": \"脸型和五官特征\",\n        \"body\": \"身材特征\",\n        \"skin\": \"肤色\"\n      },\n      \"personality\": \"性格特点\",\n      \"clothing_style\": \"服装风格\"\n    }\n  ]\n}\n```\n如果本片段没有新角色，返回空数组。",
+    "system": "你是一位专业的剧本分析师和角色设计师。请先总结发现的角色，然后逐个输出每个角色的完整信息。",
+    "template": "请从以下剧本片段中提取所有角色的详细信息。\n\n## 剧本内容（第{{chunk_index}}部分，共{{total_chunks}}部分）\n{{script_text}}{{existing_hint}}\n\n## 输出要求\n请按以下格式输出：\n\n### 1. 首先，列出本片段中发现的新角色名单\n例如：本片段发现3个新角色：张三、李四、王五\n\n### 2. 然后，为每个角色单独输出一个完整的JSON对象\n每个角色用 ```json 代码块包裹，一个角色输出完毕后再输出下一个角色：\n\n```json\n{\n  \"name\": \"角色姓名\",\n  \"gender\": \"男/女\",\n  \"age\": \"具体年龄或年龄段\",\n  \"role_type\": \"主角/配角/龙套\",\n  \"appearance\": {\n    \"hair\": \"发型和发色描述\",\n    \"face\": \"脸型和五官特征\",\n    \"body\": \"身材特征\",\n    \"skin\": \"肤色\"\n  },\n  \"personality\": \"性格特点\",\n  \"clothing_style\": \"服装风格\"\n}\n```\n\n如果本片段没有新角色，请说明\"本片段无新角色\"。",
     "existing_hint_template": "\n\n## 已识别的角色（请勿重复）\n{{existing_names}}"
   },
   "scenes": {
