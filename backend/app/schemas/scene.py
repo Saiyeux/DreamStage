@@ -39,7 +39,8 @@ class SceneResponse(CamelModel):
     time_of_day: str | None = None
     atmosphere: str | None = None
     environment_desc: str | None = None
-    characters_data: list[SceneCharacterData] = Field(default=[], alias="characters")
+    # Allow list of strings or dicts/objects to handle mixed data
+    characters_data: list[SceneCharacterData] | list[str] | list[dict] = Field(default=[], alias="characters")
     dialogue: str | None = None
     shot_type: str | None = None
     camera_movement: str | None = None
@@ -57,7 +58,7 @@ class SceneUpdate(BaseModel):
     time_of_day: str | None = None
     atmosphere: str | None = None
     environment_desc: str | None = None
-    characters_data: list[SceneCharacterData] | None = None
+    characters_data: list[SceneCharacterData] | list[str] | list[dict] | None = None
     dialogue: str | None = None
     shot_type: str | None = None
     camera_movement: str | None = None

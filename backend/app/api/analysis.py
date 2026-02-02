@@ -12,7 +12,7 @@ from app.core.dependencies import get_db
 from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.db.database import async_session_maker
-from app.models import Project, ProjectStatus, Character, CharacterImage, Scene, SceneImage, VideoClip
+from app.models import Project, ProjectStatus, Character, CharacterImage, Scene, SceneImage, VideoClip, Beat
 from app.schemas import (
     AnalysisResponse,
     CharacterResponse,
@@ -358,54 +358,37 @@ class AnalysisTask:
                     
                     # Update project status
                     proj_update = await db.execute(select(Project).where(Project.id == self.project_id))
+                    project = proj_update.scalar_one()
+                    project.status = ProjectStatus.ANALYZED
+                    await db.commit()
+
+                elif self.analysis_type == "acts":
+                    if not all_beats:
+                         await self.add_event(f"data: {json.dumps({'type': 'error', 'message': 'No beats found'})}\n\n")
+                         return
+
+                    await db.execute(delete(Beat).where(Beat.project_id == self.project_id))
+                    
+                    for idx, beat_data in enumerate(all_beats, 1):
+                        beat = Beat(
+                            id=str(uuid.uuid4()),
+                            project_id=self.project_id,
+                            scene_number=beat_data.get("scene_number", 0), # Assuming scene info passed or inferred
+                            beat_type=beat_data.get("type", "action"),
+                            description=beat_data.get("action") or beat_data.get("dialogue") or "",
+                            character_name=beat_data.get("characterName"),
+                            camera=beat_data.get("camera"),
+                            order=idx
+                        )
+                        db.add(beat)
+                        saved_count += 1
+                    
+                    await db.commit()
                     if p := proj_update.scalar_one_or_none():
                         p.status = ProjectStatus.ANALYZED
                     await db.commit()
 
-                elif self.analysis_type == "acts":
-                    # Merge beat analysis with act metadata
-                    structured_acts = []
-                    act_metadata = getattr(self, "_act_metadata", [])
-                    
-                    for idx, act_meta in enumerate(act_metadata):
-                        # Find beats that belong to this act (by chunk index)
-                        act_beats = [b for b in all_beats if b.get("_chunk_idx") == idx + 1]
-                        
-                        structured_act = {
-                            "act_number": act_meta.get("act_number", idx + 1),
-                            "title": "",  # Will be filled from LLM analysis
-                            "summary": "",  # Will be filled from LLM analysis
-                            "script_content": act_meta.get("script_content", ""),
-                            "start_line": act_meta.get("start_line", 0),
-                            "end_line": act_meta.get("end_line", 0),
-                            "beats": act_beats
-                        }
-                        
-                        # Extract title/summary from first beat if available
-                        if act_beats:
-                            first_beat = act_beats[0]
-                            if "title" in first_beat:
-                                structured_act["title"] = first_beat["title"]
-                            if "summary" in first_beat:
-                                structured_act["summary"] = first_beat["summary"]
-                        
-                        structured_acts.append(structured_act)
-                    
-                    # Fallback: if no metadata, just use beats directly
-                    if not structured_acts and all_beats:
-                        structured_acts = [{
-                            "act_number": 1,
-                            "title": "主幕",
-                            "summary": "",
-                            "script_content": project.script_text,
-                            "beats": all_beats
-                        }]
-                    
-                    proj_update = await db.execute(select(Project).where(Project.id == self.project_id))
-                    if p := proj_update.scalar_one_or_none():
-                        p.act_analysis = structured_acts
-                    await db.commit()
-                    saved_count = len(structured_acts)
+
 
                 await self.add_event(f"data: {json.dumps({'type': 'saved', 'count': saved_count})}\n\n")
                 await self.add_event(f"data: {json.dumps({'type': 'done', 'saved_count': saved_count})}\n\n")
@@ -849,17 +832,31 @@ async def finalize_scene(
         "location": scene.location,
         "time_of_day": scene.time_of_day,
         "atmosphere": scene.atmosphere,
-        "environment_desc": scene.environment_desc,
-        "scene_prompt": scene.scene_prompt,
-        "selected_image_ids": request.image_ids,
-        "main_image_id": request.main_image_id or (request.image_ids[0] if request.image_ids else None)
     }
-
-    scene.is_finalized = True
     scene.finalized_metadata = snapshot
+    scene.is_finalized = True
 
     await db.commit()
+    await db.refresh(scene)
+
     return {"success": True}
+
+
+# ============ Beats Management ============
+
+@router.get("/{project_id}/beats", response_model=list[dict])
+async def list_beats(project_id: str, db: AsyncSession = Depends(get_db)):
+    """获取项目所有Beats"""
+    result = await db.execute(
+        select(Beat)
+        .where(Beat.project_id == project_id)
+        .order_by(Beat.id) # Or order by scene_number/order
+    )
+    beats = result.scalars().all()
+    # Manual conversion to dict/response model if needed, or rely on FastAPI
+    # Simple dict return for now matching Frontend expectations
+    return beats
+
 
 
 @router.post("/{project_id}/scenes/{scene_id}/unfinalize")
