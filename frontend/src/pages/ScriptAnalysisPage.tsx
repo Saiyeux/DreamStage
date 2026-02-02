@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { Character, Scene, CharacterImage, SceneImage } from '@/types'
+import type { Character, Scene, CharacterImage, SceneImage, Beat } from '@/types'
 import { projectsApi, analysisApi, charactersApi, generationApi, configApi } from '@/api'
 import type { ImageType, CharacterImageTemplates } from '@/api'
 import { useProjectStore } from '@/stores/projectStore'
@@ -27,6 +27,7 @@ export function ScriptAnalysisPage() {
     setAnalysisState,
     appendTerminalOutput,
     updateLastTerminalLine,
+    setBeats,
   } = useProjectStore()
 
   const projectId = urlProjectId || currentProject?.id
@@ -196,6 +197,25 @@ export function ScriptAnalysisPage() {
           appendTerminalOutput(`[INFO] Found scene ${newScene.sceneNumber}: ${newScene.location}`)
         }
       }
+      else if (analysisType === 'acts') {
+        const beat = item as any
+        const newBeat: Beat = {
+          id: beat.id || `temp-${Date.now()}`,
+          sceneNumber: beat.scene_number || 0, // Fallback if missing
+          beatType: beat.type || 'action',
+          description: beat.action || beat.dialogue || '',
+          characterName: beat.characterName,
+          camera: beat.camera || {},
+          duration: 0,
+          projectId: projectId || ''
+        }
+
+        const currentBeats = useProjectStore.getState().beats
+        // Check uniqueness? Or just append? Beats might not have unique numbers in stream
+        // Usually safer to append for beats
+        setBeats([...currentBeats, newBeat])
+        appendTerminalOutput(`[INFO] Found beat: ${newBeat.beatType} ${newBeat.characterName || ''}`)
+      }
     },
     onSaved: (count: number) => {
       appendTerminalOutput('')
@@ -218,9 +238,12 @@ export function ScriptAnalysisPage() {
           if (analysisType === 'characters') {
             const data = await analysisApi.getCharacters(projectId)
             setCharacters(data)
-          } else {
+          } else if (analysisType === 'scenes') {
             const data = await analysisApi.getScenes(projectId)
             setScenes(data)
+          } else if (analysisType === 'acts') {
+            const data = await analysisApi.getBeats(projectId)
+            setBeats(data)
           }
         } catch (err) {
           console.error('Reload data failed:', err)

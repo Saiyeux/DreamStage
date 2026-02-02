@@ -129,9 +129,19 @@ export interface Task {
 
 export interface Beat {
   id: string
-  characterId: string
-  dialogue: string
-  action?: string
+  sceneNumber: number // Added
+  beatType: string    // Added (e.g., 'action', 'dialogue')
+  description: string // Added (content of action or dialogue)
   characterName?: string
-  order: number
+  camera?: {
+    shot_type?: string
+    angle?: string
+    movement?: string
+  }
+  duration: number
+  projectId: string
+  // Legacy fields (optional compatibility)
+  characterId?: string
+  action?: string
+  order?: number
 }

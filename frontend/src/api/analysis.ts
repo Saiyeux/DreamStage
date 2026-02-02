@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Character, Scene } from '@/types'
+import type { Character, Scene, Beat } from '@/types'
 
 interface AnalysisResponse {
   success: boolean
@@ -31,6 +31,10 @@ export const analysisApi = {
   // 获取场景列表
   getScenes: (projectId: string) =>
     api.get<Scene[]>(`/projects/${projectId}/scenes`),
+
+  // 获取Act/Beat列表
+  getBeats: (projectId: string) =>
+    api.get<Beat[]>(`/projects/${projectId}/beats`),
 
   // 更新场景
   updateScene: (projectId: string, sceneId: string, data: Partial<Scene>) =>
