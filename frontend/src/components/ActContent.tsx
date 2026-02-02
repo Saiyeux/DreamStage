@@ -194,20 +194,23 @@ export function ActContent({ projectId }: { projectId: string }) {
                 </aside>
 
                 {/* MAIN CONTENT AREA */}
-                <main className="flex-1 flex flex-col min-w-0">
+                {/* MAIN CONTENT AREA */}
+                <main className="flex-1 min-w-0 bg-slate-50 p-6 overflow-y-auto flex flex-col gap-6">
 
                     {/* TOP SECTION: Stage + Video Split */}
-                    <div className="flex-1 flex flex-row min-h-0">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
 
                         {/* STAGE AREA (Left Half) */}
-                        <div className="flex-1 flex flex-col border-r border-slate-200">
+                        <div className="card bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                             {/* Header */}
-                            <div className="h-10 border-b border-slate-200 flex items-center justify-between px-3 bg-white shrink-0">
-                                <span className="text-xs font-semibold text-slate-600">STAGE</span>
+                            <div className="h-12 border-b border-slate-100 flex items-center justify-between px-4 bg-white shrink-0">
+                                <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <span>🎭</span> Stage
+                                </span>
                                 <div className="flex gap-1">
                                     <button
                                         onClick={() => setActiveStageSceneId(null)}
-                                        className="btn btn-ghost text-xs px-2 py-1 h-7 min-h-0"
+                                        className="text-xs px-2 py-1 text-slate-400 hover:text-red-500 transition-colors"
                                         title="Clear Stage"
                                     >
                                         Clear
@@ -217,22 +220,22 @@ export function ActContent({ projectId }: { projectId: string }) {
 
                             {/* Scene Controls Toolbar (Shot & Camera) */}
                             {currentStageScene && (
-                                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 grid grid-cols-2 gap-2 shrink-0">
+                                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 grid grid-cols-2 gap-3 shrink-0">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Shot Type</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Shot Type</label>
                                         <input
                                             type="text"
-                                            className="w-full text-xs border border-slate-300 rounded px-2 py-1 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-700 bg-white"
+                                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-slate-700 bg-white shadow-sm transition-all"
                                             value={currentStageScene.shotType || ''}
                                             onChange={(e) => handleUpdateScene('shotType', e.target.value)}
                                             placeholder="e.g. Medium Shot"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Camera</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Camera</label>
                                         <input
                                             type="text"
-                                            className="w-full text-xs border border-slate-300 rounded px-2 py-1 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-700 bg-white"
+                                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-slate-700 bg-white shadow-sm transition-all"
                                             value={currentStageScene.cameraMovement || ''}
                                             onChange={(e) => handleUpdateScene('cameraMovement', e.target.value)}
                                             placeholder="e.g. Pan Left"
@@ -244,28 +247,35 @@ export function ActContent({ projectId }: { projectId: string }) {
                             {/* Preview */}
                             <div
                                 ref={setStageRef}
-                                className={`flex-1 flex items-center justify-center bg-slate-100 relative ${isOverStage ? 'ring-2 ring-indigo-400' : ''}`}
+                                className={`flex-1 flex items-center justify-center bg-slate-50/50 relative transition-all duration-300 ${isOverStage ? 'bg-indigo-50/50 ring-2 ring-indigo-400 ring-inset' : ''}`}
                             >
                                 {currentStageScene?.sceneImage ? (
-                                    <img
-                                        src={fileUrl.image(currentStageScene.sceneImage.imagePath)}
-                                        alt="Stage"
-                                        className="max-w-full max-h-full object-contain"
-                                    />
+                                    <div className="relative w-full h-full p-6 flex items-center justify-center">
+                                        <img
+                                            src={fileUrl.image(currentStageScene.sceneImage.imagePath)}
+                                            alt="Stage"
+                                            className="max-w-full max-h-full object-contain drop-shadow-lg rounded-lg"
+                                        />
+                                    </div>
                                 ) : (
-                                    <div className="text-slate-400 text-sm flex flex-col items-center gap-1">
-                                        <span>Stage Preview</span>
-                                        <span className="text-xs opacity-50">Drag scene here</span>
+                                    <div className="flex flex-col items-center gap-3 text-slate-300">
+                                        <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center">
+                                            <span className="text-2xl opacity-50">🎬</span>
+                                        </div>
+                                        <div className="text-sm font-medium text-slate-400">Stage Preview</div>
+                                        <span className="text-xs px-3 py-1 bg-slate-100 rounded-full text-slate-400">Drag scene here</span>
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {/* VIDEO AREA (Right Half) */}
-                        <div className="flex-1 flex flex-col bg-slate-900">
+                        <div className="card bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden flex flex-col">
                             {/* Header */}
-                            <div className="h-10 border-b border-slate-700 flex items-center justify-between px-3 bg-slate-800 shrink-0">
-                                <span className="text-xs font-semibold text-slate-300">VIDEO</span>
+                            <div className="h-12 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900 shrink-0">
+                                <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                                    <span>🎥</span> Video Output
+                                </span>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => {
@@ -274,7 +284,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                 setTimelineBeats([])
                                             }
                                         }}
-                                        className="btn btn-ghost text-slate-300 hover:text-white hover:bg-slate-700 text-xs px-2 py-1 h-7 min-h-0"
+                                        className="text-xs px-2 py-1 text-slate-500 hover:text-white transition-colors"
                                     >
                                         Reset
                                     </button>
@@ -284,19 +294,25 @@ export function ActContent({ projectId }: { projectId: string }) {
                                             setTimeout(() => setIsGenerating(false), 3000)
                                         }}
                                         disabled={isGenerating}
-                                        className="btn btn-primary text-xs px-3 py-1 h-7 min-h-0"
+                                        className="btn btn-primary text-xs px-3 py-1.5 shadow-lg shadow-indigo-500/20"
                                     >
-                                        {isGenerating ? 'Generating...' : 'Generate Channel'}
+                                        {isGenerating ? 'Generating...' : '▶ Generate Channel'}
                                     </button>
                                 </div>
                             </div>
 
                             {/* Preview */}
-                            <div className="flex-1 flex items-center justify-center">
+                            <div className="flex-1 flex items-center justify-center bg-black/50">
                                 {isGenerating ? (
-                                    <div className="text-indigo-400 text-sm animate-pulse">Generating Video...</div>
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                        <div className="text-indigo-400 text-xs animate-pulse">Processing Video...</div>
+                                    </div>
                                 ) : (
-                                    <div className="text-slate-600 text-sm">Video Preview</div>
+                                    <div className="text-slate-700 text-sm flex flex-col items-center gap-2">
+                                        <span className="text-4xl opacity-20">🎞️</span>
+                                        <span>Video Preview</span>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -306,23 +322,31 @@ export function ActContent({ projectId }: { projectId: string }) {
                     {/* BOTTOM SECTION: Lines */}
                     <div
                         ref={setLinesRef}
-                        className={`h-72 border-t border-slate-200 flex flex-col bg-white shrink-0 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset' : ''}`}
+                        className={`card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[300px] transition-all duration-300 ${isOverLines ? 'ring-2 ring-indigo-400 ring-inset shadow-indigo-100' : ''}`}
                     >
-                        <div className="h-8 border-b border-slate-100 flex items-center px-4 bg-slate-50 shrink-0">
-                            <span className="text-xs font-semibold text-slate-600">LINES</span>
+                        <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0">
+                            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <span>💬</span> Dialogue Lines
+                            </span>
+                            <span className="ml-auto text-xs text-slate-400">
+                                {timelineBeats.length} lines
+                            </span>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50/30">
                             {timelineBeats.length === 0 ? (
-                                <div className="h-full flex items-center justify-center text-slate-300 text-xs">
-                                    Drag characters here to add dialogue lines
+                                <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
+                                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                        <span className="text-2xl opacity-50">🗣️</span>
+                                    </div>
+                                    <span className="text-sm">Drag characters here to add dialogue lines</span>
                                 </div>
                             ) : (
                                 timelineBeats.map((beat) => {
                                     const char = characters.find(c => c.id === beat.characterId)
                                     return (
-                                        <div key={beat.id} className="flex gap-3 items-start p-3 bg-white rounded border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                                        <div key={beat.id} className="group flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all">
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-sm">
                                                 {char?.images?.[0] ? (
                                                     <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
                                                 ) : (
@@ -332,9 +356,20 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-xs font-bold text-slate-700 mb-1">{char?.name || 'Unknown'}</div>
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <div className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full inline-block">
+                                                        {char?.name || 'Unknown'}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setTimelineBeats(prev => prev.filter(b => b.id !== beat.id))}
+                                                        className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all"
+                                                        title="Remove line"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
                                                 <textarea
-                                                    className="w-full text-sm border border-slate-200 rounded p-2 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white"
+                                                    className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white leading-relaxed"
                                                     rows={2}
                                                     placeholder="Type dialogue..."
                                                     value={beat.text}
@@ -343,13 +378,6 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                     }}
                                                 />
                                             </div>
-                                            <button
-                                                onClick={() => setTimelineBeats(prev => prev.filter(b => b.id !== beat.id))}
-                                                className="text-slate-300 hover:text-red-500 p-1"
-                                                title="Remove line"
-                                            >
-                                                ✕
-                                            </button>
                                         </div>
                                     )
                                 })
