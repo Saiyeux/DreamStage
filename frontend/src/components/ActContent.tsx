@@ -104,138 +104,133 @@ export function ActContent({ projectId }: { projectId: string }) {
             <div className="flex h-full w-full overflow-hidden bg-slate-50">
 
                 {/* LEFT COLUMN: Unified Library */}
-                <aside className="w-72 shrink-0 border-r border-slate-200 flex flex-col bg-white">
-                    {/* Header */}
-                    <div className="px-5 py-4 border-b border-slate-100">
-                        <h2 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                            <span>📚</span> Library
-                        </h2>
+                <aside className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-slate-50/50 p-4 gap-4 overflow-y-auto custom-scrollbar">
+
+                    {/* Header - Now just a visual title or removed since cards have headers */}
+                    <div className="flex items-center gap-2 px-1">
+                        <span className="text-xl">📚</span>
+                        <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Library</h2>
                     </div>
 
-                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                        {/* 1. CAST Section */}
-                        <div className="flex-1 flex flex-col min-h-0 border-b border-slate-100">
-                            <div className="px-5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0 backdrop-blur-sm">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cast</span>
-                                <span className="text-[10px] bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full shadow-sm">{characters.length}</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 grid grid-cols-3 gap-2 content-start">
-                                {characters.map(char => {
-                                    // Determine image to show: mainImageId > first finalized image > first image
+                    {/* 1. CAST Section */}
+                    <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col shrink-0 max-h-[300px]">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-xl">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                <span>👤</span> Cast
+                            </span>
+                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-medium">
+                                {characters.filter(c => c.isFinalized).length}
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 grid grid-cols-3 gap-2 content-start min-h-[100px]">
+                            {characters.filter(c => c.isFinalized).length > 0 ? (
+                                characters.filter(c => c.isFinalized).map(char => {
                                     const mainImage = char.images?.find(img => img.id === char.mainImageId) || char.images?.[0]
-
                                     return (
-                                        <DraggableAsset key={char.id} id={char.id} type="character" data={char} disabled={!char.isFinalized}>
-                                            <div className={`group relative aspect-square rounded-lg overflow-hidden border ${char.isFinalized ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50'}`}>
+                                        <DraggableAsset key={char.id} id={char.id} type="character" data={char}>
+                                            <div className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all cursor-grab active:cursor-grabbing">
                                                 {mainImage ? (
                                                     <img src={fileUrl.image(mainImage.imagePath)} alt={char.name} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-1">
-                                                        <span className="text-2xl">{char.gender?.includes('Female') ? '👩' : '👨'}</span>
+                                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
+                                                        <span className="text-xl">{char.gender?.includes('Female') ? '👩' : '👨'}</span>
                                                     </div>
                                                 )}
-
-                                                {/* Finalized Indicator */}
-                                                {!char.isFinalized && (
-                                                    <div className="absolute inset-0 bg-slate-100/50 flex items-center justify-center">
-                                                        <span className="text-[10px] font-bold text-slate-500 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200">Draft</span>
-                                                    </div>
-                                                )}
-
-                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5">
-                                                    <span className="text-[10px] font-bold text-white truncate block text-center text-shadow-sm leading-tight">{char.name}</span>
+                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1">
+                                                    <span className="text-[9px] font-bold text-white truncate block text-center leading-tight shadow-black/50 drop-shadow-sm">{char.name}</span>
                                                 </div>
                                             </div>
                                         </DraggableAsset>
                                     )
-                                })}
-                                {characters.length === 0 && (
-                                    <div className="col-span-3 text-center py-6 text-slate-400 text-xs italic">
-                                        No characters found.
+                                })
+                            ) : (
+                                <div className="col-span-3 flex flex-col items-center justify-center py-6 text-slate-300 gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                        <span className="text-lg opacity-30">👤</span>
                                     </div>
-                                )}
-                            </div>
+                                    <span className="text-[10px]">No finalized cast</span>
+                                </div>
+                            )}
                         </div>
+                    </div>
 
-                        {/* 2. STAGE Section (Sets) */}
-                        <div className="flex-1 flex flex-col min-h-0 border-b border-slate-100">
-                            <div className="px-5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0 backdrop-blur-sm">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sets</span>
-                                <span className="text-[10px] bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full shadow-sm">{scenes.length}</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-                                {scenes.map(scene => (
-                                    <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene} disabled={!scene.isFinalized}>
-                                        <div className={`flex items-center gap-3 p-2 rounded-lg border transition-all ${scene.isFinalized ? 'bg-white border-slate-200 hover:border-indigo-400' : 'bg-slate-50 border-dashed border-slate-200 opacity-70'}`}>
-                                            <div className="w-12 h-8 rounded bg-slate-100 overflow-hidden shrink-0 border border-slate-100/50 relative">
+                    {/* 2. STAGE Section (Sets) */}
+                    <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col shrink-0 max-h-[300px]">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-xl">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                <span>🎬</span> Sets
+                            </span>
+                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-medium">
+                                {scenes.filter(s => s.isFinalized).length}
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2 min-h-[100px]">
+                            {scenes.filter(s => s.isFinalized).length > 0 ? (
+                                scenes.filter(s => s.isFinalized).map(scene => (
+                                    <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene}>
+                                        <div className="flex items-center gap-3 p-1.5 rounded-lg border border-slate-100 hover:border-indigo-300 hover:shadow-sm transition-all bg-white group cursor-grab active:cursor-grabbing">
+                                            <div className="w-10 h-7 rounded bg-slate-100 overflow-hidden shrink-0 border border-slate-200 relative">
                                                 {scene.sceneImage ? (
                                                     <img src={fileUrl.image(scene.sceneImage.imagePath)} alt={scene.location} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs text-slate-300">🎬</div>
+                                                    <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-300">🎬</div>
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-xs font-semibold text-slate-700 truncate">{scene.location}</div>
-                                                    {!scene.isFinalized && <span className="text-[8px] px-1 bg-slate-200 text-slate-500 rounded">Draft</span>}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400 truncate">{scene.timeOfDay} • {scene.atmosphere}</div>
+                                                <div className="text-[10px] font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">{scene.location}</div>
+                                                <div className="text-[9px] text-slate-400 truncate">{scene.timeOfDay} • {scene.atmosphere}</div>
                                             </div>
                                         </div>
                                     </DraggableAsset>
-                                ))}
-                                {scenes.length === 0 && (
-                                    <div className="text-center py-6 text-slate-400 text-xs italic">
-                                        No scenes found.
+                                ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-6 text-slate-300 gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                        <span className="text-lg opacity-30">🎬</span>
                                     </div>
-                                )}
-                            </div>
+                                    <span className="text-[10px]">No finalized sets</span>
+                                </div>
+                            )}
                         </div>
+                    </div>
 
-                        {/* 3. ACT Section (Analysis) */}
-                        <div className="flex-1 flex flex-col min-h-0">
-                            <div className="px-5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0 backdrop-blur-sm">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Act Analysis</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-                                {currentProject?.actAnalysis && currentProject.actAnalysis.length > 0 ? (
-                                    <div className="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-100">
-                                        {currentProject.actAnalysis.map((beat, index) => (
-                                            <div key={beat.id || index} className="relative z-0 pl-8 group">
-                                                <div className="absolute left-1.5 top-1.5 w-4 h-4 rounded-full bg-white border-2 border-slate-300 group-hover:border-indigo-500 group-hover:scale-110 transition-all z-10"></div>
-                                                <div className="bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">Beat {index + 1}</span>
-                                                        {beat.characterName && <span className="text-[10px] font-medium text-slate-500">{beat.characterName}</span>}
-                                                    </div>
-                                                    <p className="text-xs text-slate-700 leading-relaxed mb-1.5 font-medium">{beat.action}</p>
-                                                    {beat.dialogue && (
-                                                        <div className="text-xs text-slate-500 italic pl-2 border-l-2 border-slate-100">
-                                                            "{beat.dialogue}"
-                                                        </div>
-                                                    )}
+                    {/* 3. ACT Section (Analysis) */}
+                    <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[200px]">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-xl">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                <span>🎭</span> Act Analysis
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 relative">
+                            {currentProject?.actAnalysis && currentProject.actAnalysis.length > 0 ? (
+                                <div className="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-100">
+                                    {currentProject.actAnalysis.map((beat, index) => (
+                                        <div key={beat.id || index} className="relative z-0 pl-8 group">
+                                            <div className="absolute left-1.5 top-1.5 w-4 h-4 rounded-full bg-white border-2 border-slate-300 group-hover:border-indigo-500 group-hover:scale-110 transition-all z-10 shadow-sm"></div>
+                                            <div className="bg-slate-50 rounded-lg border border-slate-100 p-2.5 hover:border-indigo-200 hover:shadow-md transition-all cursor-default">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Beat {index + 1}</span>
+                                                    {beat.characterName && <span className="text-[9px] font-bold text-slate-500 bg-white border border-slate-100 px-1.5 rounded">{beat.characterName}</span>}
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-8">
-                                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100 text-2xl opacity-50">
-                                            🎭
-                                        </div>
-                                        <p className="text-xs text-slate-500 mb-2">No act analysis available.</p>
-                                        <p className="text-[10px] text-slate-400">Run "Act Analysis" from the sidebar to generate beats.</p>
-
-                                        {/* Optional: Show raw text if no analysis */}
-                                        <div className="mt-6 pt-6 border-t border-slate-100 text-left">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Script Preview</label>
-                                            <div className="text-[10px] text-slate-400 font-mono line-clamp-6 bg-slate-50 p-2 rounded">
-                                                {currentProject?.scriptText || "No script content."}
+                                                <p className="text-[10px] text-slate-600 leading-relaxed font-medium mb-1">{beat.action}</p>
+                                                {beat.dialogue && (
+                                                    <div className="text-[10px] text-slate-500 italic pl-2 border-l-2 border-indigo-100">
+                                                        "{beat.dialogue}"
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                                    <div className="w-12 h-12 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center mb-3 shadow-sm">
+                                        <span className="text-2xl opacity-30">🎭</span>
                                     </div>
-                                )}
-                            </div>
+                                    <h3 className="text-xs font-bold text-slate-700 mb-1">No Analysis</h3>
+                                    <p className="text-[10px] text-slate-400">Run "Act Analysis" to generate beats.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </aside>
