@@ -336,7 +336,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                                             setTimeout(() => setIsGenerating(false), 3000)
                                         }}
                                         disabled={isGenerating || !healthStatus?.comfyui?.connected}
-                                        title={!healthStatus?.comfyui?.connected ? 'ComfyUI Service Offline' : ''}
+                                        title={!healthStatus?.comfyui?.connected ? 'Please check ComfyUI service' : ''}
                                         className="btn btn-primary text-xs px-3 py-1.5 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isGenerating ? 'Generating...' : '▶ Generate'}

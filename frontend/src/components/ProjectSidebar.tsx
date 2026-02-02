@@ -313,10 +313,11 @@ export function ProjectSidebar({
           <div className="space-y-2.5">
             <button
               onClick={onAnalyzeCharacters}
-              disabled={!currentProject || isAnalyzing}
+              disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
+              title={!healthStatus?.llm?.connected ? 'Please check LLM service' : ''}
               className={`w-full btn justify-between group ${currentAnalyzing === 'characters'
                 ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200'
-                : 'btn-secondary text-slate-600'
+                : 'btn-secondary text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
             >
               <span className="flex items-center gap-2">
@@ -330,10 +331,11 @@ export function ProjectSidebar({
 
             <button
               onClick={onAnalyzeScenes}
-              disabled={!currentProject || isAnalyzing}
+              disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
+              title={!healthStatus?.llm?.connected ? 'Please check LLM service' : ''}
               className={`w-full btn justify-between group ${currentAnalyzing === 'scenes'
                 ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200'
-                : 'btn-secondary text-slate-600'
+                : 'btn-secondary text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
             >
               <span className="flex items-center gap-2">
@@ -347,10 +349,11 @@ export function ProjectSidebar({
 
             <button
               onClick={onAnalyzeActs}
-              disabled={!currentProject || isAnalyzing}
+              disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
+              title={!healthStatus?.llm?.connected ? 'Please check LLM service' : ''}
               className={`w-full btn justify-between group ${currentAnalyzing === 'acts'
                 ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200'
-                : 'btn-secondary text-slate-600'
+                : 'btn-secondary text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
             >
               <span className="flex items-center gap-2">
