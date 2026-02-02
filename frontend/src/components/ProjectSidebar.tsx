@@ -228,7 +228,7 @@ export function ProjectSidebar({
             <select
               value={currentProject?.id || ''}
               onChange={(e) => onProjectChange?.(e.target.value)}
-              className="w-full input text-sm mb-3 cursor-pointer appearance-none pr-8 bg-white/60 hover:bg-white transition-colors"
+              className="w-full input text-sm mb-3 cursor-pointer appearance-none pr-10 truncate bg-white/50 hover:bg-white transition-colors"
             >
               <option value="">Select a project...</option>
               {projects.map((project) => (
@@ -484,7 +484,7 @@ export function ProjectSidebar({
       </div>
 
       {/* System Status Footer */}
-      <div className="p-4 border-t border-white/20 bg-white/30 backdrop-blur-sm">
+      <div className="p-4 border-t border-white/20 bg-transparent rounded-none">
         <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-3 pl-1">
           System Status
         </label>

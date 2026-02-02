@@ -101,20 +101,21 @@ export function ActContent({ projectId }: { projectId: string }) {
 
     return (
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex h-full w-full overflow-hidden bg-slate-50">
+            <div className="flex h-full w-full overflow-hidden bg-transparent">
 
                 {/* LEFT COLUMN: Unified Library */}
-                <aside className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-slate-50/50 p-4 gap-4 overflow-y-auto custom-scrollbar">
+                {/* LEFT COLUMN: Unified Library */}
+                <aside className="w-80 shrink-0 border-r border-amber-200/50 flex flex-col bg-white/50 backdrop-blur-md p-4 gap-4 overflow-y-auto custom-scrollbar">
 
                     {/* Header - Now just a visual title or removed since cards have headers */}
                     <div className="flex items-center gap-2 px-1">
                         <span className="text-xl">📚</span>
-                        <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Library</h2>
+                        <h2 className="text-sm font-extrabold text-slate-800 tracking-tight">Library</h2>
                     </div>
 
-                    {/* 1. CAST Section */}
-                    <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col shrink-0 max-h-[300px]">
-                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-xl">
+                    {/* 1. CAST Section - Uses global .card (Amber-50) */}
+                    <div className="card flex flex-col shrink-0 max-h-[300px]">
+                        <div className="px-4 py-3 border-b border-amber-200/50 flex items-center justify-between shrink-0 bg-amber-100/30 rounded-t-xl">
                             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                                 <span>👤</span> Cast
                             </span>
@@ -128,7 +129,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                                     const mainImage = char.images?.find(img => img.id === char.mainImageId) || char.images?.[0]
                                     return (
                                         <DraggableAsset key={char.id} id={char.id} type="character" data={char}>
-                                            <div className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all cursor-grab active:cursor-grabbing">
+                                            <div className="group relative aspect-square rounded-lg overflow-hidden border border-amber-200 bg-white hover:border-amber-400 hover:shadow-md transition-all cursor-grab active:cursor-grabbing">
                                                 {mainImage ? (
                                                     <img src={fileUrl.image(mainImage.imagePath)} alt={char.name} className="w-full h-full object-cover" />
                                                 ) : (
@@ -155,12 +156,12 @@ export function ActContent({ projectId }: { projectId: string }) {
                     </div>
 
                     {/* 2. STAGE Section (Sets) */}
-                    <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col shrink-0 max-h-[300px]">
-                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white rounded-t-xl">
+                    <div className="card flex flex-col shrink-0 max-h-[300px]">
+                        <div className="px-4 py-3 border-b border-amber-200/50 flex items-center justify-between shrink-0 bg-amber-100/30 rounded-t-xl">
                             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                                 <span>🎬</span> Sets
                             </span>
-                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-medium">
+                            <span className="text-[10px] bg-amber-200/50 text-amber-900 px-1.5 py-0.5 rounded-full font-medium">
                                 {scenes.filter(s => s.isFinalized).length}
                             </span>
                         </div>
@@ -168,8 +169,8 @@ export function ActContent({ projectId }: { projectId: string }) {
                             {scenes.filter(s => s.isFinalized).length > 0 ? (
                                 scenes.filter(s => s.isFinalized).map(scene => (
                                     <DraggableAsset key={scene.id} id={scene.id} type="scene" data={scene}>
-                                        <div className="flex items-center gap-3 p-1.5 rounded-lg border border-slate-100 hover:border-indigo-300 hover:shadow-sm transition-all bg-white group cursor-grab active:cursor-grabbing">
-                                            <div className="w-10 h-7 rounded bg-slate-100 overflow-hidden shrink-0 border border-slate-200 relative">
+                                        <div className="flex items-center gap-3 p-1.5 rounded-lg border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all bg-white group cursor-grab active:cursor-grabbing">
+                                            <div className="w-10 h-7 rounded bg-amber-50 overflow-hidden shrink-0 border border-amber-100 relative">
                                                 {scene.sceneImage ? (
                                                     <img src={fileUrl.image(scene.sceneImage.imagePath)} alt={scene.location} className="w-full h-full object-cover" />
                                                 ) : (
@@ -177,8 +178,8 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-[10px] font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">{scene.location}</div>
-                                                <div className="text-[9px] text-slate-400 truncate">{scene.timeOfDay} • {scene.atmosphere}</div>
+                                                <div className="text-[10px] font-bold text-slate-800 truncate group-hover:text-amber-700 transition-colors">{scene.location}</div>
+                                                <div className="text-[9px] text-slate-500 truncate">{scene.timeOfDay} • {scene.atmosphere}</div>
                                             </div>
                                         </div>
                                     </DraggableAsset>
@@ -203,11 +204,11 @@ export function ActContent({ projectId }: { projectId: string }) {
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 relative">
                             {currentProject?.actAnalysis && currentProject.actAnalysis.length > 0 ? (
-                                <div className="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-100">
+                                <div className="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-0 before:w-0.5 before:bg-amber-200">
                                     {currentProject.actAnalysis.map((beat, index) => (
                                         <div key={beat.id || index} className="relative z-0 pl-8 group">
-                                            <div className="absolute left-1.5 top-1.5 w-4 h-4 rounded-full bg-white border-2 border-slate-300 group-hover:border-indigo-500 group-hover:scale-110 transition-all z-10 shadow-sm"></div>
-                                            <div className="bg-slate-50 rounded-lg border border-slate-100 p-2.5 hover:border-indigo-200 hover:shadow-md transition-all cursor-default">
+                                            <div className="absolute left-1.5 top-1.5 w-4 h-4 rounded-full bg-amber-400 border-2 border-amber-600 group-hover:border-amber-500 group-hover:scale-110 transition-all z-10 shadow-sm"></div>
+                                            <div className="bg-white rounded-lg border border-amber-200 p-2.5 hover:border-amber-400 hover:shadow-md transition-all cursor-default">
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Beat {index + 1}</span>
                                                     {beat.characterName && <span className="text-[9px] font-bold text-slate-500 bg-white border border-slate-100 px-1.5 rounded">{beat.characterName}</span>}
@@ -237,15 +238,15 @@ export function ActContent({ projectId }: { projectId: string }) {
 
                 {/* MAIN CONTENT AREA */}
                 {/* MAIN CONTENT AREA */}
-                <main className="flex-1 min-w-0 bg-slate-50 p-6 overflow-y-auto flex flex-col gap-6">
+                <main className="flex-1 min-w-0 bg-transparent p-6 overflow-y-auto flex flex-col gap-6">
 
                     {/* TOP SECTION: Stage + Video Split */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
 
                         {/* STAGE AREA (Left Half) */}
-                        <div className="card bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                        <div className="card overflow-hidden flex flex-col">
                             {/* Header */}
-                            <div className="h-12 border-b border-slate-100 flex items-center justify-between px-4 bg-white shrink-0">
+                            <div className="h-12 border-b border-amber-200/50 flex items-center justify-between px-4 bg-amber-100/30 shrink-0">
                                 <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
                                     <span>🎭</span> Stage
                                 </span>
@@ -481,7 +482,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                     ) : null}
                 </DragOverlay>
 
-            </div>
-        </DndContext>
+            </div >
+        </DndContext >
     )
 }

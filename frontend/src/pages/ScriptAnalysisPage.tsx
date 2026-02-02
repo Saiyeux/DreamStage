@@ -922,7 +922,7 @@ function CharactersContent({
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* List Pane */}
-      <div className="w-64 bg-white border-r border-slate-200 overflow-y-auto flex flex-col shrink-0">
+      <div className="w-64 bg-white/90 backdrop-blur-sm border-r border-white/20 overflow-y-auto flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
           <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Character List</h3>
         </div>
@@ -948,18 +948,18 @@ function CharactersContent({
 
       {/* Main Detail Content - Removed padding from container */}
       {characters.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-300">
-          <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
-            <span className="text-3xl opacity-20">👤</span>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-300 bg-white/5 backdrop-blur-sm">
+          <div className="w-16 h-16 bg-white/10 rounded-2xl border border-white/20 flex items-center justify-center mb-6 shadow-sm backdrop-blur-md">
+            <span className="text-3xl opacity-50">👤</span>
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">No Characters Found</h3>
-          <p className="text-sm text-slate-500">Run character analysis to populate this list.</p>
+          <h3 className="text-lg font-semibold text-slate-200 mb-2">No Characters Found</h3>
+          <p className="text-sm text-slate-400">Run character analysis to populate this list.</p>
         </div>
       ) : (
-        <div className="flex-1 bg-slate-50 overflow-y-auto">
+        <div className="flex-1 bg-white/80 backdrop-blur-md overflow-y-auto">
           <div className="h-full flex flex-col">
             {/* Header / Actions - Sticky & Styled like Scenes */}
-            <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
+            <div className="px-6 py-4 bg-white/80 backdrop-blur-md border-b border-indigo-50/50 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
               <div>
                 {isEditing ? (
                   <input
@@ -1680,25 +1680,25 @@ function ScenesContent({
 
 
   return (
-    <div className="flex-1 flex h-full bg-slate-50 overflow-hidden">
-      {/* LEFT SIDEBAR: Scene List */}
-      <div className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+    <div className="flex-1 flex h-full bg-transparent overflow-hidden">
+      {/* LEFT SIDEBAR: Scene List - Uses Wood Theme indirectly via bg-white/50 or custom class */}
+      <div className="w-72 bg-white/50 backdrop-blur-md border-r border-amber-200/50 flex flex-col shrink-0">
+        <div className="p-4 border-b border-amber-200/50 bg-amber-50/50">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Scene Timeline</h3>
           <div className="text-xs text-slate-400 font-mono">Total {scenes.length} Scenes</div>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
           {scenes.length === 0 ? (
-            <div className="p-4 text-center text-slate-400 text-sm">No scenes found</div>
+            <div className="p-4 text-center text-slate-500 text-sm">No scenes found</div>
           ) : (
             scenes.map((scene, i) => (
               <button
                 key={scene.id}
                 onClick={() => handleSelect(i)}
                 className={`w-full text-left p-2 rounded-lg border transition-all flex gap-3 group relative ${i === selectedIndex
-                  ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-100 shadow-sm'
-                  : 'bg-white border-slate-100 hover:border-slate-300 hover:shadow-sm'
+                  ? 'bg-amber-100 border-amber-300 shadow-sm'
+                  : 'bg-transparent border-transparent hover:bg-white/50 hover:border-amber-200'
                   }`}
               >
                 {/* Thumbnail */}
@@ -1714,7 +1714,7 @@ function ScenesContent({
 
                 {/* Info */}
                 <div className="flex-1 min-w-0 py-0.5">
-                  <div className={`text-xs font-bold truncate mb-0.5 ${i === selectedIndex ? 'text-primary-700' : 'text-slate-700'}`}>
+                  <div className={`text-xs font-bold truncate mb-0.5 ${i === selectedIndex ? 'text-amber-900' : 'text-slate-700'}`}>
                     #{scene.sceneNumber} {scene.location}
                   </div>
                   <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
@@ -1733,7 +1733,7 @@ function ScenesContent({
         <div className="flex-1 overflow-y-auto">
           <div className="h-full flex flex-col">
             {/* Header Toolbar */}
-            <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+            <div className="px-6 py-4 bg-white/80 border-b border-amber-200/50 flex justify-between items-center sticky top-0 z-10 shadow-sm backdrop-blur-md">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                   <span className="text-slate-300 font-mono text-lg">#{selectedScene.sceneNumber}</span>
@@ -1942,7 +1942,7 @@ function ScenesContent({
           </div>
         </div>
       ) : (
-        <div className="flex-1 w-full h-full flex flex-col items-center justify-center text-center p-8 text-slate-300">
+        <div className="flex-1 w-full h-full flex flex-col items-center justify-center text-center p-8 text-slate-300 bg-white/5 backdrop-blur-sm">
           <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mb-6 shadow-sm">
             <span className="text-3xl opacity-20">🎬</span>
           </div>
@@ -2036,7 +2036,7 @@ function TagManager({
       {/* List */}
       <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
         {templates.available_types.map(type => (
-          <div key={type.id} className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg text-sm group hover:border-primary-200 transition-colors">
+          <div key={type.id} className="flex items-center gap-2 p-2 bg-white/50 border border-amber-200/50 rounded-lg text-sm group hover:border-amber-400 transition-colors">
             {editingId === type.id ? (
               <div className="flex-1 flex flex-col gap-2">
                 <input
