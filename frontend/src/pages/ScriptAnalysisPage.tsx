@@ -257,6 +257,7 @@ export function ScriptAnalysisPage() {
         onProjectChange={handleProjectChange}
         onAnalyzeCharacters={() => analyzeWithStream('characters')}
         onAnalyzeScenes={() => analyzeWithStream('scenes')}
+        onAnalyzeActs={() => analyzeWithStream('acts')}
         isAnalyzing={isStreaming}
         currentAnalyzing={currentAnalyzing}
       />

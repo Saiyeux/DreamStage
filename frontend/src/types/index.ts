@@ -130,5 +130,6 @@ export interface Beat {
   characterId: string
   dialogue: string
   action?: string
+  characterName?: string
   order: number
 }
