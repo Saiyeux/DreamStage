@@ -144,3 +144,18 @@ export interface Beat {
   action?: string
   order?: number
 }
+
+// Act (剧幕)
+export interface Act {
+  id: string
+  projectId: string
+  name: string
+  stageSceneId: string | null
+  dialogueLines: ActDialogueLine[]
+}
+
+export interface ActDialogueLine {
+  id: string
+  characterId: string
+  text: string
+}

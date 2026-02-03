@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Project, Character, Scene, Beat, ServiceStatus } from '@/types'
+import type { Project, Character, Scene, Beat, ServiceStatus, Act, ActDialogueLine } from '@/types'
 
 
 
@@ -15,6 +15,10 @@ interface ProjectState {
 
   // 项目列表
   projects: Project[]
+
+  // Acts (剧幕)
+  acts: Act[]
+  selectedActId: string | null
 
   // 分析状态 (用于页面切换时保持状态)
   analysisState: {
@@ -60,6 +64,16 @@ interface ProjectState {
   setActiveStageSceneId: (sceneId: string | null) => void
   setHealthStatus: (status: ServiceStatus | null) => void
 
+  // Acts Actions (剧幕操作)
+  setActs: (acts: Act[]) => void
+  addAct: (act: Act) => void
+  updateAct: (id: string, updates: Partial<Act>) => void
+  removeAct: (id: string) => void
+  setSelectedActId: (id: string | null) => void
+  addDialogueLine: (actId: string, line: ActDialogueLine) => void
+  updateDialogueLine: (actId: string, lineId: string, updates: Partial<ActDialogueLine>) => void
+  removeDialogueLine: (actId: string, lineId: string) => void
+
   reset: () => void
 
 }
@@ -81,6 +95,8 @@ export const useProjectStore = create<ProjectState>()(
       activeStageSceneId: null,
       healthStatus: null,
       projects: [],
+      acts: [],
+      selectedActId: null,
       analysisState: { ...initialAnalysisState },
 
       setCurrentProject: (project) => set({ currentProject: project }),
@@ -170,6 +186,53 @@ export const useProjectStore = create<ProjectState>()(
 
       setHealthStatus: (status) => set({ healthStatus: status }),
 
+      // Acts Actions
+      setActs: (acts) => set({ acts }),
+
+      addAct: (act) => set((state) => ({ acts: [...state.acts, act] })),
+
+      updateAct: (id, updates) =>
+        set((state) => ({
+          acts: state.acts.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+        })),
+
+      removeAct: (id) =>
+        set((state) => ({
+          acts: state.acts.filter((a) => a.id !== id),
+          selectedActId: state.selectedActId === id ? null : state.selectedActId,
+        })),
+
+      setSelectedActId: (id) => set({ selectedActId: id }),
+
+      addDialogueLine: (actId, line) =>
+        set((state) => ({
+          acts: state.acts.map((a) =>
+            a.id === actId ? { ...a, dialogueLines: [...a.dialogueLines, line] } : a
+          ),
+        })),
+
+      updateDialogueLine: (actId, lineId, updates) =>
+        set((state) => ({
+          acts: state.acts.map((a) =>
+            a.id === actId
+              ? {
+                  ...a,
+                  dialogueLines: a.dialogueLines.map((l) =>
+                    l.id === lineId ? { ...l, ...updates } : l
+                  ),
+                }
+              : a
+          ),
+        })),
+
+      removeDialogueLine: (actId, lineId) =>
+        set((state) => ({
+          acts: state.acts.map((a) =>
+            a.id === actId
+              ? { ...a, dialogueLines: a.dialogueLines.filter((l) => l.id !== lineId) }
+              : a
+          ),
+        })),
 
       reset: () =>
         set({
@@ -178,6 +241,8 @@ export const useProjectStore = create<ProjectState>()(
           scenes: [],
           beats: [],
           activeStageSceneId: null,
+          acts: [],
+          selectedActId: null,
           analysisState: { ...initialAnalysisState },
           selectedWorkflows: {
             character: null,
@@ -193,7 +258,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'project-storage',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage), // 改用 localStorage 持久化
       // 只持久化关键数据
       partialize: (state) => ({
         currentProject: state.currentProject,
@@ -201,6 +266,8 @@ export const useProjectStore = create<ProjectState>()(
         scenes: state.scenes,
         beats: state.beats,
         activeStageSceneId: state.activeStageSceneId,
+        acts: state.acts,
+        selectedActId: state.selectedActId,
         analysisState: state.analysisState,
         selectedWorkflows: state.selectedWorkflows,
         workflowParams: state.workflowParams,
