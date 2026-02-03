@@ -327,10 +327,7 @@ class LLMClient:
         }}
       ],
       "dialogue": "对白内容",
-      "camera": {{
-        "shot_type": "特写/近景/中景/全景",
-        "movement": "固定/推进/拉远/平移"
-      }},
+
       "duration_seconds": 15
     }}
   ]

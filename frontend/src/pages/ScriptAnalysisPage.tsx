@@ -183,7 +183,7 @@ export function ScriptAnalysisPage() {
           environmentDesc: scene.environment?.description || scene.environment_desc,
           characters: scene.characters || [],
           dialogue: scene.dialogue,
-          shotType: scene.camera?.shot_type || scene.shot_type || 'Wide Shot',
+
           scenePrompt: '',
           actionPrompt: '',
           negativePrompt: '',
@@ -1514,8 +1514,7 @@ function ScenesContent({
       timeOfDay: selectedScene.timeOfDay,
       atmosphere: selectedScene.atmosphere,
       environmentDesc: selectedScene.environmentDesc,
-      shotType: selectedScene.shotType,
-      cameraMovement: selectedScene.cameraMovement,
+
       dialogue: selectedScene.dialogue,
     })
   }
@@ -1535,8 +1534,7 @@ function ScenesContent({
         timeOfDay: editedScene.timeOfDay,
         atmosphere: editedScene.atmosphere,
         environmentDesc: editedScene.environmentDesc,
-        shotType: editedScene.shotType,
-        cameraMovement: editedScene.cameraMovement,
+
         dialogue: editedScene.dialogue,
       })
 
@@ -1874,10 +1872,7 @@ function ScenesContent({
                     </h3>
                     <div className="space-y-4">
                       <Field label="Environment Description" value={selectedScene.environmentDesc} isEditing={isEditing} editValue={editedScene.environmentDesc} onChange={(v) => updateField('environmentDesc', v)} multiline />
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
-                        <Field label="Shot Type" value={selectedScene.shotType} isEditing={isEditing} editValue={editedScene.shotType} onChange={(v) => updateField('shotType', v)} />
-                        <Field label="Camera Movement" value={selectedScene.cameraMovement} isEditing={isEditing} editValue={editedScene.cameraMovement} onChange={(v) => updateField('cameraMovement', v)} />
-                      </div>
+
                     </div>
                   </div>
 

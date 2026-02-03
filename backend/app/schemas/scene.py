@@ -42,8 +42,7 @@ class SceneResponse(CamelModel):
     # Allow list of strings or dicts/objects to handle mixed data
     characters_data: list[SceneCharacterData] | list[str] | list[dict] = Field(default=[], alias="characters")
     dialogue: str | None = None
-    shot_type: str | None = None
-    camera_movement: str | None = None
+
     duration_seconds: int | None = None
     scene_prompt: str | None = None
     action_prompt: str | None = None
@@ -60,8 +59,7 @@ class SceneUpdate(BaseModel):
     environment_desc: str | None = None
     characters_data: list[SceneCharacterData] | list[str] | list[dict] | None = None
     dialogue: str | None = None
-    shot_type: str | None = None
-    camera_movement: str | None = None
+
     duration_seconds: int | None = None
     scene_prompt: str | None = None
     action_prompt: str | None = None

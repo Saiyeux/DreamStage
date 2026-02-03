@@ -212,7 +212,7 @@ class GenerationTasks:
 
         return prompt_service.build_action_prompt(
             character_actions=character_actions if character_actions else None,
-            camera_movement=scene.camera_movement,
+
         )
 
     async def generate_character_images(

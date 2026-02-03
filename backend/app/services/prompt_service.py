@@ -289,7 +289,6 @@ class PromptService:
     def build_action_prompt(
         self,
         character_actions: list[str] | None = None,
-        camera_movement: str | None = None,
     ) -> tuple[str, str]:
         """
         构建视频动作提示词
@@ -299,7 +298,6 @@ class PromptService:
         """
         config = self.get_action_prompts_config()
         video_config = config.get("video_action", {})
-        camera_mapping = config.get("camera_movement_mapping", {})
 
         parts = []
 
@@ -307,15 +305,12 @@ class PromptService:
         if character_actions:
             parts.extend(character_actions)
 
-        # 镜头运动
-        if camera_movement:
-            camera_enhanced = camera_mapping.get(camera_movement, camera_movement)
-            parts.append(camera_enhanced)
-
         # 默认动作
         if not parts:
             default_action = config.get("default_action", "subtle movement, gentle motion")
             parts.append(default_action)
+
+
 
         quality_suffix = video_config.get("quality_suffix", "")
         negative_prompt = video_config.get("negative_prompt", "")

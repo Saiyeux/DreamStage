@@ -635,8 +635,7 @@ async def analyze_scenes(project_id: str, db: AsyncSession = Depends(get_db)):
             ),
             characters_data=scene_data.get("characters", []),
             dialogue=scene_data.get("dialogue"),
-            shot_type=scene_data.get("camera", {}).get("shot_type"),
-            camera_movement=scene_data.get("camera", {}).get("movement"),
+
             duration_seconds=scene_data.get("duration_seconds"),
         )
         db.add(scene)

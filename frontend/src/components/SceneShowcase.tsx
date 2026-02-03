@@ -61,9 +61,8 @@ export function SceneShowcase({ scenes, initialIndex = 0, onClose }: SceneShowca
           <img
             src={fileUrl.image(currentScene.sceneImage!.imagePath)}
             alt={`场景 ${currentScene.sceneNumber}`}
-            className={`w-full h-full object-cover transition-all duration-1000 ${
-              isAnimating ? 'scale-110 opacity-0 blur-sm' : 'scale-100 opacity-100'
-            }`}
+            className={`w-full h-full object-cover transition-all duration-1000 ${isAnimating ? 'scale-110 opacity-0 blur-sm' : 'scale-100 opacity-100'
+              }`}
             onLoad={() => setImageLoaded(true)}
           />
           {/* 渐变遮罩 */}
@@ -125,23 +124,7 @@ export function SceneShowcase({ scenes, initialIndex = 0, onClose }: SceneShowca
           )}
         </div>
 
-        {/* 镜头信息 */}
-        <div className={`bg-black/30 backdrop-blur-lg rounded-2xl p-5 border border-white/20 transition-all duration-700 delay-200 ${isAnimating ? 'translate-x-[-100px] opacity-0' : 'translate-x-0 opacity-100'}`}>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl">🎥</span>
-            <h3 className="text-white font-bold">镜头设置</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white/10 rounded-lg px-3 py-2">
-              <div className="text-white/60 text-xs mb-1">机位</div>
-              <div className="text-white text-sm font-medium">{currentScene.shotType}</div>
-            </div>
-            <div className="bg-white/10 rounded-lg px-3 py-2">
-              <div className="text-white/60 text-xs mb-1">运动</div>
-              <div className="text-white text-sm font-medium">{currentScene.cameraMovement}</div>
-            </div>
-          </div>
-        </div>
+
       </div>
 
       {/* 右侧角色与对白 */}
@@ -219,9 +202,8 @@ export function SceneShowcase({ scenes, initialIndex = 0, onClose }: SceneShowca
                   key={scene.id}
                   onClick={() => selectScene(index)}
                   disabled={isAnimating}
-                  className={`flex-shrink-0 group relative transition-all duration-300 ${
-                    isActive ? 'scale-110' : 'scale-90 opacity-60 hover:opacity-100 hover:scale-95'
-                  }`}
+                  className={`flex-shrink-0 group relative transition-all duration-300 ${isActive ? 'scale-110' : 'scale-90 opacity-60 hover:opacity-100 hover:scale-95'
+                    }`}
                 >
                   {/* 选中指示器 */}
                   {isActive && (
@@ -229,9 +211,8 @@ export function SceneShowcase({ scenes, initialIndex = 0, onClose }: SceneShowca
                   )}
 
                   {/* 缩略图容器 */}
-                  <div className={`relative w-28 h-20 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg overflow-hidden shadow-lg border-2 ${
-                    isActive ? 'border-white' : 'border-white/30'
-                  }`}>
+                  <div className={`relative w-28 h-20 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg overflow-hidden shadow-lg border-2 ${isActive ? 'border-white' : 'border-white/30'
+                    }`}>
                     {hasImage ? (
                       <img
                         src={fileUrl.image(scene.sceneImage!.imagePath)}
@@ -251,9 +232,8 @@ export function SceneShowcase({ scenes, initialIndex = 0, onClose }: SceneShowca
                   </div>
 
                   {/* 场景名称标签 */}
-                  <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium transition-all ${
-                    isActive ? 'text-white opacity-100' : 'text-white/70 opacity-0 group-hover:opacity-100'
-                  }`}>
+                  <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium transition-all ${isActive ? 'text-white opacity-100' : 'text-white/70 opacity-0 group-hover:opacity-100'
+                    }`}>
                     {scene.location}
                   </div>
                 </button>
@@ -276,9 +256,8 @@ export function SceneShowcase({ scenes, initialIndex = 0, onClose }: SceneShowca
         {scenes.map((_, index) => (
           <div
             key={index}
-            className={`h-1 rounded-full transition-all duration-300 ${
-              index === currentIndex ? 'w-8 bg-white' : 'w-1 bg-white/30'
-            }`}
+            className={`h-1 rounded-full transition-all duration-300 ${index === currentIndex ? 'w-8 bg-white' : 'w-1 bg-white/30'
+              }`}
           />
         ))}
       </div>

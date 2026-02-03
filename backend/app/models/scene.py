@@ -33,8 +33,7 @@ class Scene(Base):
     finalized_metadata: Mapped[dict | None] = mapped_column(JSON)
 
     # 镜头信息
-    shot_type: Mapped[str | None] = mapped_column(String(50))
-    camera_movement: Mapped[str | None] = mapped_column(String(100))
+
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
 
     # 生成的 Prompt

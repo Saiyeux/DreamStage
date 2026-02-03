@@ -4,15 +4,6 @@
     "quality_suffix": "smooth motion, cinematic, high quality video",
     "negative_prompt": "blurry, low quality, distorted, jittery, unstable, flickering"
   },
-  "camera_movement_mapping": {
-    "固定": "static camera, steady shot",
-    "推进": "camera push in, zoom in slowly, dolly in",
-    "拉远": "camera pull out, zoom out slowly, dolly out",
-    "平移": "camera pan, horizontal movement, tracking shot",
-    "摇摄": "camera tilt, vertical movement",
-    "跟随": "following shot, tracking subject",
-    "环绕": "orbiting camera, circular movement around subject"
-  },
   "action_enhancements": {
     "缓慢": "slow movement, gentle motion",
     "快速": "fast movement, dynamic motion",
