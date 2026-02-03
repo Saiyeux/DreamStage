@@ -600,21 +600,119 @@ function CharactersContent({
   // Settings state
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
   const [selections, setSelections] = useState<{
-    view: string;
-    expression: string;
-    action: string;
+    view: string | undefined;
+    expression: string | undefined;
+    action: string | undefined;
   }>({
     view: 'front',
     expression: 'neutral',
     action: 'standing'
   })
-  const [isManagingTags, setIsManagingTags] = useState(false)
+
   const [isManagingGallery, setIsManagingGallery] = useState(false)
+
+  // Tag Management
+  const [isManageMode, setIsManageMode] = useState(false)
+  const [addingCategory, setAddingCategory] = useState<string | null>(null)
+  const [editingTagKey, setEditingTagKey] = useState<string | null>(null)
+  const [tempTagValue, setTempTagValue] = useState('')
 
   useEffect(() => {
     // Load image templates to get available types
     configApi.getCharacterImageTemplates().then(setTemplates).catch(console.error)
   }, [])
+
+  const handleAddTag = async (category: string) => {
+    if (!tempTagValue.trim() || !templates) return
+
+    const newTag: ImageType = {
+      id: `tag_${Date.now()}`,
+      label: tempTagValue.trim(),
+      prompt_suffix: tempTagValue.trim()
+    }
+
+    const currentTags = templates.templates[category] || []
+    const newTemplates = {
+      ...templates,
+      templates: {
+        ...templates.templates,
+        [category]: [...currentTags, newTag]
+      }
+    }
+
+    await configApi.updateCharacterImageTemplates(newTemplates)
+    setTemplates(newTemplates)
+    setAddingCategory(null)
+    setTempTagValue('')
+  }
+
+  const handleUpdateTag = async (category: string, tagId: string, newLabel: string) => {
+    if (!newLabel.trim() || !templates) return
+
+    const currentTags = templates.templates[category] || []
+    const newTags = currentTags.map(t => t.id === tagId ? { ...t, label: newLabel, prompt_suffix: newLabel } : t)
+
+    const newTemplates = {
+      ...templates,
+      templates: {
+        ...templates.templates,
+        [category]: newTags
+      }
+    }
+
+    await configApi.updateCharacterImageTemplates(newTemplates)
+    setTemplates(newTemplates)
+    setEditingTagKey(null)
+    setTempTagValue('')
+  }
+
+  const handleDeleteTag = async (category: string, tagId: string) => {
+    if (!templates || !confirm('Delete this tag?')) return
+
+    const currentTags = templates.templates[category] || []
+    const newTags = currentTags.filter(t => t.id !== tagId)
+
+    const newTemplates = {
+      ...templates,
+      templates: {
+        ...templates.templates,
+        [category]: newTags
+      }
+    }
+
+    await configApi.updateCharacterImageTemplates(newTemplates)
+    setTemplates(newTemplates)
+  }
+
+  const toggleSelection = (categoryKey: 'view' | 'expression' | 'action', id: string) => {
+    setSelections(prev => {
+      // Toggle logic: if selected, deselect; otherwise select
+      if (prev[categoryKey] === id) {
+        // Deselect
+        // We will just keep it as is? Or maybe allow empty string?
+        // The type definition says: view: string; expression: string; action: string;
+        // Looking at initial state: view: 'front', etc.
+        // If the user wants to "deselect", maybe we switch to a default? 
+        // Or we should update the type to allow optional strings.
+        // For now, let's just allow selecting different ones. 
+        // The user request said "delete current selection", implying they don't want to see the "Current Selection" text.
+        // But the functionality of selecting tags is still needed for generation.
+        // If I implement toggle, I need to handle the case where nothing is selected.
+
+        // Let's check the type definition again.
+        // "const [selections, setSelections] = useState<{ view: string; ... }>(...)"
+        // If I want to allow deselect, I need to change the state type or initial value.
+        // For now, I'll just implement the logic to update. 
+        // The previous implementation was `updateSelection` which just overwrote it.
+        // The UI requirement "don't want label's english" and "remove current selection"
+        // referred to the UI display, not necessarily the logic.
+        return { ...prev, [categoryKey]: undefined }
+      }
+      return { ...prev, [categoryKey]: id }
+    })
+  }
+
+
 
   const handleDownload = async (imageUrl: string, filename: string) => {
     try {
@@ -884,7 +982,7 @@ function CharactersContent({
   const handleGenerate = async () => {
     if (!selectedCharacter?.id || generatingCharId) return
 
-    const selectedTypes = [selections.view, selections.expression, selections.action].filter(Boolean)
+    const selectedTypes = [selections.view, selections.expression, selections.action].filter(Boolean) as string[] as string[]
     if (selectedTypes.length === 0) {
       alert('Please select at least one characteristic')
       return
@@ -948,12 +1046,7 @@ function CharactersContent({
     }
   }
 
-  const updateSelection = (category: 'view' | 'expression' | 'action', typeId: string) => {
-    setSelections(prev => ({
-      ...prev,
-      [category]: prev[category] === typeId ? undefined : typeId
-    }))
-  }
+
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -1140,7 +1233,6 @@ function CharactersContent({
                     </div>
                   </div>
 
-                  {/* Settings Panel */}
                   <div className="card p-6">
                     <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
                       <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -1148,89 +1240,126 @@ function CharactersContent({
                       </h3>
                       <div className="flex bg-slate-100 p-1 rounded-lg items-center">
                         <button
-                          onClick={() => setIsManagingTags(!isManagingTags)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${isManagingTags ? 'bg-white shadow-sm text-slate-900' : 'hover:bg-white hover:shadow-sm text-slate-500'}`}
+                          onClick={() => {
+                            setIsManageMode(!isManageMode)
+                            // Clean states when exiting manage mode
+                            if (isManageMode) {
+                              setAddingCategory(null)
+                              setEditingTagKey(null)
+                            }
+                          }}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${isManageMode ? 'bg-white shadow-sm text-slate-900' : 'hover:bg-white hover:shadow-sm text-slate-500'}`}
                         >
-                          {isManagingTags ? '✓ Done' : '🏷️ Tags'}
+                          {isManageMode ? '✓ Done' : '⚙️ Manage'}
                         </button>
                       </div>
                     </div>
 
-                    {isManagingTags && templates ? (
-                      <TagManager
-                        templates={templates}
-                        onUpdate={async (newTemplates) => {
-                          await configApi.updateCharacterImageTemplates(newTemplates)
-                          setTemplates(newTemplates)
-                        }}
-                      />
-                    ) : templates ? (
+                    {templates ? (
                       <div className="space-y-6">
-                        {/* View Row */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">1. 视图 (View)</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(templates.templates['三视图'] || []).map(type => (
-                              <button
-                                key={type.id}
-                                onClick={() => updateSelection('view', type.id)}
-                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.view === type.id
-                                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                                  }`}
-                              >
-                                {selections.view === type.id && '● '} {type.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        {/* Render Categories */}
+                        {([
+                          { key: 'view', label: '1. 视图 (View)', category: '三视图' },
+                          { key: 'expression', label: '2. 表情 (Expression)', category: '表情系列' },
+                          { key: 'action', label: '3. 动作 (Action)', category: '动作系列' },
+                        ] as const).map(({ key, label, category }) => (
+                          <div key={key}>
+                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{label}</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {/* Tags List */}
+                              {(templates.templates[category] || []).map(type => {
+                                const isEditing = editingTagKey === type.id
 
-                        {/* Expression Row */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">2. 表情 (Expression)</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(templates.templates['表情系列'] || []).map(type => (
-                              <button
-                                key={type.id}
-                                onClick={() => updateSelection('expression', type.id)}
-                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.expression === type.id
-                                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                                  }`}
-                              >
-                                {selections.expression === type.id && '● '} {type.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                                if (isEditing) {
+                                  return (
+                                    <input
+                                      key={type.id}
+                                      autoFocus
+                                      className="px-2 py-1 text-sm rounded-lg border border-primary-500 outline-none w-24"
+                                      value={tempTagValue}
+                                      onChange={(e) => setTempTagValue(e.target.value)}
+                                      onBlur={() => handleUpdateTag(category, type.id, tempTagValue)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleUpdateTag(category, type.id, tempTagValue)
+                                        if (e.key === 'Escape') setEditingTagKey(null)
+                                      }}
+                                    />
+                                  )
+                                }
 
-                        {/* Action Row */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">3. 动作 (Action)</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(templates.templates['动作系列'] || []).map(type => (
-                              <button
-                                key={type.id}
-                                onClick={() => updateSelection('action', type.id)}
-                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections.action === type.id
-                                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                                  }`}
-                              >
-                                {selections.action === type.id && '● '} {type.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                                return (
+                                  <div key={type.id} className="relative group">
+                                    <button
+                                      onClick={() => {
+                                        if (isManageMode) {
+                                          setEditingTagKey(type.id)
+                                          setTempTagValue(type.label)
+                                        } else {
+                                          toggleSelection(key, type.id)
+                                        }
+                                      }}
+                                      className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${selections[key] === type.id
+                                        ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                        } ${isManageMode ? 'hover:border-primary-300 cursor-text' : ''}`}
+                                    >
+                                      {selections[key] === type.id && !isManageMode && '● '} {type.label}
+                                    </button>
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-xs text-slate-400">Current selection:</span>
-                          <div className="flex gap-1">
-                            {Object.values(selections).filter(Boolean).map(s => (
-                              <span key={s} className="px-1.5 py-0.5 bg-slate-100 text-[10px] rounded text-slate-500">{s}</span>
-                            ))}
+                                    {isManageMode && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteTag(category, type.id)
+                                        }}
+                                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-sm hover:scale-110"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              {/* Add Button */}
+                              {addingCategory === category ? (
+                                <input
+                                  autoFocus
+                                  className="px-2 py-1 text-sm rounded-lg border border-primary-500 outline-none w-24 animate-fade-in"
+                                  placeholder="New Tag"
+                                  value={tempTagValue}
+                                  onChange={(e) => setTempTagValue(e.target.value)}
+                                  onBlur={() => {
+                                    if (tempTagValue.trim()) {
+                                      handleAddTag(category)
+                                    } else {
+                                      setAddingCategory(null)
+                                      setTempTagValue('')
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleAddTag(category)
+                                    if (e.key === 'Escape') {
+                                      setAddingCategory(null)
+                                      setTempTagValue('')
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setAddingCategory(category)
+                                    setTempTagValue('')
+                                  }}
+                                  className="px-3 py-1.5 text-sm rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-primary-400 hover:text-primary-600 hover:bg-slate-50 transition-all flex items-center gap-1"
+                                  title="Add Tag"
+                                >
+                                  <span>+</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="text-slate-400 text-sm italic">Loading settings...</div>
@@ -1990,148 +2119,7 @@ function ScenesContent({
   )
 }
 
-function TagManager({
-  templates,
-  onUpdate
-}: {
-  templates: CharacterImageTemplates
-  onUpdate: (templates: CharacterImageTemplates) => Promise<void>
-}) {
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Partial<ImageType>>({})
-  const [isAdding, setIsAdding] = useState(false)
 
-  const handleEdit = (type: ImageType) => {
-    setEditingId(type.id)
-    setEditForm({ ...type })
-    setIsAdding(false)
-  }
-
-  const handleCancel = () => {
-    setEditingId(null)
-    setEditForm({})
-    setIsAdding(false)
-  }
-
-  const handleSave = async () => {
-    const label = editForm.label?.trim()
-    if (!label) return
-
-    let newType: ImageType
-    if (isAdding) {
-      // Generate a simple ID from label or timestamp
-      const id = editForm.id || `tag_${Date.now()}`
-      newType = {
-        id,
-        label,
-        prompt_suffix: editForm.prompt_suffix || label // Default suffix to label
-      }
-    } else {
-      newType = {
-        ...(editForm as ImageType),
-        label,
-        prompt_suffix: editForm.prompt_suffix || label
-      }
-    }
-
-    let newAvailableTypes = [...templates.available_types]
-
-    if (isAdding) {
-      if (newAvailableTypes.some(t => t.id === newType.id)) {
-        alert('Tag already exists')
-        return
-      }
-      newAvailableTypes.push(newType)
-    } else {
-      newAvailableTypes = newAvailableTypes.map(t => t.id === editingId ? newType : t)
-    }
-
-    await onUpdate({
-      ...templates,
-      available_types: newAvailableTypes
-    })
-
-    handleCancel()
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this tag?')) return
-    const newAvailableTypes = templates.available_types.filter(t => t.id !== id)
-    await onUpdate({
-      ...templates,
-      available_types: newAvailableTypes
-    })
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* List */}
-      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-        {templates.available_types.map(type => (
-          <div key={type.id} className="flex items-center gap-2 p-2 bg-white/50 border border-amber-200/50 rounded-lg text-sm group hover:border-amber-400 transition-colors">
-            {editingId === type.id ? (
-              <div className="flex-1 flex flex-col gap-2">
-                <input
-                  autoFocus
-                  className="input text-sm py-1.5 w-full"
-                  placeholder="Enter tag name"
-                  value={editForm.label}
-                  onChange={e => setEditForm({ ...editForm, label: e.target.value })}
-                  onKeyDown={e => e.key === 'Enter' && handleSave()}
-                />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={handleSave} className="px-3 py-1 bg-primary-600 text-white rounded text-xs font-medium shadow-sm">Save</button>
-                  <button onClick={handleCancel} className="px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs">Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-700 truncate">{type.label}</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => handleEdit(type)} className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Edit">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  </button>
-                  <button onClick={() => handleDelete(type.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Delete">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Add Button */}
-      {!isAdding && !editingId && (
-        <button onClick={() => { setIsAdding(true); setEditForm({ id: '', label: '', prompt_suffix: '' }) }} className="w-full py-2 border border-dashed border-slate-300 rounded-lg text-slate-500 text-xs hover:border-primary-400 hover:text-primary-600 transition-colors hover:bg-slate-50">
-          + Add New Tag
-        </button>
-      )}
-
-      {isAdding && (
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-fade-in shadow-inner">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight ml-1">New Tag Name</label>
-            <input
-              autoFocus
-              className="input text-sm w-full py-2 shadow-sm"
-              placeholder="e.g. Happy, Jumping..."
-              value={editForm.label}
-              onChange={e => setEditForm({ ...editForm, label: e.target.value })}
-              onKeyDown={e => e.key === 'Enter' && handleSave()}
-            />
-          </div>
-          <div className="flex gap-2 justify-end pt-1">
-            <button onClick={handleSave} className="btn btn-primary btn-sm px-4">Add Tag</button>
-            <button onClick={handleCancel} className="btn btn-ghost btn-sm px-4">Cancel</button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // Clear Cache Button Component
 function ClearCacheButton({ onClear }: { onClear?: () => void }) {
