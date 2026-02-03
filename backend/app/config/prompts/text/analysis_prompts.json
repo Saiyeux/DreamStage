@@ -98,10 +98,7 @@
       "    \"description\": \"详细的环境视觉描述...\",",
       "    \"visual_style\": \"美术风格参考\"",
       "  },",
-      "  \"characters\": [], ",
-      "  \"dialogue\": \"\",",
-  
-      "  \"duration_seconds\": 0",
+      "  \"dialogue\": \"\"",
       "}",
       "```",
       "注意：`characters`, `dialogue`, `duration_seconds` 字段保留为空或默认值，因为这些将在 Act Analysis 阶段处理。"

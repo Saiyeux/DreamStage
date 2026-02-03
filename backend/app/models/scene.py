@@ -34,7 +34,7 @@ class Scene(Base):
 
     # 镜头信息
 
-    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+
 
     # 生成的 Prompt
     scene_prompt: Mapped[str | None] = mapped_column(Text)

@@ -1990,7 +1990,7 @@ function ScenesContent({
                       <Field label="Location" value={selectedScene.location} isEditing={isEditing} editValue={editedScene.location} onChange={(v) => updateField('location', v)} />
                       <Field label="Time" value={selectedScene.timeOfDay} isEditing={isEditing} editValue={editedScene.timeOfDay} onChange={(v) => updateField('timeOfDay', v)} />
                       <Field label="Atmosphere" value={selectedScene.atmosphere} isEditing={isEditing} editValue={editedScene.atmosphere} onChange={(v) => updateField('atmosphere', v)} />
-                      <Field label="Duration" value={selectedScene.durationSeconds ? selectedScene.durationSeconds + "s" : ""} isEditing={false} onChange={() => { }} />
+
                     </div>
                   </div>
 

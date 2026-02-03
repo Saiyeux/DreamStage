@@ -60,7 +60,7 @@ export interface Scene {
   characters: SceneCharacter[]
   dialogue: string
 
-  durationSeconds?: number
+
   scriptContent?: string
   scenePrompt: string
   actionPrompt: string

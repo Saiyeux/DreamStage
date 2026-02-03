@@ -43,7 +43,7 @@ class SceneResponse(CamelModel):
     characters_data: list[SceneCharacterData] | list[str] | list[dict] = Field(default=[], alias="characters")
     dialogue: str | None = None
 
-    duration_seconds: int | None = None
+
     scene_prompt: str | None = None
     action_prompt: str | None = None
     scene_image: SceneImageResponse | None = None
@@ -60,6 +60,6 @@ class SceneUpdate(BaseModel):
     characters_data: list[SceneCharacterData] | list[str] | list[dict] | None = None
     dialogue: str | None = None
 
-    duration_seconds: int | None = None
+
     scene_prompt: str | None = None
     action_prompt: str | None = None
