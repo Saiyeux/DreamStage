@@ -310,8 +310,6 @@ class PromptService:
             default_action = config.get("default_action", "subtle movement, gentle motion")
             parts.append(default_action)
 
-
-
         quality_suffix = video_config.get("quality_suffix", "")
         negative_prompt = video_config.get("negative_prompt", "")
 

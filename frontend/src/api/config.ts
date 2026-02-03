@@ -65,7 +65,6 @@ export interface ActionPromptsConfig {
     quality_suffix: string
     negative_prompt: string
   }
-  camera_movement_mapping: Record<string, string>
   action_enhancements: Record<string, string>
   default_action: string
 }

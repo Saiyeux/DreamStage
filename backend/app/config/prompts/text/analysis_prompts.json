@@ -104,7 +104,7 @@
       "  \"duration_seconds\": 0",
       "}",
       "```",
-      "注意：`characters`, `dialogue`, `camera`, `duration_seconds` 字段保留为空或默认值，因为这些将在 Act Analysis 阶段处理。"
+      "注意：`characters`, `dialogue`, `duration_seconds` 字段保留为空或默认值，因为这些将在 Act Analysis 阶段处理。"
     ]
   },
   "acts": {

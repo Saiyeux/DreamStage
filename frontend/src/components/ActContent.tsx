@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core'
 import { useProjectStore } from '@/stores/projectStore'
 import { fileUrl } from '@/api/client'
-import { analysisApi } from '@/api'
 
 // ------------------------------------------------------------------
 // Draggable Asset Component
@@ -35,8 +34,8 @@ function DraggableAsset({ id, type, data, disabled, children }: { id: string, ty
 // Main Component
 // ------------------------------------------------------------------
 
-export function ActContent({ projectId }: { projectId: string }) {
-    const { characters, scenes, currentProject, setScenes, healthStatus } = useProjectStore()
+export function ActContent({ projectId: _projectId }: { projectId: string }) {
+    const { characters, scenes, currentProject, healthStatus } = useProjectStore()
 
     // State
     const [activeStageSceneId, setActiveStageSceneId] = useState<string | null>(null)
@@ -84,20 +83,6 @@ export function ActContent({ projectId }: { projectId: string }) {
     }
 
     const currentStageScene = scenes.find(s => s.id === activeStageSceneId)
-
-    const handleUpdateScene = async (field: string, value: string) => {
-        if (!activeStageSceneId || !projectId) return
-
-        // Optimistic update
-        setScenes(scenes.map(s => s.id === activeStageSceneId ? { ...s, [field]: value } : s))
-
-        try {
-            await analysisApi.updateScene(projectId, activeStageSceneId, { [field]: value })
-        } catch (err) {
-            console.error('Failed to update scene:', err)
-            // Revert on error (optional, or just alert)
-        }
-    }
 
     return (
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -260,32 +245,6 @@ export function ActContent({ projectId }: { projectId: string }) {
                                     </button>
                                 </div>
                             </div>
-
-                            {/* Scene Controls Toolbar (Shot & Camera) */}
-                            {currentStageScene && (
-                                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 grid grid-cols-2 gap-3 shrink-0">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Shot Type</label>
-                                        <input
-                                            type="text"
-                                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-slate-700 bg-white shadow-sm transition-all"
-                                            value={currentStageScene.shotType || ''}
-                                            onChange={(e) => handleUpdateScene('shotType', e.target.value)}
-                                            placeholder="e.g. Medium Shot"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Camera</label>
-                                        <input
-                                            type="text"
-                                            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-slate-700 bg-white shadow-sm transition-all"
-                                            value={currentStageScene.cameraMovement || ''}
-                                            onChange={(e) => handleUpdateScene('cameraMovement', e.target.value)}
-                                            placeholder="e.g. Pan Left"
-                                        />
-                                    </div>
-                                </div>
-                            )}
 
                             {/* Preview */}
                             <div
