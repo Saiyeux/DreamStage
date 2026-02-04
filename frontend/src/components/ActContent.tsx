@@ -26,6 +26,13 @@ const customCollisionDetection: CollisionDetection = (args) => {
     return rectIntersection(args)
 }
 
+// Helper to detect female gender safely
+const isFemale = (gender?: string) => {
+    if (!gender) return false
+    const g = gender.toLowerCase()
+    return g.includes('female') || g.includes('woman') || g.includes('女')
+}
+
 // ------------------------------------------------------------------
 // Draggable Asset Component
 // ------------------------------------------------------------------
@@ -257,7 +264,7 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                     <img src={fileUrl.image(mainImage.imagePath)} alt={char.name} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
-                                                        <span className="text-xl">{char.gender?.includes('Female') ? '👩' : '👨'}</span>
+                                                        <span className="text-xl">{isFemale(char.gender) ? '👩' : '👨'}</span>
                                                     </div>
                                                 )}
                                                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1">
@@ -419,225 +426,138 @@ export function ActContent({ projectId }: { projectId: string }) {
 
                     {/* Content - always rendered, hidden when no act selected */}
                     <div className={`flex flex-col gap-6 flex-1 ${!selectedActId ? 'hidden' : ''}`}>
-                            {/* TOP SECTION: Stage + Video Split */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
+                        {/* TOP SECTION: Stage + Video Split */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
 
-                                {/* STAGE AREA (Left Half) */}
-                                <div className="card overflow-hidden flex flex-col">
-                                    {/* Header */}
-                                    <div className="h-12 border-b border-amber-200/50 flex items-center justify-between px-4 bg-amber-100/30 shrink-0">
-                                        <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                            <span>🎭</span> Stage
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => selectedActId && updateAct(selectedActId, { stageSceneId: null })}
-                                                className="text-xs px-2 py-1 text-slate-400 hover:text-red-500 transition-colors"
-                                                title="Clear Stage"
-                                            >
-                                                Clear
-                                            </button>
-                                            <button
-                                                onClick={() => console.log('Generate Keyframe clicked - Todo')}
-                                                disabled={!selectedActId}
-                                                className="text-xs px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                title={!selectedActId ? 'Select an Act first' : 'Generate Keyframe'}
-                                            >
-                                                ✨ Generate
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Preview */}
-                                    <div
-                                        ref={setStageRef}
-                                        className={`flex-1 flex items-center justify-center bg-slate-50/50 relative transition-all duration-300 ${isOverStage ? 'bg-indigo-50/50 ring-2 ring-indigo-400 ring-inset' : ''}`}
-                                    >
-                                        {currentStageScene?.sceneImage ? (
-                                            <div className="relative w-full h-full p-6 flex items-center justify-center">
-                                                <img
-                                                    src={fileUrl.image(currentStageScene.sceneImage.imagePath)}
-                                                    alt="Stage"
-                                                    className="max-w-full max-h-full object-contain drop-shadow-lg rounded-lg"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center gap-3 text-slate-300">
-                                                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center">
-                                                    <span className="text-2xl opacity-50">🎬</span>
-                                                </div>
-                                                <div className="text-sm font-medium text-slate-400">Stage Preview</div>
-                                                <span className="text-xs px-3 py-1 bg-slate-100 rounded-full text-slate-400">Drag scene here</span>
-                                            </div>
-                                        )}
+                            {/* STAGE AREA (Left Half) */}
+                            <div className="card overflow-hidden flex flex-col">
+                                {/* Header */}
+                                <div className="h-12 border-b border-amber-200/50 flex items-center justify-between px-4 bg-amber-100/30 shrink-0">
+                                    <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                        <span>🎭</span> Stage
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => selectedActId && updateAct(selectedActId, { stageSceneId: null })}
+                                            className="text-xs px-2 py-1 text-slate-400 hover:text-red-500 transition-colors"
+                                            title="Clear Stage"
+                                        >
+                                            Clear
+                                        </button>
+                                        <button
+                                            onClick={() => console.log('Generate Keyframe clicked - Todo')}
+                                            disabled={!selectedActId}
+                                            className="text-xs px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title={!selectedActId ? 'Select an Act first' : 'Generate Keyframe'}
+                                        >
+                                            ✨ Generate
+                                        </button>
                                     </div>
                                 </div>
 
-                                {/* VIDEO AREA (Right Half) */}
-                                <div className="card bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden flex flex-col">
-                                    {/* Header */}
-                                    <div className="h-12 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900 shrink-0">
-                                        <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                                            <span>🎥</span> Video Output
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    if (selectedActId && confirm('Clear entire Act?')) {
-                                                        updateAct(selectedActId, { stageSceneId: null, dialogueLines: [] })
-                                                    }
-                                                }}
-                                                className="text-xs px-2 py-1 text-slate-500 hover:text-white transition-colors"
-                                            >
-                                                Reset
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setIsGenerating(true)
-                                                    setTimeout(() => setIsGenerating(false), 3000)
-                                                }}
-                                                disabled={isGenerating || !healthStatus?.comfyui?.connected || !selectedActId}
-                                                title={!selectedActId ? 'Select an Act first' : !healthStatus?.comfyui?.connected ? 'Please check ComfyUI service' : ''}
-                                                className="btn btn-primary text-xs px-3 py-1.5 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {isGenerating ? 'Generating...' : '▶ Generate'}
-                                            </button>
+                                {/* Preview */}
+                                <div
+                                    ref={setStageRef}
+                                    className={`flex-1 flex items-center justify-center bg-slate-50/50 relative transition-all duration-300 ${isOverStage ? 'bg-indigo-50/50 ring-2 ring-indigo-400 ring-inset' : ''}`}
+                                >
+                                    {currentStageScene?.sceneImage ? (
+                                        <div className="relative w-full h-full p-6 flex items-center justify-center">
+                                            <img
+                                                src={fileUrl.image(currentStageScene.sceneImage.imagePath)}
+                                                alt="Stage"
+                                                className="max-w-full max-h-full object-contain drop-shadow-lg rounded-lg"
+                                            />
                                         </div>
-                                    </div>
-
-                                    {/* Preview */}
-                                    <div className="flex-1 flex items-center justify-center bg-black/50">
-                                        {isGenerating ? (
-                                            <div className="flex flex-col items-center gap-3">
-                                                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                                                <div className="text-indigo-400 text-xs animate-pulse">Processing Video...</div>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-3 text-slate-300">
+                                            <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center">
+                                                <span className="text-2xl opacity-50">🎬</span>
                                             </div>
-                                        ) : (
-                                            <div className="text-slate-700 text-sm flex flex-col items-center gap-2">
-                                                <span className="text-4xl opacity-20">🎞️</span>
-                                                <span>Video Preview</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                            <div className="text-sm font-medium text-slate-400">Stage Preview</div>
+                                            <span className="text-xs px-3 py-1 bg-slate-100 rounded-full text-slate-400">Drag scene here</span>
+                                        </div>
+                                    )}
                                 </div>
-
                             </div>
 
-                            {/* BOTTOM SECTION: Lines & Script */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[400px]">
-
-                                {/* LEFT: Dialogue Lines */}
-                                <div
-                                    className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col transition-all duration-300"
-                                >
-                                    <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0">
-                                        <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                            <span>💬</span> Dialogue Lines
-                                        </span>
-                                        <div className="ml-auto flex items-center gap-2">
-                                            <span className="text-xs text-slate-400">
-                                                {timelineBeats.length} lines
-                                            </span>
-                                        </div>
+                            {/* VIDEO AREA (Right Half) */}
+                            <div className="card bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden flex flex-col">
+                                {/* Header */}
+                                <div className="h-12 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900 shrink-0">
+                                    <span className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                                        <span>🎥</span> Video Output
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                if (selectedActId && confirm('Clear entire Act?')) {
+                                                    updateAct(selectedActId, { stageSceneId: null, dialogueLines: [] })
+                                                }
+                                            }}
+                                            className="text-xs px-2 py-1 text-slate-500 hover:text-white transition-colors"
+                                        >
+                                            Reset
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setIsGenerating(true)
+                                                setTimeout(() => setIsGenerating(false), 3000)
+                                            }}
+                                            disabled={isGenerating || !healthStatus?.comfyui?.connected || !selectedActId}
+                                            title={!selectedActId ? 'Select an Act first' : !healthStatus?.comfyui?.connected ? 'Please check ComfyUI service' : ''}
+                                            className="btn btn-primary text-xs px-3 py-1.5 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isGenerating ? 'Generating...' : '▶ Generate'}
+                                        </button>
                                     </div>
+                                </div>
 
-                                    <div
-                                        ref={(node) => {
-                                            setLinesRef(node)
-                                            debugLinesRef.current = node
-                                            console.log('Setting lines ref to:', node)
-                                        }}
-                                        className={`flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50/30 flex flex-col min-h-[200px] transition-all duration-300 ${isOverLines ? 'bg-indigo-50 ring-2 ring-indigo-400 ring-inset' : ''}`}
-                                    >
-                                        {timelineBeats.length === 0 ? (
-                                            <div className="flex-1 flex flex-col items-center justify-center text-slate-300 gap-3">
-                                                <button
-                                                    onClick={() => {
-                                                        if (!selectedActId) return
-                                                        const finalizedChars = characters.filter(c => c.isFinalized)
-                                                        if (finalizedChars.length === 0) return
-                                                        const newLine = {
-                                                            id: `line-${Date.now()}`,
-                                                            characterId: finalizedChars[0].id,
-                                                            text: ''
-                                                        }
-                                                        addDialogueLine(selectedActId, newLine)
-                                                    }}
-                                                    disabled={characters.filter(c => c.isFinalized).length === 0}
-                                                    className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-500 transition-all text-3xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-300"
-                                                    title={characters.filter(c => c.isFinalized).length === 0 ? 'Please finalize cast' : 'Add Line'}
-                                                >
-                                                    +
-                                                </button>
-                                                <span className="text-sm">
-                                                    {characters.filter(c => c.isFinalized).length === 0
-                                                        ? 'Please finalize cast'
-                                                        : 'Add dialogue or drag characters here'}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            timelineBeats.map((beat) => {
-                                                const char = characters.find(c => c.id === beat.characterId)
-                                                return (
-                                                    <div key={beat.id} className="group flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all">
-                                                        <DroppableCharacterTag id={`line-char-${beat.id}`}>
-                                                            <div className="relative group/char cursor-pointer">
-                                                                <div className={`w-10 h-10 rounded-full bg-slate-100 overflow-hidden shrink-0 border-2 shadow-sm flex items-center justify-center ${char?.gender?.includes('Female') ? 'border-pink-400' : 'border-blue-400'}`}>
-                                                                    {char?.images?.[0] ? (
-                                                                        <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
-                                                                    ) : (
-                                                                        <span className="text-xs">{char?.gender?.includes('Female') ? '👩' : '👨'}</span>
-                                                                    )}
-                                                                </div>
-                                                                <select
-                                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                                                    value={beat.characterId}
-                                                                    onChange={(e) => {
-                                                                        if (selectedActId) {
-                                                                            updateDialogueLine(selectedActId, beat.id, { characterId: e.target.value })
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    {characters.filter(c => c.isFinalized).map(c => (
-                                                                        <option key={c.id} value={c.id}>{c.gender?.includes('Female') ? '♀ ' : '♂ '}{c.name}</option>
-                                                                    ))}
-                                                                    {!characters.filter(c => c.isFinalized).find(c => c.id === beat.characterId) && <option value={beat.characterId}>Unknown</option>}
-                                                                </select>
-                                                                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border flex items-center justify-center shadow-sm pointer-events-none ${char?.gender?.includes('Female') ? 'bg-pink-50 border-pink-300' : 'bg-blue-50 border-blue-300'}`}>
-                                                                    <span className="text-[8px]">▼</span>
-                                                                </div>
-                                                            </div>
-                                                        </DroppableCharacterTag>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center justify-between mb-1.5">
-                                                                <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${char?.gender?.includes('Female') ? 'text-pink-700 bg-pink-50' : 'text-blue-700 bg-blue-50'}`}>
-                                                                    {char?.name || 'Unknown'}
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => selectedActId && removeDialogueLine(selectedActId, beat.id)}
-                                                                    className="text-slate-300 hover:text-red-500 p-1 transition-all opacity-0 group-hover:opacity-100"
-                                                                    title="Remove line"
-                                                                >
-                                                                    ✕
-                                                                </button>
-                                                            </div>
-                                                            <textarea
-                                                                className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white leading-relaxed"
-                                                                rows={2}
-                                                                placeholder="Type dialogue..."
-                                                                value={beat.text}
-                                                                onChange={(e) => {
-                                                                    if (selectedActId) {
-                                                                        updateDialogueLine(selectedActId, beat.id, { text: e.target.value })
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })
-                                        )}
-                                        {timelineBeats.length > 0 && (
+                                {/* Preview */}
+                                <div className="flex-1 flex items-center justify-center bg-black/50">
+                                    {isGenerating ? (
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                            <div className="text-indigo-400 text-xs animate-pulse">Processing Video...</div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-slate-700 text-sm flex flex-col items-center gap-2">
+                                            <span className="text-4xl opacity-20">🎞️</span>
+                                            <span>Video Preview</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* BOTTOM SECTION: Lines & Script */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[400px]">
+
+                            {/* LEFT: Dialogue Lines */}
+                            <div
+                                className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col transition-all duration-300"
+                            >
+                                <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0">
+                                    <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                        <span>💬</span> Dialogue Lines
+                                    </span>
+                                    <div className="ml-auto flex items-center gap-2">
+                                        <span className="text-xs text-slate-400">
+                                            {timelineBeats.length} lines
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    ref={(node) => {
+                                        setLinesRef(node)
+                                        debugLinesRef.current = node
+                                        console.log('Setting lines ref to:', node)
+                                    }}
+                                    className={`flex-1 overflow-y-auto p-6 space-y-3 bg-slate-50/30 flex flex-col min-h-[200px] transition-all duration-300 ${isOverLines ? 'bg-indigo-50 ring-2 ring-indigo-400 ring-inset' : ''}`}
+                                >
+                                    {timelineBeats.length === 0 ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-slate-300 gap-3">
                                             <button
                                                 onClick={() => {
                                                     if (!selectedActId) return
@@ -651,35 +571,122 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                     addDialogueLine(selectedActId, newLine)
                                                 }}
                                                 disabled={characters.filter(c => c.isFinalized).length === 0}
-                                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all flex items-center justify-center text-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:hover:bg-transparent"
+                                                className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-500 transition-all text-3xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-300"
                                                 title={characters.filter(c => c.isFinalized).length === 0 ? 'Please finalize cast' : 'Add Line'}
                                             >
                                                 +
                                             </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* RIGHT: Script Preview */}
-                                <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-                                    <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0 justify-between">
-                                        <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                            <span>📄</span> Script Preview
-                                        </span>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 font-mono text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
-                                        {currentStageScene?.scriptContent ? (
-                                            currentStageScene.scriptContent
-                                        ) : (
-                                            <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-2">
-                                                <span className="text-4xl opacity-20">📝</span>
-                                                <span className="text-xs">No script content available for this scene.</span>
-                                                <span className="text-[10px] text-slate-400 max-w-[200px] text-center">Try re-analyzing scenes with the latest version.</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                            <span className="text-sm">
+                                                {characters.filter(c => c.isFinalized).length === 0
+                                                    ? 'Please finalize cast'
+                                                    : 'Add dialogue or drag characters here'}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        timelineBeats.map((beat) => {
+                                            const char = characters.find(c => c.id === beat.characterId)
+                                            return (
+                                                <div key={beat.id} className="group flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all">
+                                                    <DroppableCharacterTag id={`line-char-${beat.id}`}>
+                                                        <div className="relative group/char cursor-pointer">
+                                                            <div className={`w-10 h-10 rounded-full bg-slate-100 overflow-hidden shrink-0 border-2 shadow-sm flex items-center justify-center ${isFemale(char?.gender) ? 'border-pink-300' : 'border-blue-300'}`}>
+                                                                {char?.images?.[0] ? (
+                                                                    <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="text-xs">{isFemale(char?.gender) ? '👩' : '👨'}</span>
+                                                                )}
+                                                            </div>
+                                                            <select
+                                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                                value={beat.characterId}
+                                                                onChange={(e) => {
+                                                                    if (selectedActId) {
+                                                                        updateDialogueLine(selectedActId, beat.id, { characterId: e.target.value })
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {characters.filter(c => c.isFinalized).map(c => (
+                                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                                ))}
+                                                                {!characters.filter(c => c.isFinalized).find(c => c.id === beat.characterId) && <option value={beat.characterId}>Unknown</option>}
+                                                            </select>
+                                                            <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border flex items-center justify-center shadow-sm pointer-events-none ${isFemale(char?.gender) ? 'bg-pink-50 border-pink-200' : 'bg-blue-50 border-blue-200'}`}>
+                                                                <span className="text-[8px]">▼</span>
+                                                            </div>
+                                                        </div>
+                                                    </DroppableCharacterTag>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${isFemale(char?.gender) ? 'text-pink-600 bg-pink-50' : 'text-blue-600 bg-blue-50'}`}>
+                                                                {char?.name || 'Unknown'}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => selectedActId && removeDialogueLine(selectedActId, beat.id)}
+                                                                className="text-slate-300 hover:text-red-500 p-1 transition-all opacity-0 group-hover:opacity-100"
+                                                                title="Remove line"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                        <textarea
+                                                            className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white leading-relaxed"
+                                                            rows={2}
+                                                            placeholder="Type dialogue..."
+                                                            value={beat.text}
+                                                            onChange={(e) => {
+                                                                if (selectedActId) {
+                                                                    updateDialogueLine(selectedActId, beat.id, { text: e.target.value })
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )
+                                        })
+                                    )}
+                                    {timelineBeats.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                if (!selectedActId) return
+                                                const finalizedChars = characters.filter(c => c.isFinalized)
+                                                if (finalizedChars.length === 0) return
+                                                const newLine = {
+                                                    id: `line-${Date.now()}`,
+                                                    characterId: finalizedChars[0].id,
+                                                    text: ''
+                                                }
+                                                addDialogueLine(selectedActId, newLine)
+                                            }}
+                                            disabled={characters.filter(c => c.isFinalized).length === 0}
+                                            className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all flex items-center justify-center text-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:hover:bg-transparent"
+                                            title={characters.filter(c => c.isFinalized).length === 0 ? 'Please finalize cast' : 'Add Line'}
+                                        >
+                                            +
+                                        </button>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* RIGHT: Script Preview */}
+                            <div className="card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+                                <div className="h-12 border-b border-slate-100 flex items-center px-6 bg-white shrink-0 justify-between">
+                                    <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                        <span>📄</span> Script Preview
+                                    </span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 font-mono text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                                    {currentStageScene?.scriptContent ? (
+                                        currentStageScene.scriptContent
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-2">
+                                            <span className="text-4xl opacity-20">📝</span>
+                                            <span className="text-xs">No script content available for this scene.</span>
+                                            <span className="text-[10px] text-slate-400 max-w-[200px] text-center">Try re-analyzing scenes with the latest version.</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                 </main>
