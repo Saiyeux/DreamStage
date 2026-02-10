@@ -597,6 +597,12 @@ function CharactersContent({
   // Lightbox state
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
+  // Reset gallery management state when switching characters
+  useEffect(() => {
+    setIsManagingGallery(false)
+    setSelectedImageIds([])
+  }, [selectedIndex])
+
   // Settings state
   const [templates, setTemplates] = useState<CharacterImageTemplates | null>(null)
   const [selections, setSelections] = useState<{
@@ -972,9 +978,13 @@ function CharactersContent({
 
 
   const handleFinalize = async () => {
-    if (!selectedCharacter || selectedImageIds.length === 0) return
+    if (!selectedCharacter) return
 
-    if (!confirm(`Are you sure you want to finalize ${selectedCharacter.name} with ${selectedImageIds.length} selected images?\nThis will lock the character profile.`)) return
+    // If in manage mode but no images selected, warn user
+    if (isManagingGallery && selectedImageIds.length === 0) {
+      alert('Please select at least one image to anchor this character.')
+      return
+    }
 
     setIsFinalizing(true)
     try {
@@ -982,7 +992,7 @@ function CharactersContent({
         projectId,
         'characters',
         selectedCharacter.id,
-        selectedImageIds
+        selectedImageIds // Can be empty if user just wants to lock without images, or we can enforce it.
       )
 
       // Refresh
@@ -1265,11 +1275,18 @@ function CharactersContent({
                   ) : (
                     <button
                       onClick={() => {
+                        // If already managing gallery, finalize. 
+                        // If not, enter manage mode to select images.
                         if (isManagingGallery) {
                           handleFinalize()
                         } else {
-                          setIsManagingGallery(true)
-                          alert('Please select images to anchor this character, then click "Confirm Anchor"')
+                          // Check if we have images. If so, enter manage mode.
+                          if (selectedCharacter.images && selectedCharacter.images.length > 0) {
+                            setIsManagingGallery(true)
+                          } else {
+                            // No images, just finalize directly (lock text only)
+                            handleFinalize()
+                          }
                         }
                       }}
                       disabled={isFinalizing}
@@ -1315,9 +1332,45 @@ function CharactersContent({
                       <span>📄</span> Character Profile
                     </h3>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                      <Field label="Role Type" value={selectedCharacter.roleType} isEditing={isEditing} editValue={editedCharacter.roleType} onChange={(v) => updateField('roleType', v)} />
-                      <Field label="Gender" value={selectedCharacter.gender} isEditing={isEditing} editValue={editedCharacter.gender} onChange={(v) => updateField('gender', v)} />
-                      <Field label="Age" value={selectedCharacter.age} isEditing={isEditing} editValue={editedCharacter.age} onChange={(v) => updateField('age', v)} />
+                      <SelectField
+                        label="Role Type"
+                        value={selectedCharacter.roleType}
+                        isEditing={isEditing}
+                        editValue={editedCharacter.roleType}
+                        onChange={(v) => updateField('roleType', v)}
+                        options={[
+                          { value: '主角', label: '主角 (Protagonist)' },
+                          { value: '配角', label: '配角 (Supporting)' },
+                          { value: '反派', label: '反派 (Antagonist)' },
+                          { value: '路人', label: '路人 (Extra)' }
+                        ]}
+                      />
+                      <SelectField
+                        label="Gender"
+                        value={selectedCharacter.gender}
+                        isEditing={isEditing}
+                        editValue={editedCharacter.gender}
+                        onChange={(v) => updateField('gender', v)}
+                        options={[
+                          { value: '男', label: '男 (Male)' },
+                          { value: '女', label: '女 (Female)' }
+                        ]}
+                      />
+                      <SelectField
+                        label="Age"
+                        value={selectedCharacter.age}
+                        isEditing={isEditing}
+                        editValue={editedCharacter.age}
+                        onChange={(v) => updateField('age', v)}
+                        options={[
+                          { value: 'Child', label: 'Child (0-12)' },
+                          { value: 'Teen', label: 'Teen (13-19)' },
+                          { value: 'Young Adult', label: 'Young Adult (20-35)' },
+                          { value: 'Adult', label: 'Adult (36-50)' },
+                          { value: 'Middle-aged', label: 'Middle-aged (51-65)' },
+                          { value: 'Elderly', label: 'Elderly (65+)' }
+                        ]}
+                      />
                     </div>
                     <div className="mt-4 space-y-4">
                       <Field label="Personality" value={selectedCharacter.personality} isEditing={isEditing} editValue={editedCharacter.personality} onChange={(v) => updateField('personality', v)} multiline />
@@ -1626,6 +1679,47 @@ function CharactersContent({
           />
         )
       }
+    </div>
+  )
+}
+
+
+function SelectField({
+  label,
+  value,
+  isEditing,
+  editValue,
+  onChange,
+  options
+}: {
+  label: string
+  value?: string
+  isEditing: boolean
+  editValue?: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
+      {isEditing ? (
+        <select
+          value={editValue || ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="input w-full p-2 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-no-repeat bg-[right_0.5rem_center]"
+        >
+          <option value="" disabled>Select {label.toLowerCase()}...</option>
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div className="text-sm font-medium text-slate-800 min-h-[38px] flex items-center px-1">
+          {value || <span className="text-slate-400 italic">Enter {label.toLowerCase()}...</span>}
+        </div>
+      )}
     </div>
   )
 }
