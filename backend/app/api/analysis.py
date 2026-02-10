@@ -17,8 +17,10 @@ from app.schemas import (
     AnalysisResponse,
     CharacterResponse,
     CharacterUpdate,
+    CharacterCreate,
     SceneResponse,
     SceneUpdate,
+    SceneCreate,
     AssetFinalizeRequest,
 )
 from app.services.llm_client import llm_client
@@ -662,6 +664,54 @@ async def list_characters(project_id: str, db: AsyncSession = Depends(get_db)):
     return characters
 
 
+@router.post("/{project_id}/characters", response_model=CharacterResponse)
+async def create_character(
+    project_id: str,
+    character_data: CharacterCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """手动创建角色"""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    character = Character(
+        id=str(uuid.uuid4()),
+        project_id=project_id,
+        **character_data.model_dump(exclude_unset=True)
+    )
+
+    db.add(character)
+    await db.commit()
+    await db.refresh(character)
+
+    return character
+
+
+@router.delete("/{project_id}/characters/{character_id}")
+async def delete_character(
+    project_id: str,
+    character_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除角色"""
+    result = await db.execute(
+        select(Character).where(Character.id == character_id, Character.project_id == project_id)
+    )
+    character = result.scalar_one_or_none()
+
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    await db.delete(character)
+    await db.commit()
+
+    return {"success": True, "message": "Character deleted"}
+
+
+
 @router.put("/{project_id}/characters/{character_id}", response_model=CharacterResponse)
 async def update_character(
     project_id: str,
@@ -774,6 +824,54 @@ async def list_scenes(project_id: str, db: AsyncSession = Depends(get_db)):
     )
     scenes = result.scalars().all()
     return scenes
+
+
+@router.post("/{project_id}/scenes", response_model=SceneResponse)
+async def create_scene(
+    project_id: str,
+    scene_data: SceneCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """手动创建场景"""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    scene = Scene(
+        id=str(uuid.uuid4()),
+        project_id=project_id,
+        **scene_data.model_dump(exclude_unset=True)
+    )
+
+    db.add(scene)
+    await db.commit()
+    await db.refresh(scene)
+
+    return scene
+
+
+@router.delete("/{project_id}/scenes/{scene_id}")
+async def delete_scene(
+    project_id: str,
+    scene_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除场景"""
+    result = await db.execute(
+        select(Scene).where(Scene.id == scene_id, Scene.project_id == project_id)
+    )
+    scene = result.scalar_one_or_none()
+
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found")
+
+    await db.delete(scene)
+    await db.commit()
+
+    return {"success": True, "message": "Scene deleted"}
+
 
 
 @router.put("/{project_id}/scenes/{scene_id}", response_model=SceneResponse)

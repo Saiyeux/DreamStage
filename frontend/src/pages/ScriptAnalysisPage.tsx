@@ -52,7 +52,7 @@ export function ScriptAnalysisPage() {
     const validTypes = ['.txt', '.pdf']
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
     if (!validTypes.includes(fileExtension)) {
-      alert('Only .txt or .pdf files are supported')
+      alert('只支持 .txt 或 .pdf 文件')
       return
     }
 
@@ -60,7 +60,7 @@ export function ScriptAnalysisPage() {
     try {
       const projectName = file.name.replace(/\.[^/.]+$/, '')
       const response = await projectsApi.create(projectName, file)
-      alert('Upload successful!')
+      alert('上传成功！')
       if (response.id) {
         setSearchParams({ project: response.id })
         // Force reload sidebar list if needed, though Sidebar handles its own state. 
@@ -371,8 +371,8 @@ export function ScriptAnalysisPage() {
             <div className="w-16 h-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center mx-auto mb-6 shadow-sm">
               <span className="text-3xl">👋</span>
             </div>
-            <h2 className="text-lg font-semibold text-slate-900 mb-2">Welcome to Studio</h2>
-            <p className="text-sm text-slate-500 mb-8">Select a project from the sidebar or upload a new script to get started.</p>
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">欢迎使用 Studio</h2>
+            <p className="text-sm text-slate-500 mb-8">请从左侧选择项目或上传新剧本以开始。</p>
 
             <input
               ref={fileInputRef}
@@ -389,12 +389,12 @@ export function ScriptAnalysisPage() {
               {isUploading ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  Uploading...
+                  上传中...
                 </>
               ) : (
                 <>
                   <span className="mr-2">📁</span>
-                  Upload Script
+                  上传剧本
                 </>
               )}
             </button>
@@ -414,7 +414,7 @@ export function ScriptAnalysisPage() {
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <span className="w-8 h-8 border-2 border-slate-200 border-t-primary-500 rounded-full animate-spin" />
-            <span className="text-sm font-medium text-slate-500">Loading workspace...</span>
+            <span className="text-sm font-medium text-slate-500">加载工作区...</span>
           </div>
         </div>
       </div>
@@ -465,7 +465,7 @@ export function ScriptAnalysisPage() {
                 : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'
                 }`}
             >
-              <span className={activeTab === 'characters' ? 'scale-110 transition-transform' : ''}>👤</span> Characters
+              <span className={activeTab === 'characters' ? 'scale-110 transition-transform' : ''}>👤</span> 角色
               {characters.length > 0 && (
                 <span className={`text-[10px] ${activeTab === 'characters' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'bg-slate-200 text-slate-500'} px-1.5 py-0.5 rounded-full transition-colors`}>
                   {characters.length}
@@ -479,7 +479,7 @@ export function ScriptAnalysisPage() {
                 : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'
                 }`}
             >
-              <span className={activeTab === 'scenes' ? 'scale-110 transition-transform' : ''}>🎬</span> Scenes
+              <span className={activeTab === 'scenes' ? 'scale-110 transition-transform' : ''}>🎬</span> 场景
               {scenes.length > 0 && (
                 <span className={`text-[10px] ${activeTab === 'scenes' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'bg-slate-200 text-slate-500'} px-1.5 py-0.5 rounded-full transition-colors`}>
                   {scenes.length}
@@ -523,7 +523,7 @@ export function ScriptAnalysisPage() {
           >
             <div className="flex items-center gap-2">
               <span className="text-green-400 text-xs font-mono group-hover:translate-x-1 transition-transform">➜</span>
-              <span className="text-xs font-mono font-medium text-slate-300 group-hover:text-white transition-colors">Console Output</span>
+              <span className="text-xs font-mono font-medium text-slate-300 group-hover:text-white transition-colors">控制台输出</span>
               {isStreaming && (
                 <span className="flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-medium border border-indigo-500/20 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
@@ -579,7 +579,7 @@ function CharactersContent({
   characters: Character[]
   projectId: string
 }) {
-  const { setCharacters, selectedWorkflows, workflowParams, healthStatus } = useProjectStore()
+  const { setCharacters, addCharacter, removeCharacter, selectedWorkflows, workflowParams, healthStatus } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
   const [editedCharacter, setEditedCharacter] = useState<Partial<Character>>({})
@@ -616,6 +616,48 @@ function CharactersContent({
   const [addingCategory, setAddingCategory] = useState<string | null>(null)
   const [editingTagKey, setEditingTagKey] = useState<string | null>(null)
   const [tempTagValue, setTempTagValue] = useState('')
+
+  // Add Character State
+  const [showAddPopover, setShowAddPopover] = useState(false)
+  const [newCharName, setNewCharName] = useState('')
+  const addPopoverContainerRef = useRef<HTMLDivElement>(null)
+  const addPopoverButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        showAddPopover &&
+        addPopoverContainerRef.current &&
+        !addPopoverContainerRef.current.contains(event.target as Node) &&
+        addPopoverButtonRef.current &&
+        !addPopoverButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowAddPopover(false)
+        setNewCharName('')
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showAddPopover])
+
+  const handleAddCharacter = async () => {
+    if (!newCharName.trim()) return
+
+    try {
+      const newChar = await analysisApi.createCharacter(projectId, { name: newCharName.trim() })
+      addCharacter(newChar)
+      // Select the new character
+      setSelectedIndex(characters.length)
+      setShowAddPopover(false)
+      setNewCharName('')
+    } catch (err) {
+      console.error('Add character failed:', err)
+      alert('添加角色失败')
+    }
+  }
 
   useEffect(() => {
     // Load image templates to get available types
@@ -1051,16 +1093,54 @@ function CharactersContent({
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* List Pane */}
-      <div className="w-64 bg-white/90 backdrop-blur-sm border-r border-white/20 overflow-y-auto flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Character List</h3>
+      <div className="w-64 bg-white/90 backdrop-blur-sm border-r border-white/20 flex flex-col shrink-0">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between z-20">
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">角色列表</h3>
+          <button
+            ref={addPopoverButtonRef}
+            onClick={() => setShowAddPopover(!showAddPopover)}
+            className={`text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded transition-colors ${showAddPopover ? 'text-primary-600 bg-primary-50' : ''}`}
+            title="添加角色"
+          >
+            <svg className={`w-4 h-4 transition-transform ${showAddPopover ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          </button>
         </div>
+
+        {/* Add Character Inline Input */}
+        {showAddPopover && (
+          <div ref={addPopoverContainerRef} className="p-2 bg-primary-50/50 border-b border-primary-100 animate-fade-in">
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newCharName}
+                onChange={(e) => setNewCharName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddCharacter()
+                  if (e.key === 'Escape') {
+                    setShowAddPopover(false)
+                    setNewCharName('')
+                  }
+                }}
+                placeholder="角色名称..."
+                className="w-full text-sm border border-primary-200 rounded px-2 py-1.5 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 bg-white"
+              />
+              <button
+                onClick={handleAddCharacter}
+                disabled={!newCharName.trim()}
+                className="btn btn-primary text-xs px-3 py-1.5 disabled:opacity-50 shrink-0"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {characters.map((character, index) => (
             <button
               key={character.id}
               onClick={() => handleSelect(index)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${index === selectedIndex
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all group flex items-center justify-between ${index === selectedIndex
                 ? 'bg-primary-50 text-primary-700 shadow-sm border border-primary-100'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
                 }`}
@@ -1068,7 +1148,28 @@ function CharactersContent({
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${character.gender?.includes('女') || character.gender?.toLowerCase() === 'female' ? 'bg-pink-400' : 'bg-blue-400'
                   }`} />
-                <span className="truncate">{character.name}</span>
+                <span className="truncate flex-1">{character.name}</span>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (confirm('Are you sure you want to delete this character?')) {
+                      try {
+                        await analysisApi.deleteCharacter(projectId, character.id)
+                        removeCharacter(character.id)
+                        if (selectedIndex >= index && selectedIndex > 0) {
+                          setSelectedIndex(selectedIndex - 1)
+                        }
+                      } catch (err) {
+                        console.error('Delete failed:', err)
+                        alert('删除失败')
+                      }
+                    }
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"
+                  title="删除角色"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
               </div>
             </button>
           ))}
@@ -1611,7 +1712,7 @@ function ScenesContent({
   scenes: Scene[]
   projectId: string
 }) {
-  const { setScenes, selectedWorkflows, workflowParams, healthStatus } = useProjectStore()
+  const { setScenes, addScene, removeScene, selectedWorkflows, workflowParams, healthStatus } = useProjectStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   // Lightbox state
@@ -1621,6 +1722,55 @@ function ScenesContent({
   const [isSaving, setIsSaving] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
   // Removed unused scroll handlers from old carousel layout
+
+  // Add Scene State
+  const [showAddPopover, setShowAddPopover] = useState(false)
+  const [newSceneLocation, setNewSceneLocation] = useState('')
+  const addPopoverContainerRef = useRef<HTMLDivElement>(null)
+  const addPopoverButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        showAddPopover &&
+        addPopoverContainerRef.current &&
+        !addPopoverContainerRef.current.contains(event.target as Node) &&
+        addPopoverButtonRef.current &&
+        !addPopoverButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowAddPopover(false)
+        setNewSceneLocation('')
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showAddPopover])
+
+  const handleAddScene = async () => {
+    // Calculate next scene number
+    const maxSceneNum = scenes.reduce((max, s) => Math.max(max, s.sceneNumber), 0)
+    const nextNum = maxSceneNum + 1
+    const location = newSceneLocation.trim() || '新场景'
+
+    try {
+      const newScene = await analysisApi.createScene(projectId, {
+        scene_number: nextNum,
+        location: location,
+        time_of_day: '白天',
+        atmosphere: '一般'
+      } as any)
+      addScene(newScene)
+      setSelectedIndex(scenes.length)
+      setShowAddPopover(false)
+      setNewSceneLocation('')
+    } catch (err) {
+      console.error('Add scene failed:', err)
+      alert('添加场景失败')
+    }
+  }
 
   const selectedScene = scenes[selectedIndex]
 
@@ -1847,10 +1997,49 @@ function ScenesContent({
     <div className="flex-1 flex h-full bg-transparent overflow-hidden">
       {/* LEFT SIDEBAR: Scene List - Uses Wood Theme indirectly via bg-white/50 or custom class */}
       <div className="w-72 bg-white/50 backdrop-blur-md border-r border-amber-200/50 flex flex-col shrink-0">
-        <div className="p-4 border-b border-amber-200/50 bg-amber-50/50">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Scene Timeline</h3>
-          <div className="text-xs text-slate-400 font-mono">Total {scenes.length} Scenes</div>
+        <div className="p-4 border-b border-amber-200/50 bg-amber-50/50 flex items-center justify-between relative z-20">
+          <div>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">场景时间轴</h3>
+            <div className="text-xs text-slate-400 font-mono">共 {scenes.length} 场</div>
+          </div>
+          <button
+            ref={addPopoverButtonRef}
+            onClick={() => setShowAddPopover(!showAddPopover)}
+            className={`text-slate-400 hover:text-amber-600 hover:bg-amber-100 p-1.5 rounded-lg transition-colors border border-transparent hover:border-amber-200 ${showAddPopover ? 'text-amber-600 bg-amber-100 border-amber-200' : ''}`}
+            title="添加场景"
+          >
+            <svg className={`w-4 h-4 transition-transform ${showAddPopover ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          </button>
         </div>
+
+        {/* Add Scene Inline Input */}
+        {showAddPopover && (
+          <div ref={addPopoverContainerRef} className="p-2 bg-amber-50/50 border-b border-amber-100 animate-fade-in">
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newSceneLocation}
+                onChange={(e) => setNewSceneLocation(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddScene()
+                  if (e.key === 'Escape') {
+                    setShowAddPopover(false)
+                    setNewSceneLocation('')
+                  }
+                }}
+                placeholder="例如: 咖啡馆 / INT. COFFEE SHOP"
+                className="w-full text-sm border border-amber-200 rounded px-2 py-1.5 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 bg-white"
+              />
+              <button
+                onClick={handleAddScene}
+                className="btn bg-amber-500 hover:bg-amber-600 text-white border-none text-xs px-3 py-1.5 shadow-sm shadow-amber-500/20 shrink-0"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
           {scenes.length === 0 ? (
@@ -1877,14 +2066,37 @@ function ScenesContent({
                 </div>
 
                 {/* Info */}
-                <div className="flex-1 min-w-0 py-0.5">
-                  <div className={`text-xs font-bold truncate mb-0.5 ${i === selectedIndex ? 'text-amber-900' : 'text-slate-700'}`}>
-                    #{scene.sceneNumber} {scene.location}
+                <div className="flex-1 min-w-0 py-0.5 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-xs font-bold truncate mb-0.5 ${i === selectedIndex ? 'text-amber-900' : 'text-slate-700'}`}>
+                      #{scene.sceneNumber} {scene.location}
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${i === selectedIndex ? 'bg-primary-400' : 'bg-slate-300'}`}></span>
+                      {scene.timeOfDay}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${i === selectedIndex ? 'bg-primary-400' : 'bg-slate-300'}`}></span>
-                    {scene.timeOfDay}
-                  </div>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (confirm('Are you sure you want to delete this scene?')) {
+                        try {
+                          await analysisApi.deleteScene(projectId, scene.id)
+                          removeScene(scene.id)
+                          if (selectedIndex >= i && selectedIndex > 0) {
+                            setSelectedIndex(selectedIndex - 1)
+                          }
+                        } catch (err) {
+                          console.error('Delete scene failed:', err)
+                          alert('删除场景失败')
+                        }
+                      }
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"
+                    title="删除场景"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
                 </div>
               </button>
             ))

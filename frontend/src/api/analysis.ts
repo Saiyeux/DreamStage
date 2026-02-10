@@ -24,6 +24,10 @@ export const analysisApi = {
   getCharacters: (projectId: string) =>
     api.get<Character[]>(`/projects/${projectId}/characters`),
 
+  // 创建角色
+  createCharacter: (projectId: string, data: Partial<Character>) =>
+    api.post<Character>(`/projects/${projectId}/characters`, data),
+
   // 更新角色
   updateCharacter: (projectId: string, characterId: string, data: Partial<Character>) =>
     api.put<Character>(`/projects/${projectId}/characters/${characterId}`, data),
@@ -31,6 +35,10 @@ export const analysisApi = {
   // 获取场景列表
   getScenes: (projectId: string) =>
     api.get<Scene[]>(`/projects/${projectId}/scenes`),
+
+  // 创建场景
+  createScene: (projectId: string, data: Partial<Scene>) =>
+    api.post<Scene>(`/projects/${projectId}/scenes`, data),
 
   // 获取Act/Beat列表
   getBeats: (projectId: string) =>
@@ -51,6 +59,14 @@ export const analysisApi = {
   // 删除场景视频
   deleteVideoClip: (projectId: string, videoId: string) =>
     api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/scenes/videos/${videoId}`),
+
+  // 删除角色
+  deleteCharacter: (projectId: string, characterId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/characters/${characterId}`),
+
+  // 删除场景
+  deleteScene: (projectId: string, sceneId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/projects/${projectId}/scenes/${sceneId}`),
 
   // 获取分析状态
   getAnalysisStatus: (projectId: string) =>

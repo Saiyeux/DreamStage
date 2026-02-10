@@ -46,3 +46,8 @@ class CharacterUpdate(BaseModel):
     clothing_style: str | None = None
     base_prompt: str | None = None
     main_image_id: str | None = None
+
+
+class CharacterCreate(CharacterUpdate):
+    name: str # Name is required for creation
+

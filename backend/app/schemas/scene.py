@@ -63,3 +63,8 @@ class SceneUpdate(BaseModel):
 
     scene_prompt: str | None = None
     action_prompt: str | None = None
+
+
+class SceneCreate(SceneUpdate):
+    scene_number: int # Required
+

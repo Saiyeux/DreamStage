@@ -47,8 +47,12 @@ interface ProjectState {
   setCharacters: (characters: Character[]) => void
   setScenes: (scenes: Scene[]) => void
   setProjects: (projects: Project[]) => void
+  addCharacter: (character: Character) => void
+  addScene: (scene: Scene) => void
   updateCharacter: (id: string, updates: Partial<Character>) => void
+  removeCharacter: (id: string) => void
   updateScene: (id: string, updates: Partial<Scene>) => void
+  removeScene: (id: string) => void
   setAnalysisState: (state: Partial<ProjectState['analysisState']>) => void
   appendTerminalOutput: (line: string) => void
   updateLastTerminalLine: (content: string) => void
@@ -107,6 +111,12 @@ export const useProjectStore = create<ProjectState>()(
 
       setProjects: (projects) => set({ projects }),
 
+      addCharacter: (character) =>
+        set((state) => ({ characters: [...state.characters, character] })),
+
+      addScene: (scene) =>
+        set((state) => ({ scenes: [...state.scenes, scene] })),
+
       updateCharacter: (id, updates) =>
         set((state) => ({
           characters: state.characters.map((c) =>
@@ -114,11 +124,21 @@ export const useProjectStore = create<ProjectState>()(
           ),
         })),
 
+      removeCharacter: (id) =>
+        set((state) => ({
+          characters: state.characters.filter((c) => c.id !== id),
+        })),
+
       updateScene: (id, updates) =>
         set((state) => ({
           scenes: state.scenes.map((s) =>
             s.id === id ? { ...s, ...updates } : s
           ),
+        })),
+
+      removeScene: (id) =>
+        set((state) => ({
+          scenes: state.scenes.filter((s) => s.id !== id),
         })),
 
       setAnalysisState: (newState) =>
@@ -216,11 +236,11 @@ export const useProjectStore = create<ProjectState>()(
           acts: state.acts.map((a) =>
             a.id === actId
               ? {
-                  ...a,
-                  dialogueLines: a.dialogueLines.map((l) =>
-                    l.id === lineId ? { ...l, ...updates } : l
-                  ),
-                }
+                ...a,
+                dialogueLines: a.dialogueLines.map((l) =>
+                  l.id === lineId ? { ...l, ...updates } : l
+                ),
+              }
               : a
           ),
         })),

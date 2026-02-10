@@ -17,33 +17,38 @@ router = APIRouter()
 @router.post("", response_model=ProjectResponse)
 async def create_project(
     name: str = Form(...),
-    script_file: UploadFile = File(...),
+    script_file: UploadFile = File(None),
     db: AsyncSession = Depends(get_db),
 ):
-    """创建新项目并上传剧本文件"""
+    """创建新项目"""
     project_id = str(uuid.uuid4())
 
     # 创建项目目录
     project_dir = settings.DATA_DIR / "projects" / project_id
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    # 保存上传的文件
-    file_ext = Path(script_file.filename).suffix.lower()
-    if file_ext not in [".pdf", ".txt"]:
-        raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
+    script_path = None
+    script_text = ""
 
-    script_path = project_dir / f"script{file_ext}"
-    content = await script_file.read()
-    script_path.write_bytes(content)
+    if script_file:
+        # 保存上传的文件
+        file_ext = Path(script_file.filename).suffix.lower()
+        if file_ext not in [".pdf", ".txt"]:
+            raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
 
-    # 解析剧本文本
-    script_text = await script_parser.parse(str(script_path))
+        script_path_obj = project_dir / f"script{file_ext}"
+        content = await script_file.read()
+        script_path_obj.write_bytes(content)
+        script_path = str(script_path_obj)
+
+        # 解析剧本文本
+        script_text = await script_parser.parse(script_path)
 
     # 创建项目记录
     project = Project(
         id=project_id,
         name=name,
-        script_path=str(script_path),
+        script_path=script_path,
         script_text=script_text,
         status=ProjectStatus.DRAFT,
     )

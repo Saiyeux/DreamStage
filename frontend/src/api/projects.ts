@@ -16,10 +16,12 @@ export const projectsApi = {
 
   get: (id: string) => api.get<Project>(`/projects/${id}`),
 
-  create: (name: string, scriptFile: File) => {
+  create: (name: string, scriptFile?: File) => {
     const formData = new FormData()
     formData.append('name', name)
-    formData.append('script_file', scriptFile)
+    if (scriptFile) {
+      formData.append('script_file', scriptFile)
+    }
     return api.upload<Project>('/projects', formData)
   },
 
