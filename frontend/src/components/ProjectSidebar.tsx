@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { Project, ServiceStatus } from '@/types'
 import { healthApi, projectsApi, analysisApi, configApi } from '@/api'
 import type { WorkflowConfig } from '@/api/config'
@@ -26,7 +26,7 @@ export function ProjectSidebar({
   isAnalyzing,
   currentAnalyzing
 }: ProjectSidebarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [projects, setProjects] = useState<Project[]>([])
   const [healthStatus, setHealthStatus] = useState<ServiceStatus | null>(null)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
@@ -143,35 +143,7 @@ export function ProjectSidebar({
     }
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
 
-    const validTypes = ['.txt', '.pdf']
-    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
-    if (!validTypes.includes(fileExtension)) {
-      alert('只支持 .txt 或 .pdf 格式的剧本文件')
-      return
-    }
-
-    setIsUploading(true)
-    try {
-      const projectName = file.name.replace(/\.[^/.]+$/, '')
-      const response = await projectsApi.create(projectName, file)
-      alert('上传成功！')
-      await loadProjects()
-      if (response.id) {
-        onProjectChange?.(response.id)
-      }
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    } catch (err) {
-      console.error('Upload failed:', err)
-      alert('上传失败，请重试')
-    } finally {
-    }
-  }
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
@@ -230,7 +202,7 @@ export function ProjectSidebar({
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-bold text-slate-900 tracking-tight">Studio Panel</h1>
+            <h1 className="text-sm font-bold text-slate-500 tracking-tight">Studio Panel</h1>
             <p className="text-[11px] font-medium text-slate-400">Project Management</p>
           </div>
         </div>
@@ -255,10 +227,15 @@ export function ProjectSidebar({
           </div>
 
           <div className="relative group">
+            <div className="w-full text-sm mb-3 flex items-center bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg shadow-md shadow-indigo-500/20">
+              <span className="flex-1 truncate pl-3 py-2 pr-10 text-white font-semibold">
+                {currentProject?.name || 'Select a project...'}
+              </span>
+            </div>
             <select
               value={currentProject?.id || ''}
               onChange={(e) => onProjectChange?.(e.target.value)}
-              className="w-full input text-sm mb-3 cursor-pointer appearance-none pr-10 truncate bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent hover:brightness-110 transition-all font-semibold shadow-md shadow-indigo-500/20"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             >
               <option value="" className="text-slate-900 bg-white">Select a project...</option>
               {projects.map((project) => (
@@ -267,7 +244,7 @@ export function ProjectSidebar({
                 </option>
               ))}
             </select>
-            <div className="absolute right-3 top-3.5 pointer-events-none text-white/80 group-hover:text-white transition-colors">
+            <div className="absolute right-3 top-3 pointer-events-none text-white/80 group-hover:text-white transition-colors z-20">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </div>
 
