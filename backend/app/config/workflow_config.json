@@ -30,6 +30,19 @@
   ],
   "scene_workflows": [
     {
+      "id": "anime_scene_neta",
+      "name": "NetaYume 场景图",
+      "description": "基于 NetaYume 检查点的动漫风格场景生成",
+      "workflow_file": "anime_portrait_neta.json",
+      "default": false,
+      "params": {
+        "width": 1344,
+        "height": 768,
+        "steps": 20,
+        "cfg": 4.0
+      }
+    },
+    {
       "id": "flux2_scene",
       "name": "FLUX2 9B 场景图",
       "description": "使用 FLUX2 9B 模板生成场景图",
