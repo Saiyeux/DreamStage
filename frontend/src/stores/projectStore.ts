@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Project, Character, Scene, Beat, ServiceStatus, Act, ActDialogueLine } from '@/types'
+import type { Project, Character, Scene, Beat, ServiceStatus, Act, ActDialogueLine, ActStageCharacter } from '@/types'
 
 
 
@@ -77,6 +77,11 @@ interface ProjectState {
   addDialogueLine: (actId: string, line: ActDialogueLine) => void
   updateDialogueLine: (actId: string, lineId: string, updates: Partial<ActDialogueLine>) => void
   removeDialogueLine: (actId: string, lineId: string) => void
+
+  // Stage Character Actions (角色位姿)
+  addStageCharacter: (actId: string, char: ActStageCharacter) => void
+  updateStageCharacter: (actId: string, characterId: string, updates: Partial<ActStageCharacter>) => void
+  removeStageCharacter: (actId: string, characterId: string) => void
 
   reset: () => void
 
@@ -250,6 +255,39 @@ export const useProjectStore = create<ProjectState>()(
           acts: state.acts.map((a) =>
             a.id === actId
               ? { ...a, dialogueLines: a.dialogueLines.filter((l) => l.id !== lineId) }
+              : a
+          ),
+        })),
+
+      // Stage Character Actions
+      addStageCharacter: (actId, char) =>
+        set((state) => ({
+          acts: state.acts.map((a) =>
+            a.id === actId
+              ? { ...a, stageCharacters: [...(a.stageCharacters || []), char] }
+              : a
+          ),
+        })),
+
+      updateStageCharacter: (actId, characterId, updates) =>
+        set((state) => ({
+          acts: state.acts.map((a) =>
+            a.id === actId
+              ? {
+                ...a,
+                stageCharacters: (a.stageCharacters || []).map((sc) =>
+                  sc.characterId === characterId ? { ...sc, ...updates } : sc
+                ),
+              }
+              : a
+          ),
+        })),
+
+      removeStageCharacter: (actId, characterId) =>
+        set((state) => ({
+          acts: state.acts.map((a) =>
+            a.id === actId
+              ? { ...a, stageCharacters: (a.stageCharacters || []).filter((sc) => sc.characterId !== characterId) }
               : a
           ),
         })),

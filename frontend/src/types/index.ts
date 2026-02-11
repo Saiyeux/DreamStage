@@ -145,12 +145,21 @@ export interface Beat {
   order?: number
 }
 
+// 角色在 Stage 上的位姿描述
+export interface ActStageCharacter {
+  characterId: string
+  position: string    // 位置，如 "画面左侧"、"前景中央"
+  action: string      // 动作，如 "坐在椅子上"、"面朝窗户站立"
+  expression: string  // 神态，如 "微笑"、"若有所思"
+}
+
 // Act (剧幕)
 export interface Act {
   id: string
   projectId: string
   name: string
   stageSceneId: string | null
+  stageCharacters: ActStageCharacter[]  // 拖入 Stage 的角色列表
   dialogueLines: ActDialogueLine[]
 }
 

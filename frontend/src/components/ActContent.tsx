@@ -92,6 +92,9 @@ export function ActContent({ projectId }: { projectId: string }) {
         addDialogueLine,
         updateDialogueLine,
         removeDialogueLine,
+        addStageCharacter,
+        updateStageCharacter,
+        removeStageCharacter,
     } = useProjectStore()
 
     // Local UI state
@@ -120,7 +123,7 @@ export function ActContent({ projectId }: { projectId: string }) {
     // Droppable Hooks
     const { setNodeRef: setStageRef, isOver: isOverStage } = useDroppable({
         id: 'stage-drop',
-        data: { accept: 'scene' }
+        data: { accept: ['scene', 'character'] }
     })
 
     const { setNodeRef: setLinesRef, isOver: isOverLines, node: linesNode } = useDroppable({
@@ -174,9 +177,22 @@ export function ActContent({ projectId }: { projectId: string }) {
 
         console.log('itemType:', itemType, 'itemData:', itemData)
 
-        if (over.id === 'stage-drop' && itemType === 'scene') {
-            console.log('Dropping scene on stage')
-            updateAct(selectedActId, { stageSceneId: itemData.id })
+        if (over.id === 'stage-drop') {
+            if (itemType === 'scene') {
+                console.log('Dropping scene on stage')
+                updateAct(selectedActId, { stageSceneId: itemData.id })
+            } else if (itemType === 'character') {
+                // Check if already exists
+                const exists = currentAct?.stageCharacters?.some(sc => sc.characterId === itemData.id)
+                if (!exists) {
+                    addStageCharacter(selectedActId, {
+                        characterId: itemData.id,
+                        position: '',
+                        action: '',
+                        expression: ''
+                    })
+                }
+            }
         }
 
         // Handle dropping onto a specific line's character tag
@@ -205,6 +221,7 @@ export function ActContent({ projectId }: { projectId: string }) {
             projectId,
             name: `Act ${acts.length + 1}`,
             stageSceneId: null,
+            stageCharacters: [],
             dialogueLines: []
         }
         addAct(newAct)
