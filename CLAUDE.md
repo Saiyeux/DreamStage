@@ -15,7 +15,6 @@ npm install          # 安装依赖
 npm run dev          # 启动开发服务器 (http://localhost:5173)
 npm run build        # TypeScript编译 + Vite生产构建
 npm run lint         # ESLint代码检查
-npm run preview      # 预览生产构建
 ```
 
 ### 后端 (Backend)
@@ -25,7 +24,6 @@ cd backend
 # 环境设置
 conda env create -f environment.yaml
 conda activate ai-drama-studio
-# 或手动: conda create -n ai-drama-studio python=3.11 && pip install -r requirements.txt
 
 # 启动服务器
 python -m uvicorn app.main:app --reload --port 8001
@@ -57,60 +55,62 @@ ollama serve                    # LLM服务 (端口 11434)
 - **后端**: Python 3.11 + FastAPI + SQLAlchemy 2.0 (async) + SQLite
 - **AI服务**: Ollama/LM Studio (LLM) + ComfyUI (图像/视频生成)
 
-### 前端结构 (`frontend/src/`)
-```
-api/          # API客户端模块 (使用fetch, 通过Vite代理到后端)
-components/   # React UI组件
-hooks/        # 自定义hooks (如 useLLMStream 处理SSE流)
-pages/        # 页面组件
-services/     # 业务逻辑服务
-stores/       # Zustand状态管理 (projectStore, taskStore)
-types/        # TypeScript类型定义
-```
-
-### 后端结构 (`backend/app/`)
-```
-api/          # FastAPI路由 (health, projects, analysis, generation, files, config)
-core/         # 配置、日志、依赖注入
-db/           # 数据库初始化和ORM设置
-models/       # SQLAlchemy模型 (Project, Character, Scene, Beat)
-schemas/      # Pydantic请求/响应模式
-services/     # 业务服务 (LLMClient, ComfyUIClient, PromptService)
-config/       # 配置文件和prompt模板 (JSON)
-```
-
 ### 数据流
-1. 前端通过 `/api` 代理与后端通信
-2. 后端调用 Ollama/LM Studio 进行剧本分析 (SSE流式响应)
-3. 后端调用 ComfyUI API 进行图像/视频生成 (WebSocket进度更新)
+1. 前端通过 `/api` 代理与后端通信（Vite代理配置：`/api`, `/ws`, `/files` → `localhost:8001`）
+2. 后端调用 Ollama/LM Studio 进行剧本分析（SSE流式响应）
+3. 后端调用 ComfyUI API 进行图像/视频生成，返回 `task_id`，前端**轮询**任务状态
 4. 生成的文件存储在 `data/projects/` 目录，通过 `/files` 静态服务访问
 
-### API路由结构
-- `GET /` - API元信息
-- `/api/health` - 健康检查
-- `/api/projects` - 项目CRUD
-- `/api/projects/{id}/analysis` - 剧本分析 (LLM)
-- `/api/projects/{id}/generation` - 图像/视频生成 (ComfyUI)
-- `/api/files` - 文件上传
-- `/api/config` - 配置管理
-- `/files/{path}` - 静态文件服务
+### 生成任务状态追踪
+- 任务状态存储在 `GenerationTasks._task_status`（内存字典，重启后丢失）
+- 前端轮询 `GET /api/projects/tasks/{taskId}/status`
+- 状态字段：`pending` → `running` → `completed` / `failed`
 
-### ComfyUI工作流 (`comfyui_workflows/`)
-- `character_portrait_flux2.json` - FLUX角色肖像生成
-- `scene_generation_flux2.json` - FLUX场景生成
-- `video_ltx2_i2v.json` - LTX-Video图生视频
-- `video_ltx2_t2v.json` - LTX-Video文生视频
+### SSE流式分析
+- `frontend/src/services/analysisService.ts` 是单例 EventSource 管理器，独立于组件生命周期
+- URL 模式：`/api/projects/{id}/analyze/{type}/stream?mode={quick|deep}`
+- 消息类型：`start` | `chunk` | `item_generated` | `saved` | `parse_error` | `done` | `error`
+- 剧本分块处理（默认4000字符/块）以适应LLM上下文限制
+
+### 页面路由
+- 单一主页面 `ScriptAnalysisPage`，通过URL query参数切换状态：
+  - `?project={projectId}&tab={characters|scenes|act}`
+- 无多页面路由，所有 `*` 路径都指向同一页面
 
 ## 核心概念 (Core Concepts)
 
 ### 资产定角机制 (Asset Finalization)
-- **定角/定景**: 用户选择满意的角色/场景图片后锁定，进入不可编辑状态
-- **资产化**: 锁定后的资产可拖入剧幕工作台进行编排
-- 相关字段: `is_finalized`, `finalized_images`
+- **定角/定景**：用户锁定满意的角色/场景图片，`is_finalized=true` 后不可重新生成
+- **资产化**：只有已定角/定景的资产才能拖入剧幕工作台
+- 相关端点：`POST /projects/{id}/characters/{charId}/finalize` 和 `/unfinalize`
 
 ### 剧幕工作台 (Act Workbench)
-- 资产驱动的拖拽编排界面
-- 只有已定角/定景的资产才能进入工作台
+- `ActContent.tsx` 使用 dnd-kit 实现拖拽，碰撞检测：`pointerWithin` → `rectIntersection`
+- 台词行、场景关联、舞台角色均在此管理
+
+## 关键模式 (Key Patterns)
+
+### snake_case ↔ camelCase 自动转换
+后端所有 Pydantic schema 继承 `CamelModel`（`app/schemas/common.py`），自动转换字段名。前端只使用 camelCase。
+
+### 新增 API 路由流程
+1. `backend/app/api/{module}.py` — 添加路由，用 `AsyncSession = Depends(get_db)` 和 `CamelModel` 返回
+2. `backend/app/schemas/{module}.py` — 新建 Pydantic schema（继承 `CamelModel`）
+3. `backend/app/api/__init__.py` — 注册路由 `router.include_router(...)`
+4. `frontend/src/api/{module}.ts` — 添加前端 API 调用
+5. `frontend/src/stores/projectStore.ts` — 更新 Zustand store 状态和 actions
+
+### Zustand Store 更新模式
+```typescript
+// 不可变更新
+updateCharacter: (id, updates) => set(state => ({
+  characters: state.characters.map(c => c.id === id ? {...c, ...updates} : c)
+}))
+
+// SSE流追加终端输出
+updateLastTerminalLine: (content) => // 修改 terminalOutput 数组末尾元素
+```
+Store 通过 `localStorage` 持久化关键状态（key: `"project-storage"`）。
 
 ## 环境变量 (`backend/.env`)
 ```
@@ -130,11 +130,11 @@ PORT=8001
 ### 前端
 - 使用 `@/` 路径别名引用 `src/` 目录
 - API请求通过 `frontend/src/api/client.ts` 的封装方法
-- 状态管理使用Zustand stores
-- TypeScript严格模式已启用
+- 无前端测试框架（无 Jest/Vitest）
+- `LLMTerminal.tsx` 的 `LLMTerminalManual` 变体通过 `window.__llmTerminal` 暴露方法
 
 ### 后端
-- 全程使用async/await进行异步操作
-- Pydantic模式支持snake_case/camelCase转换
-- LLM prompt模板存储在 `app/config/prompts/` (JSON格式)
-- 新增API路由需在 `app/api/__init__.py` 中注册
+- 全程使用 async/await 进行异步操作
+- LLM prompt 模板存储在 `app/config/prompts/`（JSON格式）
+- `Scene` 模型中 `characters_data` 存储为 JSON 字段（非关联表）
+- `Beat` 模型与 `Project` 是单向关系（无 `back_populates`）
