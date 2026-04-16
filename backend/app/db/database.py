@@ -28,6 +28,7 @@ async def init_db():
         # Add new columns to existing tables (idempotent)
         for stmt in [
             "ALTER TABLE scenes ADD COLUMN stage_prompt TEXT",
+            "ALTER TABLE scenes ADD COLUMN narration TEXT",
         ]:
             try:
                 await conn.execute(text(stmt))

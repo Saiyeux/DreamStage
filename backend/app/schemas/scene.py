@@ -47,6 +47,7 @@ class SceneResponse(CamelModel):
     scene_prompt: str | None = None
     action_prompt: str | None = None
     stage_prompt: str | None = None
+    narration: str | None = None
     scene_image: SceneImageResponse | None = None
     video_clip: VideoClipResponse | None = None
     is_finalized: bool = False
@@ -60,6 +61,7 @@ class SceneUpdate(BaseModel):
     environment_desc: str | None = None
     characters_data: list[SceneCharacterData] | list[str] | list[dict] | None = None
     dialogue: str | None = None
+    narration: str | None = None
 
 
     scene_prompt: str | None = None

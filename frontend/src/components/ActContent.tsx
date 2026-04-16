@@ -84,6 +84,7 @@ export function ActContent({ projectId }: { projectId: string }) {
         }).filter(Boolean).join('和') || ''
         const sceneStagePrompt = currentStageScene?.stagePrompt || ''
         const location = currentStageScene?.location || ''
+        // Auto-fill stage prompt
         if (charNames && sceneStagePrompt) {
             setStagePrompt(`${charNames}${sceneStagePrompt}`)
         } else if (charNames && location) {
@@ -93,10 +94,20 @@ export function ActContent({ projectId }: { projectId: string }) {
         } else if (location) {
             setStagePrompt(`场景：${location}`)
         }
+
+        // Auto-fill narration into dialogue if empty
+        if (selectedActId && currentStageScene?.narration && currentAct?.dialogueLines.length === 0) {
+            addDialogueLine(selectedActId, {
+                id: `narration-${Date.now()}`,
+                characterId: 'narrator', // Use a special ID or just dummy
+                text: currentStageScene.narration
+            })
+        }
+
         // Reset generated assets when selection changes
         setStageImagePath(null)
         setActVideoPath(null)
-    }, [currentAct?.stageSceneId, currentAct?.stageCharacters?.length])
+    }, [selectedActId, currentAct?.stageSceneId, currentAct?.stageCharacters?.length])
 
     // Poll task status for stage keyframe generation
     useEffect(() => {
@@ -144,7 +155,7 @@ export function ActContent({ projectId }: { projectId: string }) {
 
     const handleGenerateActVideo = async () => {
         const imagePath = stageImagePath || currentStageScene?.sceneImage?.imagePath
-        const narration = currentStageScene?.dialogue || ''
+        const narration = currentAct?.dialogueLines.map(l => l.text).join('\n') || currentStageScene?.narration || currentStageScene?.dialogue || ''
         if (!imagePath || !narration) return
         setIsGeneratingVideo(true)
         setActVideoPath(null)
@@ -552,12 +563,15 @@ export function ActContent({ projectId }: { projectId: string }) {
                                         </div>
                                     ) : (
                                         timelineBeats.map(beat => {
+                                            const isNarrator = beat.characterId === 'narrator'
                                             const char = characters.find(c => c.id === beat.characterId)
                                             return (
-                                                <div key={beat.id} className="group flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all">
+                                                <div key={beat.id} className={`group flex gap-4 items-start p-4 bg-white rounded-xl border shadow-sm hover:shadow-md transition-all ${isNarrator ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200 hover:border-slate-300'}`}>
                                                     <div className="relative shrink-0 group/char cursor-pointer">
-                                                        <div className={`w-10 h-10 rounded-full bg-slate-100 overflow-hidden border-2 shadow-sm flex items-center justify-center ${isFemale(char?.gender) ? 'border-pink-300' : 'border-blue-300'}`}>
-                                                            {char?.images?.[0] ? (
+                                                        <div className={`w-10 h-10 rounded-full bg-slate-100 overflow-hidden border-2 shadow-sm flex items-center justify-center ${isNarrator ? 'border-amber-400 bg-amber-100' : isFemale(char?.gender) ? 'border-pink-300' : 'border-blue-300'}`}>
+                                                            {isNarrator ? (
+                                                                <span className="text-xl">🎙️</span>
+                                                            ) : char?.images?.[0] ? (
                                                                 <img src={fileUrl.image(char.images[0].imagePath)} alt={char.name} className="w-full h-full object-cover" />
                                                             ) : (
                                                                 <span className="text-xs">{isFemale(char?.gender) ? '👩' : '👨'}</span>
@@ -568,17 +582,18 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                             value={beat.characterId}
                                                             onChange={e => selectedActId && updateDialogueLine(selectedActId, beat.id, { characterId: e.target.value })}
                                                         >
+                                                            <option value="narrator">🎙️ Narrator</option>
                                                             {finalizedChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                            {!finalizedChars.find(c => c.id === beat.characterId) && <option value={beat.characterId}>Unknown</option>}
+                                                            {!finalizedChars.find(c => c.id === beat.characterId) && !isNarrator && <option value={beat.characterId}>Unknown</option>}
                                                         </select>
-                                                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border flex items-center justify-center shadow-sm pointer-events-none ${isFemale(char?.gender) ? 'bg-pink-50 border-pink-200' : 'bg-blue-50 border-blue-200'}`}>
+                                                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border flex items-center justify-center shadow-sm pointer-events-none ${isNarrator ? 'bg-amber-50 border-amber-200' : isFemale(char?.gender) ? 'bg-pink-50 border-pink-200' : 'bg-blue-50 border-blue-200'}`}>
                                                             <span className="text-[8px]">▼</span>
                                                         </div>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center justify-between mb-1.5">
-                                                            <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${isFemale(char?.gender) ? 'text-pink-600 bg-pink-50' : 'text-blue-600 bg-blue-50'}`}>
-                                                                {char?.name || 'Unknown'}
+                                                            <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${isNarrator ? 'text-amber-700 bg-amber-100' : isFemale(char?.gender) ? 'text-pink-600 bg-pink-50' : 'text-blue-600 bg-blue-50'}`}>
+                                                                {isNarrator ? 'Narrator' : char?.name || 'Unknown'}
                                                             </div>
                                                             <button
                                                                 onClick={() => selectedActId && removeDialogueLine(selectedActId, beat.id)}
@@ -586,9 +601,9 @@ export function ActContent({ projectId }: { projectId: string }) {
                                                             >✕</button>
                                                         </div>
                                                         <textarea
-                                                            className="w-full text-sm border border-slate-200 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none bg-slate-50 focus:bg-white leading-relaxed"
+                                                            className={`w-full text-sm border rounded-lg p-3 focus:ring-1 transition-all resize-none leading-relaxed ${isNarrator ? 'border-amber-200 bg-amber-50/30 focus:border-amber-400 focus:ring-amber-400' : 'border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500'}`}
                                                             rows={2}
-                                                            placeholder="Type dialogue..."
+                                                            placeholder={isNarrator ? "Type narrator text..." : "Type dialogue..."}
                                                             value={beat.text}
                                                             onChange={e => selectedActId && updateDialogueLine(selectedActId, beat.id, { text: e.target.value })}
                                                         />

@@ -69,8 +69,7 @@ export interface Scene {
   environmentDesc: string
   characters: SceneCharacter[]
   dialogue: string
-
-
+  narration?: string
   scriptContent?: string
   scenePrompt: string
   actionPrompt: string

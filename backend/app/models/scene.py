@@ -41,6 +41,7 @@ class Scene(Base):
     action_prompt: Mapped[str | None] = mapped_column(Text)
     negative_prompt: Mapped[str | None] = mapped_column(Text)
     stage_prompt: Mapped[str | None] = mapped_column(Text)  # 用于 Stage 合成的简短提示（以动词开头）
+    narration: Mapped[str | None] = mapped_column(Text)
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="scenes")

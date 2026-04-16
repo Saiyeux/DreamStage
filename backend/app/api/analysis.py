@@ -381,7 +381,8 @@ class AnalysisTask:
                             atmosphere=_to_str(scene_data.get("atmosphere")),
                             environment_desc=env_desc,
                             characters_data=scene_data.get("characters") or [],
-                            dialogue=_to_str(scene_data.get("narration") or scene_data.get("dialogue")),
+                            dialogue=_to_str(scene_data.get("dialogue")),
+                            narration=_to_str(scene_data.get("narration")),
                             stage_prompt=_to_str(scene_data.get("stage_prompt")),
                             script_content="\n".join(filter(None, [
                                 scene_data.get("stage_title"),
