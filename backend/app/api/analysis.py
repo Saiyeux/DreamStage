@@ -2,7 +2,7 @@ import uuid
 import json
 import re
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +13,11 @@ from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.db.database import async_session_maker
 from app.models import Project, ProjectStatus, Character, CharacterImage, Scene, SceneImage, VideoClip, Beat
+from app.models.character import CharacterAudio
 from app.schemas import (
     AnalysisResponse,
     CharacterResponse,
+    CharacterAudioResponse,
     CharacterUpdate,
     CharacterCreate,
     SceneResponse,
@@ -123,10 +125,11 @@ from typing import Dict, List, Optional
 
 
 class AnalysisTask:
-    def __init__(self, project_id: str, analysis_type: str, mode: str = "deep"):
+    def __init__(self, project_id: str, analysis_type: str, mode: str = "deep", scene_type: str = "script"):
         self.project_id = project_id
         self.analysis_type = analysis_type
         self.mode = mode  # "quick" or "deep"
+        self.scene_type = scene_type  # "script" or "simple" (for scenes only)
         self.status = "init"  # init, running, completed, failed
         self.events: List[str] = []
         self.new_event_event = asyncio.Event()
@@ -168,7 +171,11 @@ class AnalysisTask:
                 await self.add_event(f"data: {json.dumps({'type': 'start', 'analysis_type': self.analysis_type})}\n\n")
 
                 # Split script
-                if self.analysis_type == "scenes":
+                if self.analysis_type == "scenes" and self.scene_type == "simple":
+                    # 简单文本模式：整段文字作为一个 chunk
+                    script_chunks = [project.script_text]
+                    logger.info(f"Project {self.project_id} - Scene Analysis: Simple/brief mode, single chunk")
+                elif self.analysis_type == "scenes":
                     script_chunks = prompt_service.split_script_by_scenes(project.script_text)
                     logger.info(f"Project {self.project_id} - Scene Analysis: Using scene header split")
                 elif self.analysis_type == "acts":
@@ -226,13 +233,16 @@ class AnalysisTask:
                         )
                     elif self.analysis_type == "scenes":
                         scene_start_num = len(all_scenes) + 1
-                        prompt = prompt_service.get_scenes_prompt(
-                            script_text=script_chunk,
-                            chunk_index=chunk_idx,
-                            total_chunks=total_chunks,
-                            characters_json=characters_json,
-                            scene_start_num=scene_start_num,
-                        )
+                        if self.scene_type == "simple":
+                            prompt = prompt_service.get_scenes_simple_prompt(script_text=script_chunk)
+                        else:
+                            prompt = prompt_service.get_scenes_prompt(
+                                script_text=script_chunk,
+                                chunk_index=chunk_idx,
+                                total_chunks=total_chunks,
+                                characters_json=characters_json,
+                                scene_start_num=scene_start_num,
+                            )
                     elif self.analysis_type == "acts":
                          prompt = prompt_service.get_acts_prompt(
                             script_text=script_chunk,
@@ -268,17 +278,25 @@ class AnalysisTask:
                                         all_characters = merge_characters(all_characters, [item], mode=self.mode)
                                 
                                 elif self.analysis_type == "scenes":
-                                    if "location" in item:
-                                        # Enrich with script content if it's the first scene of chunk?
-                                        # Or just pass it. For now simple.
-                                        item["script_content"] = script_chunk # Attach chunk text to scenes found in it
-                                        
-                                        # Update scene number globally
-                                        item["scene_number"] = len(all_scenes) + 1
-                                        item_with_id["scene_number"] = item["scene_number"]
-                                        
-                                        await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': item_with_id})}\n\n")
-                                        all_scenes.append(item)
+                                    # 支持两种格式：
+                                    # 1. 单个 scene 对象 {"scene_number": 1, "location": "..."}
+                                    # 2. wrapper 对象 {"scenes": [...]}
+                                    candidate_scenes = []
+                                    if "scenes" in item and isinstance(item["scenes"], list):
+                                        candidate_scenes = item["scenes"]
+                                    elif "scene_number" in item or "location" in item or "atmosphere" in item:
+                                        candidate_scenes = [item]
+
+                                    for scene_item in candidate_scenes:
+                                        if not isinstance(scene_item, dict):
+                                            continue
+                                        scene_item["script_content"] = script_chunk
+                                        scene_item["scene_number"] = len(all_scenes) + 1
+                                        scene_item_with_id = scene_item.copy()
+                                        scene_item_with_id["id"] = str(uuid.uuid4())
+                                        scene_item_with_id["scene_number"] = scene_item["scene_number"]
+                                        await self.add_event(f"data: {json.dumps({'type': 'item_generated', 'item': scene_item_with_id})}\n\n")
+                                        all_scenes.append(scene_item)
 
                                 elif self.analysis_type == "acts":
                                     if "action" in item:
@@ -338,20 +356,38 @@ class AnalysisTask:
                          await self.add_event(f"data: {json.dumps({'type': 'error', 'message': 'No scenes found'})}\n\n")
                          return
 
+                    def _to_str(v) -> str | None:
+                        if v is None:
+                            return None
+                        if isinstance(v, list):
+                            return "、".join(str(x) for x in v)
+                        return str(v)
+
                     await db.execute(delete(Scene).where(Scene.project_id == self.project_id))
                     for idx, scene_data in enumerate(all_scenes, 1):
+                        env = scene_data.get("environment") or {}
+                        if isinstance(env, str):
+                            env_desc = env
+                        else:
+                            desc = _to_str(env.get("description"))
+                            style = _to_str(env.get("visual_style"))
+                            env_desc = f"{desc}\n\n[Visual Style]: {style}" if style else desc
                         scene = Scene(
                             id=str(uuid.uuid4()),
                             project_id=self.project_id,
                             scene_number=idx,
-                            location=scene_data.get("location"),
-                            time_of_day=scene_data.get("time_of_day"),
-                            atmosphere=scene_data.get("atmosphere"),
-                            environment_desc=scene_data.get("environment", {}).get("description"),
-                            characters_data=scene_data.get("characters", []),
-                            dialogue=scene_data.get("dialogue"),
-                            duration_seconds=scene_data.get("duration_seconds"),
-                            script_content=scene_data.get("script_content"),
+                            location=_to_str(scene_data.get("location")),
+                            time_of_day=_to_str(scene_data.get("time_of_day")),
+                            atmosphere=_to_str(scene_data.get("atmosphere")),
+                            environment_desc=env_desc,
+                            characters_data=scene_data.get("characters") or [],
+                            dialogue=_to_str(scene_data.get("narration") or scene_data.get("dialogue")),
+                            stage_prompt=_to_str(scene_data.get("stage_prompt")),
+                            script_content="\n".join(filter(None, [
+                                scene_data.get("stage_title"),
+                                scene_data.get("time_period"),
+                                scene_data.get("script_content"),
+                            ])) or None,
                         )
                         db.add(scene)
                         saved_count += 1
@@ -402,13 +438,13 @@ class AnalysisTask:
 
 ANALYSIS_TASKS: Dict[str, AnalysisTask] = {}
 
-async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession, mode: str = "deep"):
-    task_key = f"{project_id}_{analysis_type}_{mode}"
-    
+async def sse_generator(project_id: str, analysis_type: str, db: AsyncSession, mode: str = "deep", scene_type: str = "script"):
+    task_key = f"{project_id}_{analysis_type}_{mode}_{scene_type}"
+
     # Check for existing task
     if task_key not in ANALYSIS_TASKS or ANALYSIS_TASKS[task_key].status in ["completed", "failed", "cancelled"]:
         # Start new task
-        task = AnalysisTask(project_id, analysis_type, mode=mode)
+        task = AnalysisTask(project_id, analysis_type, mode=mode, scene_type=scene_type)
         ANALYSIS_TASKS[task_key] = task
         # Run in background
         asyncio.create_task(task.run())
@@ -442,20 +478,24 @@ async def analyze_stream(
     project_id: str,
     analysis_type: str,
     mode: str = "deep",
+    scene_type: str = "script",
     db: AsyncSession = Depends(get_db),
 ):
     """流式分析 (持久化任务版)
-    
+
     Args:
         mode: 'quick' for fast shallow analysis, 'deep' for detailed analysis
+        scene_type: 'script' for traditional script-based scenes, 'simple' for brief/introduction → scenes
     """
     if analysis_type not in ["summary", "characters", "scenes", "acts"]:
         raise HTTPException(status_code=400, detail="Invalid analysis type")
     if mode not in ["quick", "deep"]:
         mode = "deep"
+    if scene_type not in ["script", "simple"]:
+        scene_type = "script"
 
     return StreamingResponse(
-        sse_generator(project_id, analysis_type, db, mode=mode),
+        sse_generator(project_id, analysis_type, db, mode=mode, scene_type=scene_type),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -657,7 +697,7 @@ async def list_characters(project_id: str, db: AsyncSession = Depends(get_db)):
     """获取项目所有角色"""
     result = await db.execute(
         select(Character)
-        .options(selectinload(Character.images))
+        .options(selectinload(Character.images), selectinload(Character.audios))
         .where(Character.project_id == project_id)
     )
     characters = result.scalars().all()
@@ -722,7 +762,7 @@ async def update_character(
     """更新角色信息"""
     result = await db.execute(
         select(Character)
-        .options(selectinload(Character.images))
+        .options(selectinload(Character.images), selectinload(Character.audios))
         .where(Character.id == character_id, Character.project_id == project_id)
     )
     character = result.scalar_one_or_none()
@@ -750,7 +790,7 @@ async def finalize_character(
     """定角：锁定角色并保存快照"""
     result = await db.execute(
         select(Character)
-        .options(selectinload(Character.images))
+        .options(selectinload(Character.images), selectinload(Character.audios))
         .where(Character.id == character_id, Character.project_id == project_id)
     )
     character = result.scalar_one_or_none()
@@ -1015,6 +1055,158 @@ async def delete_character_image(
     await db.commit()
 
     return {"success": True, "message": "Image deleted"}
+
+
+# ============ 角色音频管理 ============
+
+@router.get("/{project_id}/characters/{character_id}/audio", response_model=list[CharacterAudioResponse])
+async def get_character_audios(
+    project_id: str,
+    character_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取角色的音频列表"""
+    result = await db.execute(
+        select(CharacterAudio)
+        .join(Character)
+        .where(CharacterAudio.character_id == character_id, Character.project_id == project_id)
+        .order_by(CharacterAudio.created_at)
+    )
+    return result.scalars().all()
+
+
+@router.post("/{project_id}/characters/{character_id}/audio/upload", response_model=CharacterAudioResponse)
+async def upload_character_audio(
+    project_id: str,
+    character_id: str,
+    audio_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传角色参考音频"""
+    result = await db.execute(
+        select(Character).where(Character.id == character_id, Character.project_id == project_id)
+    )
+    character = result.scalar_one_or_none()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    content_type = audio_file.content_type or ""
+    if not (content_type.startswith("audio/") or audio_file.filename.endswith((".wav", ".mp3", ".flac", ".ogg", ".m4a"))):
+        raise HTTPException(status_code=400, detail="Only audio files are allowed")
+
+    project_dir = settings.DATA_DIR / "projects" / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    file_ext = Path(audio_file.filename or "audio.wav").suffix.lower() or ".wav"
+    filename = f"ref_{uuid.uuid4().hex[:8]}{file_ext}"
+    save_path = project_dir / filename
+
+    content = await audio_file.read()
+    save_path.write_bytes(content)
+
+    char_audio = CharacterAudio(
+        id=str(uuid.uuid4()),
+        character_id=character_id,
+        audio_name=audio_file.filename or filename,
+        audio_path=f"{project_id}/{filename}",
+        audio_type="reference",
+    )
+    db.add(char_audio)
+    await db.commit()
+    await db.refresh(char_audio)
+    return char_audio
+
+
+@router.delete("/{project_id}/characters/audio/{audio_id}")
+async def delete_character_audio(
+    project_id: str,
+    audio_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除角色音频"""
+    result = await db.execute(
+        select(CharacterAudio)
+        .join(Character)
+        .where(CharacterAudio.id == audio_id, Character.project_id == project_id)
+    )
+    audio = result.scalar_one_or_none()
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    try:
+        project_dir = settings.DATA_DIR / "projects" / project_id
+        file_path = project_dir / Path(audio.audio_path).name
+        if file_path.exists():
+            file_path.unlink()
+    except Exception as e:
+        logger.error(f"删除音频文件失败: {e}")
+
+    await db.delete(audio)
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/{project_id}/characters/{character_id}/images/upload")
+async def upload_character_image(
+    project_id: str,
+    character_id: str,
+    image_file: UploadFile = File(...),
+    image_type: str = Form(default="upload"),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传角色图像"""
+    # 验证角色归属
+    result = await db.execute(
+        select(Character).where(
+            Character.id == character_id,
+            Character.project_id == project_id,
+        )
+    )
+    character = result.scalar_one_or_none()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    # 验证文件类型
+    content_type = image_file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+
+    # 保存文件
+    project_dir = settings.DATA_DIR / "projects" / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    file_ext = Path(image_file.filename or "upload.png").suffix.lower() or ".png"
+    filename = f"upload_{uuid.uuid4().hex[:8]}{file_ext}"
+    save_path = project_dir / filename
+
+    content = await image_file.read()
+    save_path.write_bytes(content)
+
+    # 创建数据库记录
+    image_id = str(uuid.uuid4())
+    char_image = CharacterImage(
+        id=image_id,
+        character_id=character_id,
+        image_type=image_type,
+        image_path=f"{project_id}/{filename}",
+        prompt_used=None,
+        seed=None,
+        is_selected=False,
+    )
+    db.add(char_image)
+    await db.commit()
+    await db.refresh(char_image)
+
+    return {
+        "id": char_image.id,
+        "characterId": character_id,
+        "imageType": char_image.image_type,
+        "imagePath": char_image.image_path,
+        "promptUsed": None,
+        "seed": None,
+        "isSelected": False,
+    }
+
 
 @router.delete("/{project_id}/scenes/images/{image_id}")
 async def delete_scene_image(

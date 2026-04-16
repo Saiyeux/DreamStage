@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
@@ -24,6 +25,14 @@ async def init_db():
     """初始化数据库表"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add new columns to existing tables (idempotent)
+        for stmt in [
+            "ALTER TABLE scenes ADD COLUMN stage_prompt TEXT",
+        ]:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists
 
 
 async def close_db():

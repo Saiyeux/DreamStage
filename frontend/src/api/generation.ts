@@ -71,4 +71,18 @@ export const generationApi = {
       workflow_id: workflowId,
       params,
     }),
+
+  generateStageKeyframe: (projectId: string, sceneId: string, characterIds: string[], prompt: string) =>
+    api.post<TaskResponse>(`/projects/${projectId}/acts/generate-stage`, {
+      scene_id: sceneId,
+      character_ids: characterIds,
+      prompt,
+    }),
+
+  generateActVideo: (projectId: string, imagePath: string, narrationText: string, workflowId?: string) =>
+    api.post<TaskResponse>(`/projects/${projectId}/acts/generate-video`, {
+      image_path: imagePath,
+      narration_text: narrationText,
+      workflow_id: workflowId,
+    }),
 }

@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 from app.schemas.common import CamelModel
 
@@ -10,6 +11,15 @@ class CharacterImageResponse(CamelModel):
     prompt_used: str | None = None
     seed: int | None = None
     is_selected: bool = False
+
+
+class CharacterAudioResponse(CamelModel):
+    id: str
+    character_id: str
+    audio_name: str
+    audio_path: str
+    audio_type: str = "reference"
+    created_at: datetime | None = None
 
 
 class CharacterResponse(CamelModel):
@@ -31,6 +41,7 @@ class CharacterResponse(CamelModel):
     is_finalized: bool = False
     finalized_metadata: dict | None = None
     images: list[CharacterImageResponse] = []
+    audios: list[CharacterAudioResponse] = []
 
 
 class CharacterUpdate(BaseModel):

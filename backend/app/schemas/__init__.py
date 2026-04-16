@@ -8,6 +8,7 @@ from app.schemas.character import (
     CharacterResponse,
     CharacterUpdate,
     CharacterImageResponse,
+    CharacterAudioResponse,
     CharacterCreate,
 )
 from app.schemas.scene import (
@@ -39,6 +40,7 @@ __all__ = [
     "CharacterUpdate",
     "CharacterCreate",
     "CharacterImageResponse",
+    "CharacterAudioResponse",
     "SceneResponse",
     "SceneUpdate",
     "SceneCreate",

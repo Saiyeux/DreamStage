@@ -115,21 +115,36 @@ class LLMClient:
                         "model": self.model,
                         "messages": messages,
                         "stream": True,
-                        "max_tokens": 8192,  # 最大输出token数（OpenAI兼容参数）
+                        "max_tokens": 8192,
+                        # 禁用 Qwen3 thinking 模式，避免长时间缓冲导致 ReadTimeout
+                        "chat_template_kwargs": {"enable_thinking": False},
                     },
                 ) as response:
+                    in_think_block = False
                     async for line in response.aiter_lines():
                         if line.startswith("data: "):
                             data_str = line[6:]
-                            if data_str == "[DONE]":
+                            if data_str.strip() == "[DONE]":
                                 break
                             try:
                                 data = json.loads(data_str)
                                 content = (
                                     data.get("choices", [{}])[0]
                                     .get("delta", {})
-                                    .get("content", "")
+                                    .get("content") or ""
                                 )
+                                if not content:
+                                    continue
+                                # 过滤 Qwen3 thinking 标签 <think>...</think>
+                                if "<think>" in content:
+                                    in_think_block = True
+                                if in_think_block:
+                                    if "</think>" in content:
+                                        in_think_block = False
+                                        # 只保留 </think> 之后的部分
+                                        content = content.split("</think>", 1)[1]
+                                    else:
+                                        continue  # 跳过 thinking 内容
                                 if content:
                                     yield content
                             except json.JSONDecodeError:

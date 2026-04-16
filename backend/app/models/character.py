@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, JSON
+from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime, timezone
 
 from app.db.database import Base
 
@@ -45,6 +46,9 @@ class Character(Base):
     images: Mapped[list["CharacterImage"]] = relationship(
         "CharacterImage", back_populates="character", cascade="all, delete-orphan"
     )
+    audios: Mapped[list["CharacterAudio"]] = relationship(
+        "CharacterAudio", back_populates="character", cascade="all, delete-orphan"
+    )
 
 
 class CharacterImage(Base):
@@ -63,3 +67,21 @@ class CharacterImage(Base):
 
     # Relationships
     character: Mapped["Character"] = relationship("Character", back_populates="images")
+
+
+class CharacterAudio(Base):
+    __tablename__ = "character_audios"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    character_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("characters.id"), nullable=False
+    )
+    audio_name: Mapped[str] = mapped_column(String(200), nullable=False)  # 原始文件名
+    audio_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对路径
+    audio_type: Mapped[str] = mapped_column(String(20), default="reference")  # reference | generated
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    character: Mapped["Character"] = relationship("Character", back_populates="audios")

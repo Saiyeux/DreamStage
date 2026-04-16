@@ -1,5 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -7,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_db
 from app.core.logging_config import get_logger
 from app.models import Project, ProjectStatus, Character, Scene
+from app.models.character import CharacterAudio
 from app.schemas import TaskResponse, GenerateCharacterImagesRequest, GenerateCharacterLibraryRequest, GenerateSceneRequest, GenerateBulkRequest
 from app.services.comfyui_client import comfyui_client
 from app.services.generation_tasks import generation_tasks
@@ -292,3 +294,144 @@ async def sync_project_images(
         
     logger.info(f"同步完成: {stats}")
     return stats
+
+
+# ============ TTS 生成 ============
+
+class TTSGenerateRequest(BaseModel):
+    text: str
+    ref_audio_id: str | None = None  # CharacterAudio id（参考音频）
+
+
+@router.post("/{project_id}/characters/{character_id}/tts/generate", response_model=TaskResponse)
+async def generate_character_tts(
+    project_id: str,
+    character_id: str,
+    request: TTSGenerateRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """为角色生成 TTS 语音片段"""
+    # 验证角色
+    result = await db.execute(
+        select(Character).where(Character.id == character_id, Character.project_id == project_id)
+    )
+    character = result.scalar_one_or_none()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    # 查询参考音频
+    ref_audio_path = None
+    ref_audio_name = None
+    if request.ref_audio_id:
+        audio_result = await db.execute(
+            select(CharacterAudio).where(
+                CharacterAudio.id == request.ref_audio_id,
+                CharacterAudio.character_id == character_id,
+                CharacterAudio.audio_type == "reference",
+            )
+        )
+        ref_audio = audio_result.scalar_one_or_none()
+        if ref_audio:
+            ref_audio_path = ref_audio.audio_path
+            ref_audio_name = ref_audio.audio_name
+
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        generation_tasks.generate_character_tts,
+        task_id=task_id,
+        project_id=project_id,
+        character_id=character_id,
+        target_text=request.text,
+        ref_audio_path=ref_audio_path,
+        ref_audio_name=ref_audio_name,
+    )
+
+    return TaskResponse(task_id=task_id, message=f"TTS generation started")
+
+
+# ============ Stage 关键帧合成 ============
+
+class GenerateActVideoRequest(BaseModel):
+    image_path: str          # relative path to keyframe or scene image
+    narration_text: str
+    workflow_id: str | None = None
+
+
+@router.post("/{project_id}/acts/generate-video", response_model=TaskResponse)
+async def generate_act_video(
+    project_id: str,
+    request: GenerateActVideoRequest,
+    background_tasks: BackgroundTasks,
+):
+    """生成剧幕视频：TTS旁白 + 图生视频 + ffmpeg合并"""
+    if not request.image_path:
+        raise HTTPException(status_code=400, detail="image_path is required")
+    if not request.narration_text.strip():
+        raise HTTPException(status_code=400, detail="narration_text cannot be empty")
+
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        generation_tasks.generate_act_video,
+        task_id=task_id,
+        project_id=project_id,
+        image_path=request.image_path,
+        narration_text=request.narration_text,
+        workflow_id=request.workflow_id,
+    )
+    return TaskResponse(task_id=task_id, message="Act video generation started")
+
+
+class StageKeyframeRequest(BaseModel):
+    scene_id: str
+    character_ids: list[str]
+    prompt: str
+
+
+@router.post("/{project_id}/acts/generate-stage", response_model=TaskResponse)
+async def generate_stage_keyframe(
+    project_id: str,
+    request: StageKeyframeRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """合成 Stage 关键帧：场景背景 + 角色肖像"""
+    # 获取场景图
+    scene_result = await db.execute(
+        select(Scene).options(selectinload(Scene.scene_image))
+        .where(Scene.id == request.scene_id, Scene.project_id == project_id)
+    )
+    scene = scene_result.scalar_one_or_none()
+    if not scene or not scene.scene_image:
+        raise HTTPException(status_code=400, detail="Scene has no image")
+
+    # 获取角色图
+    char_image_paths: list[str] = []
+    for char_id in request.character_ids[:2]:
+        char_result = await db.execute(
+            select(Character).options(selectinload(Character.images))
+            .where(Character.id == char_id, Character.project_id == project_id)
+        )
+        char = char_result.scalar_one_or_none()
+        if char:
+            main_img = next((img for img in char.images if img.id == char.main_image_id), None) or (char.images[0] if char.images else None)
+            if main_img:
+                char_image_paths.append(main_img.image_path)
+
+    if not char_image_paths:
+        raise HTTPException(status_code=400, detail="No character images available")
+
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        generation_tasks.generate_stage_keyframe,
+        task_id=task_id,
+        project_id=project_id,
+        scene_image_path=scene.scene_image.image_path,
+        character_image_paths=char_image_paths,
+        prompt=request.prompt,
+        output_prefix=f"stage_{project_id[:8]}",
+    )
+    return TaskResponse(task_id=task_id, message="Stage keyframe generation started")

@@ -52,7 +52,8 @@ class AnalysisService {
     projectId: string,
     analysisType: AnalysisType,
     callbacks: AnalysisCallbacks,
-    mode: 'quick' | 'deep' = 'deep'
+    mode: 'quick' | 'deep' = 'deep',
+    extraParams: Record<string, string> = {}
   ): boolean {
     // 如果已有分析在进行，不允许启动新任务
     if (this.isAnalyzing()) {
@@ -64,7 +65,8 @@ class AnalysisService {
     this.currentAnalysisType = analysisType
     this.callbacks = callbacks
 
-    const url = `/api/projects/${projectId}/analyze/${analysisType}/stream?mode=${mode}`
+    const params = new URLSearchParams({ mode, ...extraParams })
+    const url = `/api/projects/${projectId}/analyze/${analysisType}/stream?${params}`
     this.eventSource = new EventSource(url)
 
     this.eventSource.onmessage = async (event) => {

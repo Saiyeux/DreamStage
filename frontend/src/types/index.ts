@@ -15,6 +15,15 @@ export interface Project {
 }
 
 // 角色
+export interface CharacterAudio {
+  id: string
+  characterId: string
+  audioName: string
+  audioPath: string
+  audioType: 'reference' | 'generated'
+  createdAt?: string
+}
+
 export interface Character {
   id: string
   projectId: string
@@ -31,6 +40,7 @@ export interface Character {
   sceneNumbers: number[]
   basePrompt: string
   images: CharacterImage[]
+  audios: CharacterAudio[]
   mainImageId?: string
   isFinalized: boolean
   finalizedMetadata?: Record<string, any>
@@ -65,6 +75,7 @@ export interface Scene {
   scenePrompt: string
   actionPrompt: string
   negativePrompt: string
+  stagePrompt?: string
   sceneImage?: SceneImage
   videoClip?: VideoClip
   isFinalized: boolean

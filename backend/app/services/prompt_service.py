@@ -126,6 +126,18 @@ class PromptService:
         prompt = prompt.replace("{{scene_start_num}}", str(scene_start_num))
 
         return prompt
+
+    def get_scenes_simple_prompt(self, script_text: str) -> str:
+        """获取数字人视频分镜提示词（简单文本模式）"""
+        config = self.get_analysis_prompts().get("scenes_simple", {})
+        template = config.get("template", "")
+        return template.replace("{{script_text}}", script_text)
+
+    def get_scenes_system_prompt(self, scene_type: str = "script") -> str:
+        """获取场景分析的 system prompt"""
+        key = "scenes_simple" if scene_type == "simple" else "scenes"
+        config = self.get_analysis_prompts().get(key, {})
+        return config.get("system", "")
  
     def get_acts_prompt(
          self,

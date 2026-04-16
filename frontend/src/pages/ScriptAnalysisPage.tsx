@@ -192,7 +192,8 @@ export function ScriptAnalysisPage() {
         }
 
         const currentScenes = useProjectStore.getState().scenes
-        if (!currentScenes.some(s => s.sceneNumber === newScene.sceneNumber)) {
+        // 用 id 去重，避免重复添加同一场景；scene_number 由后端保证
+        if (!currentScenes.some(s => s.id === newScene.id)) {
           setScenes([...currentScenes, newScene])
           appendTerminalOutput(`[INFO] Found scene ${newScene.sceneNumber}: ${newScene.location}`)
         }
@@ -321,7 +322,7 @@ export function ScriptAnalysisPage() {
     await refreshProjectStatus()
   }
 
-  const analyzeWithStream = async (analysisType: 'characters' | 'scenes' | 'acts', mode: 'quick' | 'deep' = 'deep') => {
+  const analyzeWithStream = async (analysisType: 'characters' | 'scenes' | 'acts', mode: 'quick' | 'deep' = 'deep', extraParams: Record<string, string> = {}) => {
     if (!currentProject?.id || isStreaming) return
 
     setAnalysisState({
@@ -349,7 +350,7 @@ export function ScriptAnalysisPage() {
     })
 
     const callbacks = createAnalysisCallbacks(analysisType)
-    analysisService.start(projectId, analysisType, callbacks, mode)
+    analysisService.start(projectId, analysisType, callbacks, mode, extraParams)
   }
 
   const handleProjectChange = (newProjectId: string) => {
@@ -428,7 +429,7 @@ export function ScriptAnalysisPage() {
         currentProject={currentProject}
         onProjectChange={handleProjectChange}
         onAnalyzeCharacters={(mode) => analyzeWithStream('characters', mode)}
-        onAnalyzeScenes={() => analyzeWithStream('scenes')}
+        onAnalyzeScenes={(sceneType) => analyzeWithStream('scenes', 'deep', { scene_type: sceneType })}
         onAnalyzeActs={() => analyzeWithStream('acts')}
         onStopAnalysis={stopStream}
         isAnalyzing={isStreaming}
@@ -567,6 +568,189 @@ export function ScriptAnalysisPage() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ AudioSection Component ============
+function AudioSection({
+  character,
+  projectId,
+  onAudiosUpdated,
+}: {
+  character: Character
+  projectId: string
+  onAudiosUpdated: () => Promise<void>
+}) {
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false)
+  const [selectedRefAudioId, setSelectedRefAudioId] = useState<string | undefined>()
+  const [ttsText, setTtsText] = useState('')
+  const [ttsTaskId, setTtsTaskId] = useState<string | null>(null)
+  const [ttsStatus, setTtsStatus] = useState<'idle' | 'generating' | 'done' | 'error'>('idle')
+  const [ttsAudioPath, setTtsAudioPath] = useState<string | null>(null)
+  const audioUploadRef = useRef<HTMLInputElement>(null)
+  const ttsPollingRef = useRef<number | null>(null)
+
+  const refAudios = character.audios?.filter(a => a.audioType === 'reference') ?? []
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingAudio(true)
+    try {
+      await charactersApi.uploadAudio(projectId, character.id, file)
+      await onAudiosUpdated()
+    } catch {
+      alert('Failed to upload audio')
+    } finally {
+      setIsUploadingAudio(false)
+      if (audioUploadRef.current) audioUploadRef.current.value = ''
+    }
+  }
+
+  const handleDeleteAudio = async (audioId: string) => {
+    if (!confirm('Delete this audio?')) return
+    try {
+      await charactersApi.deleteAudio(projectId, audioId)
+      if (selectedRefAudioId === audioId) setSelectedRefAudioId(undefined)
+      await onAudiosUpdated()
+    } catch {
+      alert('Failed to delete audio')
+    }
+  }
+
+  const handleGenerateTTS = async () => {
+    if (!ttsText.trim()) return
+    setTtsStatus('generating')
+    setTtsAudioPath(null)
+    try {
+      const res = await charactersApi.generateTTS(projectId, character.id, ttsText, selectedRefAudioId)
+      setTtsTaskId(res.task_id)
+      // Poll for result
+      ttsPollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await generationApi.getTaskStatus(res.task_id)
+          if (status.status === 'completed') {
+            clearInterval(ttsPollingRef.current!)
+            setTtsStatus('done')
+            const result = status.result as any
+            if (result?.audio_path) setTtsAudioPath(result.audio_path)
+            await onAudiosUpdated()
+          } else if (status.status === 'failed') {
+            clearInterval(ttsPollingRef.current!)
+            setTtsStatus('error')
+          }
+        } catch {
+          // ignore polling errors
+        }
+      }, 2000)
+    } catch {
+      setTtsStatus('error')
+    }
+  }
+
+  return (
+    <div className="card p-5">
+      <h3 className="text-sm font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+        <span>🎙️</span> Voice & Audio
+      </h3>
+
+      {/* Reference Audio */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Reference Audio</span>
+          <div>
+            <input ref={audioUploadRef} type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" className="hidden" onChange={handleAudioUpload} />
+            <button
+              onClick={() => audioUploadRef.current?.click()}
+              disabled={isUploadingAudio}
+              className="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-600 transition-colors disabled:opacity-50"
+            >
+              {isUploadingAudio ? '⏳' : '+ Upload'}
+            </button>
+          </div>
+        </div>
+        {refAudios.length === 0 ? (
+          <p className="text-xs text-slate-400 italic">No reference audio yet. Upload a voice sample for cloning.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {refAudios.map(audio => (
+              <div
+                key={audio.id}
+                onClick={() => setSelectedRefAudioId(prev => prev === audio.id ? undefined : audio.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-xs ${
+                  selectedRefAudioId === audio.id
+                    ? 'border-primary-400 bg-primary-50 text-primary-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <span className="text-base">🎵</span>
+                <span className="flex-1 truncate">{audio.audioName}</span>
+                {selectedRefAudioId === audio.id && <span className="text-primary-500 font-bold text-[10px]">ACTIVE</span>}
+                <button
+                  onClick={e => { e.stopPropagation(); handleDeleteAudio(audio.id) }}
+                  className="p-0.5 text-red-400 hover:text-red-600 rounded"
+                  title="Delete"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* TTS Preview */}
+      <div>
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-2">TTS Preview</span>
+        <textarea
+          value={ttsText}
+          onChange={e => setTtsText(e.target.value)}
+          placeholder="Enter text to synthesize..."
+          rows={3}
+          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-primary-400 bg-white/80"
+        />
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={handleGenerateTTS}
+            disabled={!ttsText.trim() || ttsStatus === 'generating'}
+            className="btn btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
+          >
+            {ttsStatus === 'generating' ? '⏳ Generating...' : '▶ Generate TTS'}
+          </button>
+          {selectedRefAudioId && (
+            <span className="text-[10px] text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">Voice Clone</span>
+          )}
+          {ttsStatus === 'error' && <span className="text-xs text-red-500">Generation failed</span>}
+        </div>
+        {ttsAudioPath && ttsStatus === 'done' && (
+          <div className="mt-3">
+            <audio controls src={`/files/${ttsAudioPath}`} className="w-full h-8" />
+          </div>
+        )}
+        {/* Generated audio list */}
+        {(character.audios?.filter(a => a.audioType === 'generated') ?? []).length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Generated Clips</span>
+            {character.audios.filter(a => a.audioType === 'generated').slice(-3).map(audio => (
+              <div key={audio.id} className="flex items-center gap-2">
+                <audio controls src={`/files/${audio.audioPath}`} className="flex-1 h-7" />
+                <button
+                  onClick={() => handleDeleteAudio(audio.id)}
+                  className="p-0.5 text-red-400 hover:text-red-600 rounded shrink-0"
+                  title="Delete"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -788,6 +972,26 @@ function CharactersContent({
     } catch (err) {
       console.error('Delete image failed:', err)
       alert('Failed to delete image')
+    }
+  }
+
+  const [isUploading, setIsUploading] = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedCharacter) return
+    setIsUploading(true)
+    try {
+      await charactersApi.uploadImage(projectId, selectedCharacter.id, file)
+      const updatedCharacters = await analysisApi.getCharacters(projectId)
+      setCharacters(updatedCharacters)
+    } catch (err) {
+      console.error('Upload failed:', err)
+      alert('Failed to upload image')
+    } finally {
+      setIsUploading(false)
+      if (uploadInputRef.current) uploadInputRef.current.value = ''
     }
   }
 
@@ -1519,6 +1723,16 @@ function CharactersContent({
                       <div className="text-slate-400 text-sm italic">Loading settings...</div>
                     )}
                   </div>
+
+                  {/* Audio Section */}
+                  <AudioSection
+                    character={selectedCharacter}
+                    projectId={projectId}
+                    onAudiosUpdated={async () => {
+                      const updated = await analysisApi.getCharacters(projectId)
+                      setCharacters(updated)
+                    }}
+                  />
                 </div>
 
                 {/* Right Column: Gallery */}
@@ -1543,6 +1757,21 @@ function CharactersContent({
                             {isManagingGallery ? 'Cancel Selection' : '⚙️ Manage / Anchor'}
                           </button>
                         )}
+                        <input
+                          ref={uploadInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleUploadImage}
+                        />
+                        <button
+                          onClick={() => uploadInputRef.current?.click()}
+                          disabled={isUploading}
+                          className="text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                          title="Upload image"
+                        >
+                          {isUploading ? '⏳' : '⬆️ Upload'}
+                        </button>
                         <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">
                           {selectedCharacter.images?.length || 0} images
                         </span>
@@ -1817,6 +2046,9 @@ function ScenesContent({
   const [isFinalizing, setIsFinalizing] = useState(false)
   // Removed unused scroll handlers from old carousel layout
 
+  // Resolution
+  const [sceneResolution, setSceneResolution] = useState('768x1344')
+
   // Add Scene State
   const [showAddPopover, setShowAddPopover] = useState(false)
   const [newSceneLocation, setNewSceneLocation] = useState('')
@@ -2061,7 +2293,9 @@ function ScenesContent({
     if (!selectedScene?.id || generatingSceneId) return
 
     try {
-      const response = await generationApi.generateSceneImage(projectId, selectedScene.id, selectedWorkflows.scene || undefined, workflowParams.scene)
+      const [w, h] = sceneResolution.split('x').map(Number)
+      const resolvedParams = { ...workflowParams.scene, width: w, height: h }
+      const response = await generationApi.generateSceneImage(projectId, selectedScene.id, selectedWorkflows.scene || undefined, resolvedParams)
       startPolling(response.task_id, selectedScene.id)
     } catch (err) {
       console.error('Generate image failed:', err)
@@ -2236,6 +2470,22 @@ function ScenesContent({
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       Edit Scene
                     </button>
+
+                    <select
+                      value={sceneResolution}
+                      onChange={e => setSceneResolution(e.target.value)}
+                      className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-primary-400"
+                    >
+                      <option value="512x512">512 × 512</option>
+                      <option value="768x768">768 × 768</option>
+                      <option value="768x1024">768 × 1024</option>
+                      <option value="768x1344">768 × 1344</option>
+                      <option value="1024x768">1024 × 768</option>
+                      <option value="1024x1024">1024 × 1024</option>
+                      <option value="1344x768">1344 × 768</option>
+                      <option value="1024x1536">1024 × 1536</option>
+                      <option value="1536x1024">1536 × 1024</option>
+                    </select>
 
                     <button
                       onClick={handleGenerateImage}

@@ -275,6 +275,38 @@ class ComfyUIClient:
                 logger.error(f"Connection to ComfyUI timed out at {self.base_url}")
                 raise RuntimeError(f"Connection to ComfyUI at {self.base_url} timed out.")
 
+    async def upload_file_to_input(self, file_content: bytes, filename: str, subfolder: str = "") -> str:
+        """上传文件到 ComfyUI input 目录，返回文件名"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+                files = {"image": (filename, file_content)}  # ComfyUI /upload/image 兼容音频
+                data = {"type": "input", "overwrite": "true"}
+                if subfolder:
+                    data["subfolder"] = subfolder
+                response = await client.post(
+                    f"{self.base_url}/upload/image",
+                    files=files,
+                    data=data,
+                )
+                response.raise_for_status()
+                result = response.json()
+                return result.get("name", filename)
+        except Exception as e:
+            logger.error(f"Failed to upload file to ComfyUI input: {e}")
+            raise
+
+    async def get_audio_content(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
+        """从 ComfyUI 获取音频内容"""
+        params = {
+            "filename": filename,
+            "subfolder": subfolder,
+            "type": folder_type,
+        }
+        async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
+            response = await client.get(f"{self.base_url}/view", params=params)
+            response.raise_for_status()
+            return response.content
+
     async def get_system_stats(self) -> dict[str, Any]:
         """获取系统状态"""
         async with httpx.AsyncClient(trust_env=False) as client:

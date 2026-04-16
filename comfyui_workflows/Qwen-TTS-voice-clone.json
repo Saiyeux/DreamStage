@@ -1,0 +1,54 @@
+{
+  "1": {
+    "inputs": {
+      "audio": "20260106_065106_d59c6514.wav",
+      "audioUI": "/api/view?filename=20260106_065106_d59c6514.wav&type=input&subfolder=&rand=0.14116736799312257"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "加载音频"
+    }
+  },
+  "2": {
+    "inputs": {
+      "target_text": "袁隆平（1930年9月7日—2021年5月22日）[注 1][6]，汉族[7]，江西德安人，中国杂交水稻育种专家，中国工程院院士和美国科学院外籍院士，于1960年代至1970年代对杂交水稻品种的研究，提高了中国大陆和世界各地的粮产，获美誉“杂交水稻之父”[8][9]。\n\n1953年袁隆平毕业于西南农学院，分发到湖南安江农业学校。袁隆平决意研究农产源于他目睹1959年湖南在三年大饥荒期间的惨状[10]。1966年2月他在中国科学院《科学通报》于文革休刊前最后一期赶及发表他第一篇论文，受国家科委九局的熊衍衡和赵石英局长注目，国家科委因而责成安江农业学校在湖南文革期间保护并支持袁隆平研究[11][12][13]。在国家科委支持下，袁隆平的水稻研究在1970至2000年代屡有突破，使他获得联合国多项奖项，并获封澳门科技大学荣誉博士；因其突出贡献，2019年获得共和国勋章[14]。2020年任湖南农业大学名誉校长[15]。2021年5月22日，袁隆平因多器官衰竭离世[16]，享年90岁。",
+      "model_choice": "1.7B",
+      "device": "auto",
+      "precision": "bf16",
+      "language": "Auto",
+      "ref_text": "只要站在风口上,声音也能飞起来",
+      "seed": 1014293134535412,
+      "max_new_tokens": 2048,
+      "top_p": 0.8,
+      "top_k": 20,
+      "temperature": 1,
+      "repetition_penalty": 1.05,
+      "x_vector_only": false,
+      "attention": "auto",
+      "unload_model_after_generate": false,
+      "custom_model_path": "",
+      "ref_audio": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "FB_Qwen3TTSVoiceClone",
+    "_meta": {
+      "title": "🎭 Qwen3-TTS VoiceClone"
+    }
+  },
+  "3": {
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "audioUI": "/api/view?filename=ComfyUI_00010_.flac&type=output&subfolder=audio&rand=0.9290993034195719",
+      "audio": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "SaveAudio",
+    "_meta": {
+      "title": "保存音频"
+    }
+  }
+}

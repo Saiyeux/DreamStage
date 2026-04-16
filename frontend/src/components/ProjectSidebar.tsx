@@ -9,7 +9,7 @@ interface ProjectSidebarProps {
   currentProject: Project | null
   onProjectChange?: (projectId: string) => void
   onAnalyzeCharacters?: (mode: 'quick' | 'deep') => void
-  onAnalyzeScenes?: () => void
+  onAnalyzeScenes?: (sceneType: 'script' | 'simple') => void
   onAnalyzeActs?: () => void
   onStopAnalysis?: () => void
   isAnalyzing?: boolean
@@ -26,6 +26,8 @@ export function ProjectSidebar({
   isAnalyzing,
   currentAnalyzing
 }: ProjectSidebarProps) {
+  const [sceneMode, setSceneMode] = useState<'script' | 'simple'>('script')
+  const [analysisMode, setAnalysisMode] = useState<'quick' | 'deep'>('quick')
 
   const [projects, setProjects] = useState<Project[]>([])
   const [healthStatus, setHealthStatus] = useState<ServiceStatus | null>(null)
@@ -408,45 +410,61 @@ export function ProjectSidebar({
               </button>
             )}
           </div>
-          <div className="space-y-2.5">
-            {/* Character Analysis with Quick/Deep toggle */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-sm text-slate-700 font-medium">
-                  <span>👥</span> Character Analysis
-                  {currentAnalyzing === 'characters' && (
-                    <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => onAnalyzeCharacters?.('quick')}
-                  disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
-                  title="Fast scan - basic info"
-                  className={`flex-1 text-[11px] px-2 py-1 rounded border transition-colors ${currentAnalyzing === 'characters'
-                    ? 'bg-primary-50 text-primary-700 border-primary-200'
-                    : 'bg-white/60 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300'
-                    } disabled:opacity-40 disabled:cursor-not-allowed`}
-                >
-                  ⚡ Quick
-                </button>
-                <button
-                  onClick={() => onAnalyzeCharacters?.('deep')}
-                  disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
-                  title="Detailed analysis - full profiles"
-                  className={`flex-1 text-[11px] px-2 py-1 rounded border transition-colors ${currentAnalyzing === 'characters'
-                    ? 'bg-primary-50 text-primary-700 border-primary-200'
-                    : 'bg-white/60 text-slate-500 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300'
-                    } disabled:opacity-40 disabled:cursor-not-allowed`}
-                >
-                  🔍 Deep
-                </button>
-              </div>
+          <div className="space-y-2">
+            {/* Quick / Deep toggle */}
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold">
+              <button
+                onClick={() => setAnalysisMode('quick')}
+                className={`flex-1 py-1 rounded-md transition-colors ${analysisMode === 'quick' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                ⚡ Quick
+              </button>
+              <button
+                onClick={() => setAnalysisMode('deep')}
+                className={`flex-1 py-1 rounded-md transition-colors ${analysisMode === 'deep' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                🔍 Deep
+              </button>
             </div>
 
+            {/* Character Analysis */}
             <button
-              onClick={onAnalyzeScenes}
+              onClick={() => onAnalyzeCharacters?.(analysisMode)}
+              disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
+              title={!healthStatus?.llm?.connected ? 'Please check LLM service' : ''}
+              className={`w-full btn justify-between group relative overflow-hidden ${currentAnalyzing === 'characters'
+                ? 'bg-primary-50 text-primary-700 border-primary-200 ring-1 ring-primary-200 shadow-md shadow-primary-500/10'
+                : 'btn-secondary text-slate-600 bg-white/50 hover:bg-white hover:text-primary-600 hover:border-primary-200/50 hover:shadow-md hover:shadow-primary-500/5'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <span className="flex items-center gap-2 relative z-10">
+                <span className="text-lg group-hover:scale-110 transition-transform duration-300">👥</span>
+                Character Analysis
+              </span>
+              {currentAnalyzing === 'characters' && (
+                <span className="w-2 h-2 bg-primary-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+              )}
+            </button>
+
+            {/* Drama / Bio toggle — scene analysis mode */}
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold">
+              <button
+                onClick={() => setSceneMode('script')}
+                className={`flex-1 py-1 rounded-md transition-colors ${sceneMode === 'script' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                🎭 Drama
+              </button>
+              <button
+                onClick={() => setSceneMode('simple')}
+                className={`flex-1 py-1 rounded-md transition-colors ${sceneMode === 'simple' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                📖 Bio
+              </button>
+            </div>
+
+            {/* Scene Analysis */}
+            <button
+              onClick={() => onAnalyzeScenes?.(sceneMode)}
               disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
               title={!healthStatus?.llm?.connected ? 'Please check LLM service' : ''}
               className={`w-full btn justify-between group relative overflow-hidden ${currentAnalyzing === 'scenes'
@@ -463,6 +481,7 @@ export function ProjectSidebar({
               )}
             </button>
 
+            {/* Act Analysis */}
             <button
               onClick={onAnalyzeActs}
               disabled={!currentProject || isAnalyzing || !healthStatus?.llm?.connected}
