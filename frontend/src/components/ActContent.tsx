@@ -25,6 +25,7 @@ export function ActContent({ projectId }: { projectId: string }) {
         removeDialogueLine,
         addStageCharacter,
         removeStageCharacter,
+        updateScene,
     } = useProjectStore()
 
     const [editingActId, setEditingActId] = useState<string | null>(null)
@@ -117,7 +118,19 @@ export function ActContent({ projectId }: { projectId: string }) {
                 const status = await generationApi.getTaskStatus(stageTaskId)
                 if (status.status === 'completed') {
                     const result = status.result as { image_path?: string } | null
-                    if (result?.image_path) setStageImagePath(result.image_path)
+                    if (result?.image_path && currentAct?.stageSceneId) {
+                        const newPath = result.image_path
+                        setStageImagePath(newPath)
+                        // Also update the global scene state so the "Set" library and other views reflect the composite
+                        const scene = scenes.find(s => s.id === currentAct.stageSceneId)
+                        if (scene) {
+                            updateScene(scene.id, {
+                                sceneImage: scene.sceneImage 
+                                    ? { ...scene.sceneImage, imagePath: newPath }
+                                    : { id: `img-${Date.now()}`, imagePath: newPath, sceneId: scene.id, promptUsed: '', isApproved: true } as any
+                            })
+                        }
+                    }
                     setIsGeneratingStage(false)
                     setStageTaskId(null)
                 } else if (status.status === 'failed') {
@@ -129,7 +142,7 @@ export function ActContent({ projectId }: { projectId: string }) {
             }
         }, 2000)
         return () => clearInterval(interval)
-    }, [stageTaskId])
+    }, [stageTaskId, currentAct?.stageSceneId, scenes, updateScene])
 
     // Poll task status for act video generation
     useEffect(() => {
@@ -170,18 +183,26 @@ export function ActContent({ projectId }: { projectId: string }) {
 
     const handleGenerateKeyframe = async () => {
         if (!selectedActId || !currentAct?.stageSceneId) return
+        
+        const characterIds = currentAct.stageCharacters?.map(sc => sc.characterId) || []
+        if (characterIds.length === 0) {
+            alert('请先在上方 CAST 中选择至少一位角色，才能使用图像融合合成工作流。')
+            return
+        }
+
         setIsGeneratingStage(true)
         setStageImagePath(null)
         try {
             const response = await generationApi.generateStageKeyframe(
                 projectId,
                 currentAct.stageSceneId,
-                currentAct.stageCharacters?.map(sc => sc.characterId) || [],
+                characterIds,
                 stagePrompt,
             )
             setStageTaskId(response.task_id)
-        } catch (e) {
+        } catch (e: any) {
             console.error('Stage keyframe generation failed', e)
+            alert(`Stage keyframe generation failed: ${e.message || 'Unknown error'}`)
             setIsGeneratingStage(false)
         }
     }
@@ -365,12 +386,13 @@ export function ActContent({ projectId }: { projectId: string }) {
                                         </button>
                                         <button
                                             onClick={handleGenerateKeyframe}
-                                            disabled={isGeneratingStage || !currentAct?.stageSceneId}
+                                            disabled={isGeneratingStage || !currentAct?.stageSceneId || !currentAct.stageCharacters?.length}
+                                            title={!currentAct?.stageCharacters?.length ? "请选择角色" : ""}
                                             className="text-xs px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                         >
                                             {isGeneratingStage ? (
                                                 <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> Generating...</>
-                                            ) : '✨ Generate'}
+                                            ) : <><span className={isGeneratingStage ? "animate-spin" : ""}>✨</span> Generate</>}
                                         </button>
                                     </div>
                                 </div>

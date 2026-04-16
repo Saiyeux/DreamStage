@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.core.logging_config import get_logger
 from app.core.config import settings
@@ -912,6 +912,7 @@ class GenerationTasks:
         self,
         task_id: str,
         project_id: str,
+        scene_id: str,
         scene_image_path: str,
         character_image_paths: list[str],
         prompt: str,
@@ -994,6 +995,23 @@ class GenerationTasks:
                 raise RuntimeError("No output image from stage workflow")
 
             saved_path = await self._save_generated_file(output_image, project_id)
+
+            # 更新数据库中对应的场景图，将原有的场景图替换为包含人物的这个合成图
+            async with async_session_maker() as db:
+                scene_image_query = await db.execute(select(SceneImage).where(SceneImage.scene_id == scene_id))
+                scene_image = scene_image_query.scalar_one_or_none()
+                if scene_image:
+                    scene_image.image_path = saved_path
+                else:
+                    new_scene_image = SceneImage(
+                        id=str(uuid.uuid4()), 
+                        scene_id=scene_id, 
+                        image_path=saved_path, 
+                        prompt_used=prompt, 
+                        is_approved=True
+                    )
+                    db.add(new_scene_image)
+                await db.commit()
 
             self.update_task_status(
                 task_id, "completed", 100, "关键帧合成完成",

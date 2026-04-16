@@ -429,6 +429,7 @@ async def generate_stage_keyframe(
         generation_tasks.generate_stage_keyframe,
         task_id=task_id,
         project_id=project_id,
+        scene_id=request.scene_id,
         scene_image_path=scene.scene_image.image_path,
         character_image_paths=char_image_paths,
         prompt=request.prompt,

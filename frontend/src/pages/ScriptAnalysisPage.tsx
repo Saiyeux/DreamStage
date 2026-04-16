@@ -2047,7 +2047,13 @@ function ScenesContent({
   // Removed unused scroll handlers from old carousel layout
 
   // Resolution
-  const [sceneResolution, setSceneResolution] = useState('768x1344')
+  const [sceneResolution, setSceneResolutionRaw] = useState(() => {
+    return localStorage.getItem('dreamstage_scene_resolution') || '768x1344'
+  })
+  const setSceneResolution = (newRes: string) => {
+    setSceneResolutionRaw(newRes)
+    localStorage.setItem('dreamstage_scene_resolution', newRes)
+  }
 
   // Add Scene State
   const [showAddPopover, setShowAddPopover] = useState(false)
@@ -2451,82 +2457,49 @@ function ScenesContent({
                     <span>{selectedScene.location}</span>
                   )}
                 </h2>
-                <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                  <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full font-medium border border-orange-100">{selectedScene.timeOfDay}</span>
-                  <span className="w-px h-3 bg-slate-300"></span>
-                  <span>{selectedScene.atmosphere}</span>
-                </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-3 items-center">
                 {isEditing ? (
                   <>
-                    <button onClick={handleSave} disabled={isSaving} className="btn btn-primary px-4">Save Changes</button>
-                    <button onClick={handleCancel} className="btn btn-ghost px-4">Cancel</button>
+                    <button onClick={handleSave} disabled={isSaving} className="btn btn-primary text-sm px-6 py-2 rounded-lg font-medium shadow-sm transition-all bg-indigo-600 text-white hover:bg-indigo-700">Save Changes</button>
+                    <button onClick={handleCancel} className="btn btn-ghost text-sm px-6 py-2 rounded-lg font-medium transition-all">Cancel</button>
                   </>
                 ) : (
-                  <div className="flex gap-2 items-center">
-                    <button onClick={handleEdit} className="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  <>
+                    <button onClick={handleEdit} className="btn btn-secondary text-sm px-6 py-2 flex items-center justify-center gap-2 font-medium bg-white rounded-lg shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       Edit Scene
                     </button>
-
-                    <select
-                      value={sceneResolution}
-                      onChange={e => setSceneResolution(e.target.value)}
-                      className="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-primary-400"
-                    >
-                      <option value="512x512">512 × 512</option>
-                      <option value="768x768">768 × 768</option>
-                      <option value="768x1024">768 × 1024</option>
-                      <option value="768x1344">768 × 1344</option>
-                      <option value="1024x768">1024 × 768</option>
-                      <option value="1024x1024">1024 × 1024</option>
-                      <option value="1344x768">1344 × 768</option>
-                      <option value="1024x1536">1024 × 1536</option>
-                      <option value="1536x1024">1536 × 1024</option>
-                    </select>
 
                     <button
                       onClick={handleGenerateImage}
                       disabled={!!generatingSceneId || !healthStatus?.comfyui?.connected}
                       title={!healthStatus?.comfyui?.connected ? 'Please check ComfyUI service' : ''}
-                      className="btn btn-primary text-xs px-3 py-1.5 shadow-md shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn btn-primary text-sm px-6 py-2 flex items-center justify-center gap-2 font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 hover:bg-indigo-700 text-white transition-all"
                     >
                       {generatingSceneId === selectedScene.id ? '⏳ Generating...' : '▶ Generate'}
                     </button>
 
-
-                    {/* Status Text (Optional, keeping it minimal) */}
-                    {generatingSceneId === selectedScene.id && (
-                      <span className="text-xs text-primary-600 font-medium animate-pulse">
-                        {generateMessage}
-                      </span>
+                    {selectedScene.isFinalized ? (
+                      <button
+                        onClick={handleUnfinalize}
+                        className="btn text-sm px-6 py-2 flex items-center justify-center gap-2 font-medium rounded-lg shadow-sm border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100 hover:border-amber-300 transition-all"
+                      >
+                        <span>🔓</span> Unlock Scene
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleFinalize}
+                        disabled={!selectedScene.sceneImage || isFinalizing}
+                        title={!selectedScene.sceneImage ? 'Generate an image first' : ''}
+                        className="btn btn-secondary text-sm px-6 py-2 flex items-center justify-center gap-2 font-medium bg-white rounded-lg shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span>🔒</span> {isFinalizing ? 'Finalizing...' : 'Finalize Scene'}
+                      </button>
                     )}
-                  </div>
+                  </>
                 )}
-
-                {/* Finalize Controls */}
-                {!isEditing && (
-                  selectedScene.isFinalized ? (
-                    <button
-                      onClick={handleUnfinalize}
-                      className="btn bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:border-amber-300 text-xs flex items-center gap-1"
-                    >
-                      <span>🔓</span> Unlock Scene
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleFinalize}
-                      disabled={!selectedScene.sceneImage || isFinalizing}
-                      title={!selectedScene.sceneImage ? 'Generate an image first' : ''}
-                      className="btn btn-secondary text-xs flex items-center gap-1"
-                    >
-                      <span>🔒</span> {isFinalizing ? 'Finalizing...' : 'Finalize Scene'}
-                    </button>
-                  )
-                )}
-
               </div>
             </div>
 
@@ -2547,6 +2520,24 @@ function ScenesContent({
                       <Field label="Time" value={selectedScene.timeOfDay} isEditing={isEditing} editValue={editedScene.timeOfDay} onChange={(v) => updateField('timeOfDay', v)} />
                       <Field label="Atmosphere" value={selectedScene.atmosphere} isEditing={isEditing} editValue={editedScene.atmosphere} onChange={(v) => updateField('atmosphere', v)} />
 
+                      <div className="flex flex-col">
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Resolution</label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            className="input w-28 px-2 text-center py-2 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-all" 
+                            type="number" 
+                            value={sceneResolution.split('x')[0] || ''} 
+                            onChange={(e) => setSceneResolution(`${e.target.value}x${sceneResolution.split('x')[1] || '1024'}`)} 
+                          />
+                          <span className="text-slate-400 font-medium">×</span>
+                          <input 
+                            className="input w-28 px-2 text-center py-2 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-all" 
+                            type="number" 
+                            value={sceneResolution.split('x')[1] || ''} 
+                            onChange={(e) => setSceneResolution(`${sceneResolution.split('x')[0] || '1024'}x${e.target.value}`)} 
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
